@@ -1,26 +1,106 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --eavi-bg: #ffffff;
+  --eavi-text: #1a1420;
+  --eavi-card: #ffffff;
+  --eavi-primary: #8e2a9e;
+  --eavi-primary-light: #b84fc4;
+  --eavi-primary-dark: #6b1f78;
+  --eavi-secondary: #2f8c55;
+  --eavi-muted: #f3eef5;
+  --eavi-border: #e5dce8;
+
+  /* Text and fill shades are picked so every pairing clears WCAG AA. */
+  --eavi-primary-text: #8e2a9e;
+  --eavi-secondary-text: #256e43;
+  --eavi-fill: #8e2a9e;
+  --eavi-fill-hover: #6b1f78;
+  --eavi-on-fill: #ffffff;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-eavi-bg: var(--eavi-bg);
+  --color-eavi-text: var(--eavi-text);
+  --color-eavi-card: var(--eavi-card);
+  --color-eavi-primary: var(--eavi-primary);
+  --color-eavi-primary-light: var(--eavi-primary-light);
+  --color-eavi-primary-dark: var(--eavi-primary-dark);
+  --color-eavi-secondary: var(--eavi-secondary);
+  --color-eavi-muted: var(--eavi-muted);
+  --color-eavi-border: var(--eavi-border);
+  --color-eavi-primary-text: var(--eavi-primary-text);
+  --color-eavi-secondary-text: var(--eavi-secondary-text);
+  --color-eavi-fill: var(--eavi-fill);
+  --color-eavi-fill-hover: var(--eavi-fill-hover);
+  --color-eavi-on-fill: var(--eavi-on-fill);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --eavi-bg: #17121c;
+    --eavi-text: #f3eef5;
+    --eavi-card: #201a28;
+    --eavi-primary: #b84fc4;
+    --eavi-secondary: #4caf7d;
+    --eavi-muted: #241d2c;
+    --eavi-border: #33283b;
+
+    --eavi-primary-text: #cf7ad8;
+    --eavi-secondary-text: #4caf7d;
+    --eavi-fill: #a845b6;
+    --eavi-fill-hover: #ad4abb;
+    --eavi-on-fill: #ffffff;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--eavi-bg);
+  color: var(--eavi-text);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--eavi-primary-text);
+    outline-offset: 3px;
+  }
+}
+
+@theme {
+  --animate-eavi-load: eavi-load 1.5s cubic-bezier(0.65, 0.05, 0.36, 0.95) infinite;
+  --animate-eavi-rise: eavi-rise 0.5s ease-out both;
+  --animate-eavi-fade: eavi-fade 1.8s ease-in-out infinite;
+
+  @keyframes eavi-load {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(200%);
+    }
+  }
+
+  @keyframes eavi-rise {
+    0% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes eavi-fade {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
 }
