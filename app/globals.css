@@ -36,6 +36,7 @@
   --color-eavi-on-fill: var(--eavi-on-fill);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-eavi-display);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -59,7 +60,7 @@
 body {
   background: var(--eavi-bg);
   color: var(--eavi-text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {

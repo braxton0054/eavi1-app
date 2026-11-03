@@ -29,7 +29,7 @@ export default function Home() {
                 className="h-8 w-auto"
               />
             </span>
-            <span className="truncate text-sm font-semibold tracking-tight">
+            <span className="min-w-0 truncate font-display text-[15px] font-semibold leading-tight tracking-tight sm:text-base">
               <span className="sm:hidden">EAVI</span>
               <span className="hidden sm:inline">
                 East Africa Vision Institute
@@ -51,14 +51,16 @@ export default function Home() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-eavi-secondary-text sm:text-xs">
               Eldoret &middot; Kenya
             </p>
-            <h1 className="text-balance text-[2.25rem] font-semibold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl">
-              Nurturing quality and{" "}
-              <span className="text-eavi-primary-text">affordable</span>{" "}
-              education.
+            <h1 className="font-display text-balance text-[2.4rem] font-semibold leading-[1.04] tracking-tight sm:text-[3.1rem] lg:text-[3.9rem]">
+              East Africa Vision Institute
             </h1>
+            <p className="font-display text-xl font-medium leading-none text-eavi-primary-text sm:text-2xl">
+              Leading the Leaders
+            </p>
             <p className="max-w-md text-pretty text-base leading-7 text-eavi-text/75 sm:text-lg sm:leading-8">
-              East Africa Vision Institute &mdash; Leading the Leaders, across
-              three campuses in Eldoret.
+              Nurturing quality and{" "}
+              <span className="font-semibold text-eavi-text">affordable</span>{" "}
+              education across three campuses in Eldoret.
             </p>
             <div className="flex w-full flex-col gap-3 pt-1 sm:w-auto sm:flex-row">
               <a
@@ -79,12 +81,15 @@ export default function Home() {
           <div className="relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-3xl border border-eavi-border bg-eavi-muted sm:aspect-[4/3] lg:aspect-[5/4]">
             <div className="absolute -left-10 -top-10 h-48 w-48 rounded-full bg-eavi-primary/20 blur-2xl sm:h-56 sm:w-56" />
             <div className="absolute -bottom-12 -right-8 h-48 w-48 rounded-full bg-eavi-secondary/20 blur-2xl sm:h-56 sm:w-56" />
-            <div className="relative flex flex-col items-center gap-2 text-center">
-              <span className="text-5xl font-semibold tracking-tight text-eavi-primary-text sm:text-6xl lg:text-7xl">
+            <div className="relative flex flex-col items-center gap-3 px-6 text-center">
+              <span className="font-display text-5xl font-semibold tracking-tight text-eavi-primary-text sm:text-6xl lg:text-7xl">
                 EAVI
               </span>
-              <span className="text-[10px] uppercase tracking-[0.3em] text-eavi-text/70 sm:text-xs">
-                Leading the Leaders
+              <span className="h-px w-16 bg-eavi-border" />
+              <span className="flex flex-wrap justify-center gap-x-2 gap-y-1 text-[10px] uppercase tracking-[0.18em] text-eavi-text/70 sm:text-[11px]">
+                {campuses.map((campus) => (
+                  <span key={campus.name}>{campus.name}</span>
+                ))}
               </span>
             </div>
           </div>
@@ -172,7 +177,7 @@ export default function Home() {
       <footer className="border-t border-eavi-border">
         <div className="mx-auto grid w-full max-w-6xl gap-8 px-5 py-10 sm:px-6 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-2 lg:col-span-2">
-            <p className="text-sm font-semibold">
+            <p className="font-display text-base font-semibold tracking-tight sm:text-lg">
               East Africa Vision Institute
             </p>
             <p className="max-w-xs text-pretty text-xs leading-5 text-eavi-text/75">

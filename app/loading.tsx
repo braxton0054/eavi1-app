@@ -21,7 +21,7 @@ export default function Loading() {
         </div>
 
         <div className="flex flex-col items-center gap-1 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-eavi-text sm:text-3xl">
+          <h1 className="font-display text-[1.75rem] font-semibold leading-tight tracking-tight text-balance sm:text-4xl">
             East Africa Vision Institute
           </h1>
           <p className="text-sm text-eavi-text/75">Eldoret, Kenya</p>
@@ -32,7 +32,7 @@ export default function Loading() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-eavi-primary-text sm:text-xs">
           Leading the Leaders
         </p>
-        <p className="text-sm italic text-eavi-secondary-text">
+        <p className="text-sm text-eavi-secondary-text">
           Nurturing quality and affordable education.
         </p>
       </div>
