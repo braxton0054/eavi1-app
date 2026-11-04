@@ -1,0 +1,502 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPERADMIN
+  CAMPUS_ADMIN
+  TUTOR
+  STUDENT
+}
+
+enum Status {
+  ACTIVE
+  PENDING
+  DISABLED
+}
+
+enum ProgramLevel {
+  CERTIFICATE
+  DIPLOMA
+  HIGHER_DIPLOMA
+  DEGREE
+  SHORT_COURSE
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  REVIEWING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  SUSPENDED
+  COMPLETED
+  WITHDRAWN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNDECLARED
+}
+
+enum TermStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
+enum CalendarEventType {
+  ACADEMIC
+  HOLIDAY
+  EXAMINATION
+  ADMISSION
+  FINANCE
+  MEETING
+}
+
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+enum ExamStatus {
+  DRAFT
+  SCHEDULED
+  COMPLETED
+  RELEASED
+}
+
+enum InvoiceStatus {
+  OPEN
+  PARTIAL
+  PAID
+  VOID
+}
+
+enum PaymentMethod {
+  MPESA
+  CASH
+  BANK
+  CHEQUE
+}
+
+enum CardStatus {
+  PENDING
+  PRINTING
+  ISSUED
+  LOST
+  REPLACED
+}
+
+enum Audience {
+  EVERYONE
+  STUDENTS
+  TUTORS
+}
+
+model Campus {
+  id             Int              @id @default(autoincrement())
+  code           String           @unique
+  name           String
+  place          String
+  phone          String?
+  users          User[]
+  programs       Program[]        @relation("ProgramCampuses")
+  students       StudentProfile[]
+  tutors         TutorProfile[]
+  applications   Application[]
+  enrollments    Enrollment[]
+  calendarEvents CalendarEvent[]
+  timetableSlots TimetableSlot[]
+  exams          Exam[]
+  invoices       Invoice[]
+  announcements  Announcement[]
+  idCards        IdCard[]
+
+  @@map("campuses")
+}
+
+model User {
+  id           String         @id @default(uuid())
+  /// Stored lowercased so the unique index is effectively case-insensitive.
+  email        String         @unique
+  fullName     String
+  phone        String?
+  passwordHash String
+  role         Role           @default(STUDENT)
+  status       Status         @default(ACTIVE)
+  campus       Campus?        @relation(fields: [campusId], references: [id])
+  campusId     Int?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     Session[]
+  student      StudentProfile?
+  tutor        TutorProfile?
+  announcements Announcement[] @relation("AnnouncementAuthor")
+  decisions    Application[]  @relation("ApplicationDecider")
+
+  @@index([role, status])
+  @@index([campusId])
+  @@map("users")
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  tokenHash  String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// A programme on the college catalogue, offered at one or more campuses.
+model Program {
+  id             String        @id @default(uuid())
+  code           String        @unique
+  name           String
+  level          ProgramLevel
+  durationMonths Int
+  description    String?
+  campuses       Campus[]      @relation("ProgramCampuses")
+  tutors         TutorProfile[] @relation("ProgramTutors")
+  enrollments    Enrollment[]
+  applications   Application[]
+  feeItems       FeeItem[]
+  exams          Exam[]
+  timetableSlots TimetableSlot[]
+  idCards        IdCard[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("programs")
+}
+
+/// Academic record attached to a User with role STUDENT. Admission numbers are issued
+/// by the campus admin, not by the self-service registration form.
+model StudentProfile {
+  id                  String         @id @default(uuid())
+  userId              String         @unique
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admissionNo         String         @unique
+  campusId            Int
+  campus              Campus         @relation(fields: [campusId], references: [id])
+  gender              Gender?
+  dateOfBirth         DateTime?
+  nationalId          String?
+  guardianName        String?
+  guardianPhone       String?
+  guardianEmail       String?
+  address             String?
+  applications        Application[]
+  enrollments         Enrollment[]
+  invoices            Invoice[]
+  payments            Payment[]
+  idCards             IdCard[]
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([campusId])
+  @@map("student_profiles")
+}
+
+/// Academic record attached to a User with role TUTOR.
+model TutorProfile {
+  id             String          @id @default(uuid())
+  userId         String          @unique
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  staffNo        String          @unique
+  campusId       Int
+  campus         Campus          @relation(fields: [campusId], references: [id])
+  title          String?
+  department     String?
+  programs       Program[]       @relation("ProgramTutors")
+  timetableSlots TimetableSlot[]
+  invigilations  Exam[]          @relation("ExamInvigilator")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([campusId])
+  @@map("tutor_profiles")
+}
+
+/// A prospect's application. Approving one creates the student profile and enrollment.
+model Application {
+  id                    String           @id @default(uuid())
+  reference             String           @unique
+  fullName              String
+  email                 String
+  phone                 String
+  programId             String
+  program               Program          @relation(fields: [programId], references: [id])
+  campusId              Int
+  campus                Campus           @relation(fields: [campusId], references: [id])
+  status                ApplicationStatus @default(SUBMITTED)
+  previousQualification String?
+  notes                 String?
+  decisionNote          String?
+  decidedById           String?
+  decidedBy             User?            @relation("ApplicationDecider", fields: [decidedById], references: [id])
+  decidedAt             DateTime?
+  studentId             String?
+  student               StudentProfile?  @relation(fields: [studentId], references: [id])
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@index([campusId, status])
+  @@map("applications")
+}
+
+model Term {
+  id             String          @id @default(uuid())
+  name           String          @unique
+  startDate      DateTime
+  endDate        DateTime
+  status         TermStatus      @default(PLANNED)
+  intakes        Intake[]
+  calendarEvents CalendarEvent[]
+  exams          Exam[]
+  timetableSlots TimetableSlot[]
+  feeItems       FeeItem[]
+  invoices       Invoice[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@map("terms")
+}
+
+/// An admission window inside a term (May, September, January intakes).
+model Intake {
+  id                    String      @id @default(uuid())
+  name                  String
+  termId                String
+  term                  Term        @relation(fields: [termId], references: [id])
+  applicationDeadline   DateTime
+  commenceAt            DateTime
+  enrollments           Enrollment[]
+
+  @@unique([termId, name])
+  @@map("intakes")
+}
+
+/// One dated entry on the academic calendar. campusId null means college-wide.
+model CalendarEvent {
+  id          String            @id @default(uuid())
+  termId      String
+  term        Term              @relation(fields: [termId], references: [id])
+  campusId    Int?
+  campus      Campus?           @relation(fields: [campusId], references: [id])
+  title       String
+  description String?
+  type        CalendarEventType
+  startsAt    DateTime
+  endsAt      DateTime?
+  createdAt   DateTime          @default(now())
+
+  @@index([startsAt])
+  @@index([campusId])
+  @@map("calendar_events")
+}
+
+model Enrollment {
+  id          String           @id @default(uuid())
+  studentId   String
+  student     StudentProfile   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  programId   String
+  program     Program          @relation(fields: [programId], references: [id])
+  campusId    Int
+  campus      Campus           @relation(fields: [campusId], references: [id])
+  intakeId    String?
+  intake      Intake?          @relation(fields: [intakeId], references: [id])
+  cohort      String?
+  status      EnrollmentStatus @default(ACTIVE)
+  enrolledAt  DateTime         @default(now())
+  withdrawnAt DateTime?
+  grades      Grade[]
+
+  @@unique([studentId, programId])
+  @@index([campusId, status])
+  @@map("enrollments")
+}
+
+/// A recurring weekly class. Times are "HH:mm" strings validated in the action layer.
+model TimetableSlot {
+  id              String    @id @default(uuid())
+  campusId        Int
+  campus          Campus    @relation(fields: [campusId], references: [id])
+  programId       String
+  program         Program   @relation(fields: [programId], references: [id])
+  tutorId         String?
+  tutor           TutorProfile? @relation(fields: [tutorId], references: [id])
+  termId          String?
+  term            Term?     @relation(fields: [termId], references: [id])
+  day             Weekday
+  startAt         String
+  endAt           String
+  room            String?
+  weekOffsetLabel String?
+  createdAt       DateTime  @default(now())
+
+  @@index([campusId, day])
+  @@map("timetable_slots")
+}
+
+model Exam {
+  id              String       @id @default(uuid())
+  title           String
+  programId       String
+  program         Program      @relation(fields: [programId], references: [id])
+  campusId        Int
+  campus          Campus       @relation(fields: [campusId], references: [id])
+  termId          String?
+  term            Term?        @relation(fields: [termId], references: [id])
+  invigilatorId   String?
+  invigilator     TutorProfile? @relation("ExamInvigilator", fields: [invigilatorId], references: [id])
+  date            DateTime
+  startAt         String
+  durationMinutes Int          @default(120)
+  room            String?
+  status          ExamStatus   @default(DRAFT)
+  grades          Grade[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([campusId, date])
+  @@map("exams")
+}
+
+/// A mark for one enrollment in one exam; maxScore carries the denominator.
+model Grade {
+  id          String     @id @default(uuid())
+  examId      String
+  exam        Exam       @relation(fields: [examId], references: [id], onDelete: Cascade)
+  enrollmentId String
+  enrollment  Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  score       Decimal?   @db.Decimal(6, 2)
+  maxScore    Decimal    @default(100) @db.Decimal(6, 2)
+  remark      String?
+  published   Boolean    @default(false)
+
+  @@unique([examId, enrollmentId])
+  @@map("grades")
+}
+
+/// A billable component of a programme's fees, optionally per term.
+model FeeItem {
+  id         String   @id @default(uuid())
+  programId  String
+  program    Program  @relation(fields: [programId], references: [id])
+  termId     String?
+  term       Term?    @relation(fields: [termId], references: [id])
+  label      String
+  amount     Decimal  @db.Decimal(12, 2)
+  isOptional Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([programId])
+  @@map("fee_items")
+}
+
+model Invoice {
+  id        String        @id @default(uuid())
+  number    String        @unique
+  studentId String
+  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  campusId  Int
+  campus    Campus        @relation(fields: [campusId], references: [id])
+  termId    String?
+  term      Term?         @relation(fields: [termId], references: [id])
+  programId String?
+  dueAt     DateTime?
+  status    InvoiceStatus @default(OPEN)
+  note      String?
+  lines     InvoiceLine[]
+  payments  Payment[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([studentId])
+  @@index([campusId, status])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id        String  @id @default(uuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  label     String
+  amount    Decimal @db.Decimal(12, 2)
+
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+model Payment {
+  id        String        @id @default(uuid())
+  invoiceId String
+  invoice   Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  studentId String
+  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  amount    Decimal       @db.Decimal(12, 2)
+  method    PaymentMethod
+  reference String?
+  paidAt    DateTime      @default(now())
+
+  @@index([invoiceId])
+  @@index([studentId])
+  @@map("payments")
+}
+
+/// Notice-board post for the campus or the whole college (campusId null).
+model Announcement {
+  id          String   @id @default(uuid())
+  title       String
+  body        String
+  audience    Audience @default(EVERYONE)
+  campusId    Int?
+  campus      Campus?  @relation(fields: [campusId], references: [id])
+  authorId    String?
+  author      User?    @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+  pinned      Boolean  @default(false)
+  publishedAt DateTime @default(now())
+
+  @@index([campusId, publishedAt])
+  @@map("announcements")
+}
+
+model IdCard {
+  id        String     @id @default(uuid())
+  serial    String     @unique
+  studentId String
+  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  campusId  Int
+  campus    Campus     @relation(fields: [campusId], references: [id])
+  programId String?
+  program   Program?   @relation(fields: [programId], references: [id])
+  status    CardStatus @default(PENDING)
+  issuedAt  DateTime?
+  expiresAt DateTime?
+  remarks   String?
+  createdAt DateTime   @default(now())
+
+  @@index([campusId, status])
+  @@map("id_cards")
+}

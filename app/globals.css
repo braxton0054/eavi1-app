@@ -1,4 +1,10 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* next-themes owns the theme: it puts `dark` on <html> for the manual dark choice and
+   for the system choice, so the class is the single signal both modes follow. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --eavi-bg: #ffffff;
@@ -17,6 +23,68 @@
   --eavi-fill: #8e2a9e;
   --eavi-fill-hover: #6b1f78;
   --eavi-on-fill: #ffffff;
+  --eavi-muted-text: #5c5563;
+  --eavi-destructive: #b3261e;
+
+  /* Tinted surface for chips, icon badges and section panels. Each pairing against
+     --eavi-text and --eavi-primary-text clears AA (5.99:1 and 15.31:1). */
+  --eavi-primary-soft: #f4e9f6;
+  /* Green is a confirmation color only, so its fill needs the darker shade: white
+     text on --eavi-secondary (#2f8c55) is only 4.2:1, on this it is 6.2:1. */
+  --eavi-success-fill: #256e43;
+  --eavi-on-success: #ffffff;
+  /* Portal status hues. Slate-teal and blush are brand accents and stay text-only —
+     they never become fills. Ratios measured on --eavi-card and --eavi-primary-soft. */
+  --eavi-info-text: #3d6f70;
+  --eavi-warn-text: #9c4a50;
+  --eavi-info-soft: color-mix(in oklab, #7fa3a4 16%, var(--eavi-card));
+  --eavi-warn-soft: color-mix(in oklab, #dfbdbe 24%, var(--eavi-card));
+  --eavi-success-soft: color-mix(in oklab, var(--eavi-secondary) 14%, var(--eavi-card));
+  --eavi-danger-soft: color-mix(in oklab, var(--eavi-destructive) 12%, var(--eavi-card));
+  --eavi-mesh-primary: color-mix(in oklab, var(--eavi-primary) 16%, transparent);
+  --eavi-mesh-secondary: color-mix(in oklab, var(--eavi-secondary) 12%, transparent);
+  /* Deep plum band for the closing CTA and the footer; white body text on it is 15.9:1. */
+  --eavi-band: #2a1030;
+  --eavi-band-foreground: #f6eff8;
+  --eavi-band-muted: #d9c7e0;
+  --eavi-shadow-tint: #6b1f78;
+  /* The logo artwork assumes a light plate, so it keeps one in both themes. */
+  --eavi-plate: #ffffff;
+
+  /* shadcn/ui semantic tokens, pointed at the brand palette above. */
+  --background: var(--eavi-bg);
+  --foreground: var(--eavi-text);
+  --card: var(--eavi-card);
+  --card-foreground: var(--eavi-text);
+  --popover: var(--eavi-card);
+  --popover-foreground: var(--eavi-text);
+  --primary: var(--eavi-fill);
+  --primary-foreground: var(--eavi-on-fill);
+  --secondary: var(--eavi-muted);
+  --secondary-foreground: var(--eavi-text);
+  --muted: var(--eavi-muted);
+  --muted-foreground: var(--eavi-muted-text);
+  --accent: var(--eavi-muted);
+  --accent-foreground: var(--eavi-text);
+  --destructive: var(--eavi-destructive);
+  --destructive-foreground: #ffffff;
+  --border: var(--eavi-border);
+  --input: var(--eavi-border);
+  --ring: var(--eavi-primary-text);
+  --chart-1: #8e2a9e;
+  --chart-2: #2f8c55;
+  --chart-3: #b84fc4;
+  --chart-4: #4caf7d;
+  --chart-5: #6b1f78;
+  --radius: 0.75rem;
+  --sidebar: var(--eavi-card);
+  --sidebar-foreground: var(--eavi-text);
+  --sidebar-primary: var(--eavi-fill);
+  --sidebar-primary-foreground: var(--eavi-on-fill);
+  --sidebar-accent: var(--eavi-muted);
+  --sidebar-accent-foreground: var(--eavi-text);
+  --sidebar-border: var(--eavi-border);
+  --sidebar-ring: var(--eavi-primary-text);
 }
 
 @theme inline {
@@ -34,27 +102,93 @@
   --color-eavi-fill: var(--eavi-fill);
   --color-eavi-fill-hover: var(--eavi-fill-hover);
   --color-eavi-on-fill: var(--eavi-on-fill);
+  --color-eavi-muted-text: var(--eavi-muted-text);
+  --color-eavi-destructive: var(--eavi-destructive);
+  --color-eavi-primary-soft: var(--eavi-primary-soft);
+  --color-eavi-success-fill: var(--eavi-success-fill);
+  --color-eavi-on-success: var(--eavi-on-success);
+  --color-eavi-info-text: var(--eavi-info-text);
+  --color-eavi-warn-text: var(--eavi-warn-text);
+  --color-eavi-info-soft: var(--eavi-info-soft);
+  --color-eavi-warn-soft: var(--eavi-warn-soft);
+  --color-eavi-success-soft: var(--eavi-success-soft);
+  --color-eavi-danger-soft: var(--eavi-danger-soft);
+  --color-eavi-band: var(--eavi-band);
+  --color-eavi-band-foreground: var(--eavi-band-foreground);
+  --color-eavi-band-muted: var(--eavi-band-muted);
+  --color-eavi-plate: var(--eavi-plate);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-eavi-display);
+  --font-heading: var(--font-eavi-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --eavi-bg: #17121c;
-    --eavi-text: #f3eef5;
-    --eavi-card: #201a28;
-    --eavi-primary: #b84fc4;
-    --eavi-secondary: #4caf7d;
-    --eavi-muted: #241d2c;
-    --eavi-border: #33283b;
+.dark {
+  --eavi-bg: #17121c;
+  --eavi-text: #f3eef5;
+  --eavi-card: #201a28;
+  --eavi-primary: #b84fc4;
+  --eavi-secondary: #4caf7d;
+  --eavi-muted: #241d2c;
+  --eavi-border: #33283b;
 
-    --eavi-primary-text: #cf7ad8;
-    --eavi-secondary-text: #4caf7d;
-    --eavi-fill: #a845b6;
-    --eavi-fill-hover: #ad4abb;
-    --eavi-on-fill: #ffffff;
-  }
+  --eavi-primary-text: #cf7ad8;
+  --eavi-secondary-text: #4caf7d;
+  --eavi-fill: #a845b6;
+  --eavi-fill-hover: #ad4abb;
+  --eavi-on-fill: #ffffff;
+  --eavi-muted-text: #b9aec1;
+  --eavi-destructive: #f2a9a4;
+
+  --eavi-primary-soft: #2b1f33;
+  --eavi-success-fill: #256e43;
+  --eavi-info-text: #8fbfc0;
+  --eavi-warn-text: #e0a5a9;
+  --eavi-mesh-primary: color-mix(in oklab, var(--eavi-primary) 22%, transparent);
+  --eavi-mesh-secondary: color-mix(in oklab, var(--eavi-secondary) 14%, transparent);
+  --eavi-shadow-tint: #05030a;
+  --eavi-band: #120c16;
+  --eavi-band-foreground: #f3eef5;
+  --eavi-band-muted: #b9aec1;
 }
 
 body {
@@ -68,9 +202,82 @@ body {
     outline: 2px solid var(--eavi-primary-text);
     outline-offset: 3px;
   }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+    /* The sticky header would otherwise sit on top of the heading an anchor link
+       jumps to. */
+    scroll-padding-top: 6rem;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+}
+
+/* shadcn's CardTitle ships this class, but nothing in the registry defines it,
+   so headings fell back to the body font. */
+@utility cn-font-heading {
+  font-family: var(--font-heading);
+  font-optical-sizing: auto;
+}
+
+/* Radix menus and selects get 44px rows so they meet the same touch-target floor
+   as the buttons, instead of the 30px the component classes alone produce. */
+@utility cn-menu-target {
+  min-height: 2.75rem;
+}
+
+/* 88% popover over a blur keeps the menu legible against the hero panel while
+   still letting the page read through it. */
+@utility cn-menu-translucent {
+  backdrop-filter: blur(12px) saturate(1.15);
+  background-color: color-mix(in oklab, var(--popover) 88%, transparent);
+}
+
+/* Hero depth without a photo download: two soft brand blooms behind the headline. */
+@utility eavi-mesh {
+  background-image:
+    radial-gradient(58% 52% at 10% 6%, var(--eavi-mesh-primary), transparent 62%),
+    radial-gradient(52% 48% at 92% 16%, var(--eavi-mesh-secondary), transparent 64%),
+    radial-gradient(70% 60% at 50% 100%, var(--eavi-mesh-primary), transparent 70%);
+}
+
+/* Translucent surface for the sticky header and the floating contact button. */
+@utility eavi-glass {
+  background-color: color-mix(in oklab, var(--background) 84%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+
+/* Hover lift for cards; visitors who ask for reduced motion get no movement. */
+@utility eavi-lift {
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-eavi-lift);
+    }
+  }
 }
 
 @theme {
+  /* Shadows are brand-tinted so lifted cards read purple, not grey. Dark mode swaps
+     the tint to near-black, because a purple glow on a plum card just looks muddy. */
+  --shadow-eavi-card: 0 1px 2px
+      color-mix(in oklab, var(--eavi-shadow-tint) 12%, transparent),
+    0 12px 28px -18px color-mix(in oklab, var(--eavi-shadow-tint) 45%, transparent);
+  --shadow-eavi-lift: 0 2px 4px
+      color-mix(in oklab, var(--eavi-shadow-tint) 14%, transparent),
+    0 22px 44px -20px color-mix(in oklab, var(--eavi-shadow-tint) 55%, transparent);
+
   --animate-eavi-load: eavi-load 1.5s cubic-bezier(0.65, 0.05, 0.36, 0.95) infinite;
   --animate-eavi-rise: eavi-rise 0.5s ease-out both;
   --animate-eavi-fade: eavi-fade 1.8s ease-in-out infinite;
@@ -103,5 +310,20 @@ body {
     50% {
       opacity: 1;
     }
+  }
+}
+
+/* Scroll reveal. JS adds the hidden class only to blocks still below the fold, so the
+   server-rendered page is never blank and reduced-motion visitors skip it entirely. */
+.eavi-reveal {
+  transition:
+    opacity 0.5s ease-out,
+    transform 0.5s ease-out;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .eavi-reveal--hidden {
+    opacity: 0;
+    transform: translateY(0.75rem);
   }
 }

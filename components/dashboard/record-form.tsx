@@ -1,0 +1,212 @@
+import { PlusIcon } from "lucide-react";
+import type { ReactNode } from "react";
+
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SubmitButton } from "@/components/dashboard/submit-button";
+import { Textarea } from "@/components/ui/textarea";
+import { common } from "@/lib/content/dashboard";
+import type { Field } from "@/lib/content/dashboard";
+import { cn } from "@/lib/utils";
+
+export type Choice = { value: string; label: string };
+export type OptionSets = Partial<Record<NonNullable<Field["optionKey"]>, Choice[]>>;
+export type FormAction = (formData: FormData) => Promise<void>;
+
+const control =
+  "flex h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 aria-invalid:border-destructive md:text-sm dark:bg-input/30";
+
+function Control({
+  field,
+  htmlId,
+  options,
+  value,
+}: {
+  field: Field;
+  htmlId: string;
+  options: OptionSets;
+  value?: string;
+}) {
+  const choices = field.options ?? (field.optionKey ? (options[field.optionKey] ?? []) : []);
+
+  if (field.type === "select") {
+    return (
+      <select
+        id={htmlId}
+        name={field.name}
+        required={field.required}
+        defaultValue={value}
+        className={cn(control, "appearance-none bg-eavi-card")}
+      >
+        {field.required ? null : <option value="">{common.none}</option>}
+        {choices.map((choice) => (
+          <option key={choice.value} value={choice.value}>
+            {choice.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (field.type === "textarea") {
+    return (
+      <Textarea id={htmlId} name={field.name} required={field.required} defaultValue={value} placeholder={field.placeholder} rows={4} className={control} />
+    );
+  }
+
+  if (field.type === "checkbox") {
+    return (
+      <label htmlFor={htmlId} className="flex h-11 items-center gap-2 text-sm">
+        <input
+          id={htmlId}
+          name={field.name}
+          type="checkbox"
+          value="yes"
+          defaultChecked={value === "yes"}
+          className="size-5 accent-eavi-fill"
+        />
+        <span className="text-eavi-muted-text">{common.yes}</span>
+      </label>
+    );
+  }
+
+  return (
+    <Input
+      id={htmlId}
+      name={field.name}
+      type={field.type}
+      required={field.required}
+      step={field.step}
+      placeholder={field.placeholder}
+      defaultValue={value}
+    />
+  );
+}
+
+export function RecordForm({
+  id,
+  fields,
+  options,
+  values,
+  action,
+  submitLabel,
+  note,
+  aside,
+  hidden,
+  compact = false,
+}: {
+  id: string;
+  fields: readonly Field[];
+  options?: OptionSets;
+  values?: Record<string, string | undefined>;
+  action: FormAction;
+  submitLabel: string;
+  note?: string;
+  aside?: ReactNode;
+  /** Ids the form must carry but the administrator should not edit. */
+  hidden?: Record<string, string>;
+  /** One column instead of two, for the small form attached to a table row. */
+  compact?: boolean;
+}) {
+  return (
+    <form
+      action={action}
+      id={id}
+      className={cn("grid gap-4", compact ? "grid-cols-1" : "sm:grid-cols-2")}
+    >
+      {Object.entries(hidden ?? {}).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
+
+      {fields.map((field) => {
+        const htmlId = `${id}-${field.name}`;
+        return (
+          <div key={field.name} className={cn("flex flex-col gap-1.5", field.wide && !compact && "sm:col-span-2")}>
+            <Label htmlFor={htmlId}>
+              {field.label}
+              {field.required ? <span className="text-eavi-destructive"> *</span> : null}
+            </Label>
+            <Control field={field} htmlId={htmlId} options={options ?? {}} value={values?.[field.name]} />
+            {field.hint ? <p className="text-xs text-eavi-muted-text">{field.hint}</p> : null}
+          </div>
+        );
+      })}
+
+      {note ? <p className={cn("text-xs text-eavi-muted-text", !compact && "sm:col-span-2")}>{note}</p> : null}
+
+      <div className={cn("flex flex-wrap items-center gap-3", !compact && "sm:col-span-2")}>
+        <SubmitButton label={submitLabel} />
+        {aside}
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Inline disclosure rather than a dialog: the create form is server-rendered and costs
+ * no client JavaScript, which keeps the portal light on slow connections.
+ */
+export function DisclosureForm(props: {
+  button: string;
+  title: string;
+  id: string;
+  fields: readonly Field[];
+  options?: OptionSets;
+  values?: Record<string, string | undefined>;
+  action: FormAction;
+  submitLabel: string;
+  note?: string;
+  hidden?: Record<string, string>;
+}) {
+  const { button, title, ...form } = props;
+
+  return (
+    <details className="rounded-2xl border border-eavi-border bg-eavi-card shadow-eavi-card open:shadow-eavi-lift">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+        <PlusIcon aria-hidden className="size-4 text-eavi-primary-text" />
+        {button}
+      </summary>
+      <div className="border-t border-eavi-border p-4">
+        <h2 className="mb-4 text-sm font-semibold">{title}</h2>
+        <RecordForm {...form} />
+      </div>
+    </details>
+  );
+}
+
+/**
+ * The row-level form: a status change, a decision, a payment. It opens under the row it
+ * belongs to so the administrator never loses sight of the record being edited.
+ */
+export function RowForm(props: {
+  button: string;
+  id: string;
+  fields: readonly Field[];
+  options?: OptionSets;
+  values?: Record<string, string | undefined>;
+  hidden?: Record<string, string>;
+  action: FormAction;
+  submitLabel: string;
+  note?: string;
+  tone?: "neutral" | "danger";
+}) {
+  const { button, tone = "neutral", ...form } = props;
+
+  return (
+    <details>
+      <summary
+        className={cn(
+          "inline-flex min-h-11 cursor-pointer list-none items-center rounded-lg border px-3 text-sm font-medium underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden",
+          tone === "danger"
+            ? "border-eavi-border text-eavi-destructive"
+            : "border-eavi-border text-eavi-primary-text",
+        )}
+      >
+        {button}
+      </summary>
+      <div className="mt-2 w-72 max-w-full rounded-xl border border-eavi-border bg-eavi-card p-3 shadow-eavi-card">
+        <RecordForm {...form} compact submitLabel={form.submitLabel} />
+      </div>
+    </details>
+  );
+}

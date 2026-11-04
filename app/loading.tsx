@@ -3,13 +3,13 @@ import { campuses } from "@/lib/campuses";
 
 export default function Loading() {
   return (
-    <main
+    <div
       role="status"
       aria-live="polite"
       className="flex flex-1 flex-col items-center justify-center gap-8 bg-eavi-bg px-6 py-16 font-sans"
     >
       <div className="animate-eavi-rise flex flex-col items-center gap-6">
-        <div className="rounded-[28px] border border-eavi-border bg-white p-6 shadow-[0_18px_40px_-24px_rgba(107,31,120,0.5)] sm:p-8">
+        <div className="shadow-eavi-card rounded-[28px] border border-eavi-border bg-eavi-plate p-6 sm:p-8">
           <Image
             src="/logo.png"
             alt="East Africa Vision Institute"
@@ -74,6 +74,6 @@ export default function Loading() {
           </div>
         ))}
       </div>
-    </main>
+    </div>
   );
 }
