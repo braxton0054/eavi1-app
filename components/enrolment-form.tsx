@@ -6,6 +6,17 @@ import { KENYA_COUNTIES } from "@/lib/data/kenya-locations";
 
 type Option = { value: string; label: string };
 
+type Application = {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string;
+  gender: string | null;
+  program: { id: string; name: string; code: string };
+  campus: { name: string } | null;
+  reference?: string;
+};
+
 type Guardian = { fullName: string; relationship: string; phone: string; altPhone: string; email: string; occupation: string; address: string };
 type Emergency = { fullName: string; relationship: string; phone: string; altPhone: string; address: string };
 
@@ -19,91 +30,74 @@ function LocationPicker({ prefix, label = "Residential address" }: { prefix: str
   const [county, setCounty] = useState("");
   const [subCounty, setSubCounty] = useState("");
   const countyObj = KENYA_COUNTIES.find((c) => c.name === county);
-
   return (
     <div className="sm:col-span-2 space-y-2">
       <span className={labelCls}>{label}</span>
       <div className="grid gap-3 sm:grid-cols-3">
-        <select
-          name={`${prefix}County`}
-          value={county}
-          onChange={(e) => {
-            setCounty(e.target.value);
-            setSubCounty("");
-          }}
-          className={inputCls}
-        >
+        <select name={`${prefix}County`} value={county} onChange={(e) => { setCounty(e.target.value); setSubCounty(""); }} className={inputCls}>
           <option value="">Select county (47)</option>
-          {KENYA_COUNTIES.map((c) => (
-            <option key={c.name} value={c.name}>{c.name}</option>
-          ))}
+          {KENYA_COUNTIES.map((c) => (<option key={c.name} value={c.name}>{c.name}</option>))}
         </select>
-        <select
-          name={`${prefix}SubCounty`}
-          value={subCounty}
-          onChange={(e) => setSubCounty(e.target.value)}
-          className={inputCls}
-          disabled={!countyObj}
-        >
+        <select name={`${prefix}SubCounty`} value={subCounty} onChange={(e) => setSubCounty(e.target.value)} className={inputCls} disabled={!countyObj}>
           <option value="">{countyObj ? `Select sub-county (${countyObj.subCounties.length})` : "Select county first"}</option>
-          {countyObj?.subCounties.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
+          {countyObj?.subCounties.map((s) => (<option key={s} value={s}>{s}</option>))}
         </select>
         <input name={`${prefix}Detail`} placeholder="Town / estate / street" className={inputCls} />
       </div>
-      <p className="text-xs text-eavi-muted-text">
-        Choose the county, then only its sub-counties will appear. Add the specific town or estate in the last box.
-      </p>
+      <p className="text-xs text-eavi-muted-text">Choose the county, then only its sub-counties appear. Add the specific town or estate in the last box.</p>
     </div>
   );
 }
 
 export function EnrolmentForm({
-  application,
+  application: initialApplication,
+  applications = [],
   programs,
   intakes,
 }: {
-  application: {
-    id: string;
-    fullName: string;
-    email: string | null;
-    phone: string;
-    gender: string | null;
-    program: { id: string; name: string; code: string };
-    campus: { name: string } | null;
-  };
+  application?: Application | null;
+  applications?: Application[];
   programs: Option[];
   intakes: Option[];
 }) {
+  const [selectedId, setSelectedId] = useState<string>(initialApplication?.id ?? "");
+  const selectedApp = applications.find((a) => a.id === selectedId) ?? initialApplication ?? null;
+
   const [step, setStep] = useState(1);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [guardians, setGuardians] = useState<Guardian[]>([{ ...emptyGuardian }]);
   const [emergencies, setEmergencies] = useState<Emergency[]>([{ ...emptyEmergency }]);
 
   return (
-    <form action={enrolStudent} className="space-y-6">
-      <input type="hidden" name="applicationId" value={application.id} />
+    <form action={enrolStudent} className="space-y-6" key={selectedApp?.id ?? "new"}>
+      <input type="hidden" name="applicationId" value={selectedApp?.id ?? ""} />
+
+      {/* Application selector */}
+      {applications.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <label className={labelCls}>Enrol from existing application (optional)</label>
+          <select
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">— New enrolment (enter details manually) —</option>
+            {applications.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.reference ? `${a.reference} · ` : ""}{a.fullName} · {a.program.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-eavi-muted-text">Selecting an application auto-fills the student details below.</p>
+        </div>
+      )}
 
       {/* Progress indicator */}
       <div className="flex items-center gap-3">
         {[1, 2].map((n) => (
           <div key={n} className="flex items-center gap-2">
-            <span
-              className={
-                "flex size-8 items-center justify-center rounded-full text-sm font-semibold " +
-                (step === n
-                  ? "bg-eavi-fill text-eavi-on-fill"
-                  : step > n
-                    ? "bg-eavi-secondary text-eavi-on-success"
-                    : "bg-eavi-muted text-eavi-muted-text")
-              }
-            >
-              {n}
-            </span>
-            <span className={step === n ? "text-sm font-semibold text-eavi-text" : "text-sm text-eavi-muted-text"}>
-              {n === 1 ? "Student details" : "Parent & emergency"}
-            </span>
+            <span className={"flex size-8 items-center justify-center rounded-full text-sm font-semibold " + (step === n ? "bg-eavi-fill text-eavi-on-fill" : step > n ? "bg-eavi-secondary text-eavi-on-success" : "bg-eavi-muted text-eavi-muted-text")}>{n}</span>
+            <span className={step === n ? "text-sm font-semibold text-eavi-text" : "text-sm text-eavi-muted-text"}>{n === 1 ? "Student details" : "Parent & emergency"}</span>
             {n < 2 && <span className="mx-2 h-px w-8 bg-eavi-border" />}
           </div>
         ))}
@@ -116,19 +110,19 @@ export function EnrolmentForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <label className={labelCls}>Full name</label>
-              <input name="fullName" defaultValue={application.fullName} required className={inputCls} />
+              <input name="fullName" defaultValue={selectedApp?.fullName ?? ""} required className={inputCls} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={labelCls}>Email</label>
-              <input name="email" type="email" defaultValue={application.email ?? ""} required className={inputCls} />
+              <input name="email" type="email" defaultValue={selectedApp?.email ?? ""} required className={inputCls} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={labelCls}>Phone</label>
-              <input name="phone" defaultValue={application.phone} className={inputCls} />
+              <input name="phone" defaultValue={selectedApp?.phone ?? ""} className={inputCls} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={labelCls}>Gender</label>
-              <select name="gender" defaultValue={application.gender ?? ""} className={inputCls}>
+              <select name="gender" defaultValue={selectedApp?.gender ?? ""} className={inputCls}>
                 <option value="">—</option>
                 <option value="MALE">Male</option>
                 <option value="FEMALE">Female</option>
@@ -144,7 +138,6 @@ export function EnrolmentForm({
               <label className={labelCls}>National ID / birth cert no.</label>
               <input name="nationalId" className={inputCls} />
             </div>
-            <LocationPicker prefix="address" />
           </div>
         </section>
 
@@ -221,16 +214,7 @@ export function EnrolmentForm({
             </div>
             <div className="flex flex-1 flex-col gap-2">
               <label className={labelCls}>Upload student photograph</label>
-              <input
-                name="profilePhoto"
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) setPhotoPreview(URL.createObjectURL(f));
-                }}
-                className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1.5 file:text-eavi-primary-text"
-              />
+              <input name="profilePhoto" type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) setPhotoPreview(URL.createObjectURL(f)); }} className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1.5 file:text-eavi-primary-text" />
               <p className="text-xs text-eavi-muted-text">JPG or PNG. Used as the student's profile avatar throughout the system.</p>
             </div>
           </div>
@@ -241,14 +225,12 @@ export function EnrolmentForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <label className={labelCls}>Campus</label>
-              <input value={application.campus?.name ?? ""} readOnly className={inputCls + " bg-eavi-muted"} />
+              <input value={selectedApp?.campus?.name ?? ""} readOnly className={inputCls + " bg-eavi-muted"} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={labelCls}>Programme</label>
-              <select name="programId" defaultValue={application.program.id} required className={inputCls}>
-                {programs.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
-                ))}
+              <select name="programId" defaultValue={selectedApp?.program.id ?? (programs[0]?.value ?? "")} required className={inputCls}>
+                {programs.map((p) => (<option key={p.value} value={p.value}>{p.label}</option>))}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -259,15 +241,14 @@ export function EnrolmentForm({
               <label className={labelCls}>Intake</label>
               <select name="intakeId" className={inputCls}>
                 <option value="">—</option>
-                {intakes.map((i) => (
-                  <option key={i.value} value={i.value}>{i.label}</option>
-                ))}
+                {intakes.map((i) => (<option key={i.value} value={i.value}>{i.label}</option>))}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={labelCls}>Temporary password</label>
               <input name="password" type="text" required minLength={10} className={inputCls} />
             </div>
+            <LocationPicker prefix="address" />
           </div>
         </section>
 
@@ -287,9 +268,7 @@ export function EnrolmentForm({
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-eavi-text">Guardian {idx + 1}</h3>
                 {guardians.length > 1 && (
-                  <button type="button" onClick={() => setGuardians((gs) => gs.filter((_, i) => i !== idx))} className="text-xs text-eavi-destructive">
-                    Remove
-                  </button>
+                  <button type="button" onClick={() => setGuardians((gs) => gs.filter((_, i) => i !== idx))} className="text-xs text-eavi-destructive">Remove</button>
                 )}
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -326,11 +305,7 @@ export function EnrolmentForm({
               </div>
             </div>
           ))}
-          <button
-            type="button"
-            onClick={() => setGuardians((gs) => [...gs, { ...emptyGuardian }])}
-            className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text"
-          >
+          <button type="button" onClick={() => setGuardians((gs) => [...gs, { ...emptyGuardian }])} className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text">
             + Add another guardian
           </button>
         </section>
@@ -342,9 +317,7 @@ export function EnrolmentForm({
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-eavi-text">Emergency contact {idx + 1}</h3>
                 {emergencies.length > 1 && (
-                  <button type="button" onClick={() => setEmergencies((es) => es.filter((_, i) => i !== idx))} className="text-xs text-eavi-destructive">
-                    Remove
-                  </button>
+                  <button type="button" onClick={() => setEmergencies((es) => es.filter((_, i) => i !== idx))} className="text-xs text-eavi-destructive">Remove</button>
                 )}
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -368,11 +341,7 @@ export function EnrolmentForm({
               </div>
             </div>
           ))}
-          <button
-            type="button"
-            onClick={() => setEmergencies((es) => [...es, { ...emptyEmergency }])}
-            className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text"
-          >
+          <button type="button" onClick={() => setEmergencies((es) => [...es, { ...emptyEmergency }])} className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text">
             + Add another emergency contact
           </button>
         </section>
