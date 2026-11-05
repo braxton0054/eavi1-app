@@ -13,11 +13,11 @@ export type ListQuery = { q?: string; status?: string; page?: number };
 
 const money = (value: unknown) => Number(String(value ?? 0)) || 0;
 
-const contains = (term: string) => ({ contains: term, mode: "insensitive" as const });
+const contains = (semester: string) => ({ contains: semester, mode: "insensitive" as const });
 
 function trimmed(q?: string) {
-  const term = q?.trim();
-  return term ? term : null;
+  const semester = q?.trim();
+  return semester ? semester : null;
 }
 
 function clampPage(page: number | undefined) {
@@ -26,36 +26,36 @@ function clampPage(page: number | undefined) {
 
 /** Scalar columns only — relation searches get their own matcher below. */
 function searchWhere(q: string | undefined, fields: string[]) {
-  const term = trimmed(q);
-  if (!term) return {};
-  return { OR: fields.map((field) => ({ [field]: contains(term) })) };
+  const semester = trimmed(q);
+  if (!semester) return {};
+  return { OR: fields.map((field) => ({ [field]: contains(semester) })) };
 }
 
 function studentSearch(q: string | undefined) {
-  const term = trimmed(q);
-  if (!term) return {};
+  const semester = trimmed(q);
+  if (!semester) return {};
   return {
     OR: [
-      { admissionNo: contains(term) },
-      { guardianName: contains(term) },
-      { user: { OR: [{ fullName: contains(term) }, { email: contains(term) }] } },
+      { admissionNo: contains(semester) },
+      { guardianName: contains(semester) },
+      { user: { OR: [{ fullName: contains(semester) }, { email: contains(semester) }] } },
     ],
   };
 }
 
 function throughStudent(q: string | undefined) {
-  const term = trimmed(q);
-  return term ? { student: studentSearch(term) } : {};
+  const semester = trimmed(q);
+  return semester ? { student: studentSearch(semester) } : {};
 }
 
 function tutorSearch(q: string | undefined) {
-  const term = trimmed(q);
-  if (!term) return {};
+  const semester = trimmed(q);
+  if (!semester) return {};
   return {
     OR: [
-      { staffNo: contains(term) },
-      { department: contains(term) },
-      { user: { OR: [{ fullName: contains(term) }, { email: contains(term) }] } },
+      { staffNo: contains(semester) },
+      { department: contains(semester) },
+      { user: { OR: [{ fullName: contains(semester) }, { email: contains(semester) }] } },
     ],
   };
 }
@@ -100,17 +100,17 @@ async function overviewFor(campusId: number | null) {
   const collected = money(paymentTotals._sum.amount);
 
   const deadlines = await prisma.intake.findMany({
-    where: { term: { status: "ACTIVE" }, commenceAt: { gte: now } },
+    where: { semester: { status: "ACTIVE" }, commenceAt: { gte: now } },
     orderBy: { applicationDeadline: "asc" },
     take: 4,
-    include: { term: { select: { name: true } } },
+    include: { semester: { select: { name: true } } },
   });
 
   const events = await prisma.calendarEvent.findMany({
     where: { OR: [{ campusId: null }, campusId === null ? {} : { campusId }], startsAt: { gte: now } },
     orderBy: { startsAt: "asc" },
     take: 5,
-    include: { term: { select: { name: true } }, campus: { select: { name: true } } },
+    include: { semester: { select: { name: true } }, campus: { select: { name: true } } },
   });
 
   const exams = await prisma.exam.findMany({
@@ -343,12 +343,12 @@ export async function getEnrollments(query: ListQuery) {
   const scope = await requireCollegeAdmin();
   const page = clampPage(query.page);
   const status = pick(ENROLLABLE, query.status);
-  const term = trimmed(query.q);
+  const semester = trimmed(query.q);
   const where = {
     AND: [
       campusWhere(scope.campusId),
       status ? { status } : {},
-      term ? { OR: [{ cohort: contains(term) }, { student: { admissionNo: contains(term) } }] } : {},
+      semester ? { OR: [{ cohort: contains(semester) }, { student: { admissionNo: contains(semester) } }] } : {},
     ],
   };
 
@@ -361,7 +361,7 @@ export async function getEnrollments(query: ListQuery) {
       include: {
         student: { select: { id: true, admissionNo: true, user: { select: { fullName: true } } } },
         program: { select: { name: true, code: true } },
-        intake: { select: { name: true, term: { select: { name: true } } } },
+        intake: { select: { name: true, semester: { select: { name: true } } } },
       },
     }),
     prisma.enrollment.count({ where }),
@@ -401,7 +401,7 @@ async function programsFor(campusId: number | null, q?: string) {
   }));
 }
 
-/** Departments are college-wide, like terms: one list every campus shares. */
+/** Departments are college-wide, like semesters: one list every campus shares. */
 export async function getDepartments() {
   await requireCollegeAdmin();
   return prisma.department.findMany({
@@ -473,8 +473,8 @@ export async function getTimetable() {
 
 /* ------------------------------------------------------------------ calendar */
 
-/** The three term slots every campus is expected to run inside one calendar year. */
-const TERM_SLOTS = [1, 2, 3] as const;
+/** The three semester slots every campus is expected to run inside one calendar year. */
+const SEMESTER_SLOTS = [1, 2, 3] as const;
 
 /** How far back a closed year can still be read, and how far ahead one may be planned. */
 const HISTORY_YEARS = 5;
@@ -484,7 +484,7 @@ const clampYear = (value: number, current: number) =>
   Math.min(current + OPEN_YEARS, Math.max(current - HISTORY_YEARS, value));
 
 /**
- * A term belongs to exactly one campus, so a calendar read always resolves to a single
+ * A semester belongs to exactly one campus, so a calendar read always resolves to a single
  * campus: a campus admin is pinned to their own, and a super admin chooses one, because
  * "all campuses" has no meaning for a window only one campus runs.
  */
@@ -522,10 +522,10 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year, 11, 31, 23, 59, 59);
 
-  const [terms, collegeEvents, cards] = await Promise.all([
-    prisma.term.findMany({
+  const [semesters, collegeEvents, cards] = await Promise.all([
+    prisma.semester.findMany({
       where: { campusId: context.campusId, year },
-      orderBy: { termNo: "asc" },
+      orderBy: { semesterNo: "asc" },
       include: {
         intakes: { orderBy: { applicationDeadline: "asc" } },
         exams: {
@@ -547,7 +547,7 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
       },
     }),
     prisma.calendarEvent.findMany({
-      where: { campusId: null, termId: null, startsAt: { gte: yearStart, lte: yearEnd } },
+      where: { campusId: null, semesterId: null, startsAt: { gte: yearStart, lte: yearEnd } },
       orderBy: { startsAt: "asc" },
     }),
     prisma.idCard.findMany({
@@ -563,18 +563,18 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
     }),
   ]);
 
-  // A card belongs to the term whose window covers the day it was issued.
+  // A card belongs to the semester whose window covers the day it was issued.
   const cardsIn = (from: Date, to: Date) =>
     cards.filter((card) => card.issuedAt! >= from && card.issuedAt! <= to);
 
-  const slots = TERM_SLOTS.map((termNo) => {
-    const term = terms.find((row) => row.termNo === termNo) ?? null;
+  const slots = SEMESTER_SLOTS.map((semesterNo) => {
+    const semester = semesters.find((row) => row.semesterNo === semesterNo) ?? null;
     return {
-      termNo,
-      term,
-      // A term stops taking changes the day its window closes.
-      editable: year >= currentYear && (!term || term.endDate >= startOfToday),
-      cards: term ? cardsIn(term.startDate, term.endDate) : [],
+      semesterNo,
+      semester,
+      // A semester stops taking changes the day its window closes.
+      editable: year >= currentYear && (!semester || semester.endDate >= startOfToday),
+      cards: semester ? cardsIn(semester.startDate, semester.endDate) : [],
     };
   });
 
@@ -650,13 +650,13 @@ export async function getAccounts(query: ListQuery) {
   const scope = await requireCollegeAdmin();
   const page = clampPage(query.page);
   const status = pick(INVOICEABLE, query.status);
-  const term = trimmed(query.q);
+  const semester = trimmed(query.q);
 
   const where: Prisma.InvoiceWhereInput = {
     AND: [
       campusWhere(scope.campusId),
       status ? { status } : { status: { not: "VOID" } },
-      term ? { OR: [{ number: contains(term) }, throughStudent(term ? query.q : undefined)] } : {},
+      semester ? { OR: [{ number: contains(semester) }, throughStudent(semester ? query.q : undefined)] } : {},
     ],
   };
 
@@ -668,7 +668,7 @@ export async function getAccounts(query: ListQuery) {
       take: pagination.window,
       include: {
         student: { select: { id: true, admissionNo: true, user: { select: { fullName: true } } } },
-        term: { select: { name: true } },
+        semester: { select: { name: true } },
         lines: true,
         payments: { orderBy: { paidAt: "desc" } },
       },
@@ -705,12 +705,12 @@ export async function getCards(query: ListQuery) {
   const scope = await requireCollegeAdmin();
   const page = clampPage(query.page);
   const status = pick(CARDABLE, query.status);
-  const term = trimmed(query.q);
+  const semester = trimmed(query.q);
   const where = {
     AND: [
       campusWhere(scope.campusId),
       status ? { status } : {},
-      term ? { OR: [{ serial: contains(term) }, { student: { admissionNo: contains(term) } }] } : {},
+      semester ? { OR: [{ serial: contains(semester) }, { student: { admissionNo: contains(semester) } }] } : {},
     ],
   };
 
@@ -896,14 +896,14 @@ export async function getTutorOptions(campusId: number | null) {
 }
 
 /**
- * A term is one campus's, so this select never offers another campus's window. A super
- * admin is not pinned to a campus and sees every term, labelled with the campus it runs on.
+ * A semester is one campus's, so this select never offers another campus's window. A super
+ * admin is not pinned to a campus and sees every semester, labelled with the campus it runs on.
  */
-export async function getTermOptions() {
+export async function getSemesterOptions() {
   const scope = await requireCollegeAdmin();
-  const rows = await prisma.term.findMany({
+  const rows = await prisma.semester.findMany({
     where: campusWhere(scope.campusId),
-    orderBy: [{ year: "desc" }, { termNo: "desc" }],
+    orderBy: [{ year: "desc" }, { semesterNo: "desc" }],
     select: { id: true, name: true, campus: { select: { name: true } } },
   });
 
@@ -916,11 +916,11 @@ export async function getTermOptions() {
 export async function getIntakeOptions() {
   const scope = await requireCollegeAdmin();
   const rows = await prisma.intake.findMany({
-    where: { term: { status: { in: ["ACTIVE", "PLANNED"] }, ...campusWhere(scope.campusId) } },
+    where: { semester: { status: { in: ["ACTIVE", "PLANNED"] }, ...campusWhere(scope.campusId) } },
     orderBy: { applicationDeadline: "desc" },
-    include: { term: { select: { name: true } } },
+    include: { semester: { select: { name: true } } },
   });
-  return rows.map((row) => ({ value: row.id, label: `${row.name} · ${row.term.name}` }));
+  return rows.map((row) => ({ value: row.id, label: `${row.name} · ${row.semester.name}` }));
 }
 
 export async function getInvoiceOptions(campusId: number | null) {

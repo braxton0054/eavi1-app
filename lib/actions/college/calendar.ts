@@ -1,6 +1,6 @@
 "use server";
 
-import { CalendarEventType, TermStatus } from "@/generated/prisma/enums";
+import { CalendarEventType, SemesterStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin, type AdminScope } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
@@ -19,36 +19,36 @@ import {
   unique,
 } from "@/lib/actions/college/_shared";
 
-const TERM_STATUSES = Object.keys(TermStatus) as (keyof typeof TermStatus)[];
+const SEMESTER_STATUSES = Object.keys(SemesterStatus) as (keyof typeof SemesterStatus)[];
 const EVENT_TYPES = Object.keys(CalendarEventType) as (keyof typeof CalendarEventType)[];
 
 const copy = pages.calendar;
 
 const fieldLabel = (name: string) =>
-  copy.terms.create.fields.find((field) => field.name === name)?.label ??
-  copy.terms.edit.fields.find((field) => field.name === name)?.label ??
-  copy.terms.intake.fields.find((field) => field.name === name)?.label ??
+  copy.semesters.create.fields.find((field) => field.name === name)?.label ??
+  copy.semesters.edit.fields.find((field) => field.name === name)?.label ??
+  copy.semesters.intake.fields.find((field) => field.name === name)?.label ??
   copy.events.create.fields.find((field) => field.name === name)?.label ??
   name;
 
 /** The calendar screen and the overview deadline/event strips all read this. */
 const AFFECTED = ["/dashboard/calendar", "/dashboard"];
 
-/** A term window has to close after it opens, and one campus cannot run two at a time. */
+/** A semester window has to close after it opens, and one campus cannot run two at a time. */
 function orderedDates(from: Date, to: Date) {
   if (to < from) throw new FieldError(fieldErrors.dateOrder);
 }
 
-/** Once a term's window has closed, its schedule is history and stops accepting changes. */
+/** Once a semester's window has closed, its schedule is history and stops accepting changes. */
 function assertNotEnded(endDate: Date) {
-  if (endDate < startOfToday()) throw new FieldError(fieldErrors.termEnded);
+  if (endDate < startOfToday()) throw new FieldError(fieldErrors.semesterEnded);
 }
 
 /**
- * The campus a term is written to. A campus admin is pinned to their own and the form value
+ * The campus a semester is written to. A campus admin is pinned to their own and the form value
  * is ignored; a super admin has no campus of their own, so they name the one being configured.
  */
-async function termCampusId(scope: AdminScope, formData: FormData): Promise<number> {
+async function semesterCampusId(scope: AdminScope, formData: FormData): Promise<number> {
   if (scope.campusId !== null) return scope.campusId;
 
   const campusId = requiredNumber(formData, "campusId", fieldLabel("campusId"));
@@ -59,10 +59,10 @@ async function termCampusId(scope: AdminScope, formData: FormData): Promise<numb
 }
 
 /** The label a campus admin reads for a slot, generated so nobody types a duplicate. */
-const termName = (termNo: number, year: number) => `${copy.terms.slot} ${termNo} · ${year}`;
+const semesterName = (semesterNo: number, year: number) => `${copy.semesters.slot} ${semesterNo} · ${year}`;
 
 async function assertNoOverlap(campusId: number, from: Date, to: Date, exceptId?: string) {
-  const clash = await prisma.term.findFirst({
+  const clash = await prisma.semester.findFirst({
     where: {
       campusId,
       ...(exceptId ? { id: { not: exceptId } } : {}),
@@ -74,18 +74,18 @@ async function assertNoOverlap(campusId: number, from: Date, to: Date, exceptId?
   if (clash) throw new FieldError(fieldErrors.windowOverlap(clash.name));
 }
 
-export async function createTerm(formData: FormData) {
+export async function createSemester(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
-    const campusId = await termCampusId(scope, formData);
+    const campusId = await semesterCampusId(scope, formData);
 
     const year = Math.round(requiredNumber(formData, "year", fieldLabel("year")));
     assertOpenYear(year);
 
-    const termNo = requiredNumber(formData, "termNo", fieldLabel("termNo"));
-    if (!Number.isInteger(termNo) || termNo < 1 || termNo > 3) {
-      throw new FieldError(fieldErrors.termSlot(fieldLabel("termNo")));
+    const semesterNo = requiredNumber(formData, "semesterNo", fieldLabel("semesterNo"));
+    if (!Number.isInteger(semesterNo) || semesterNo < 1 || semesterNo > 3) {
+      throw new FieldError(fieldErrors.semesterSlot(fieldLabel("semesterNo")));
     }
 
     const startDate = requiredDate(formData, "startDate", fieldLabel("startDate"));
@@ -93,27 +93,27 @@ export async function createTerm(formData: FormData) {
     orderedDates(startDate, endDate);
     assertNotEnded(endDate);
 
-    const name = termName(termNo, year);
-    const taken = await prisma.term.findUnique({
-      where: { campusId_year_termNo: { campusId, year, termNo } },
+    const name = semesterName(semesterNo, year);
+    const taken = await prisma.semester.findUnique({
+      where: { campusId_year_semesterNo: { campusId, year, semesterNo } },
       select: { id: true },
     });
-    if (taken) throw new FieldError(fieldErrors.termExists(name, year));
+    if (taken) throw new FieldError(fieldErrors.semesterExists(name, year));
 
     await assertNoOverlap(campusId, startDate, endDate);
 
     await unique(name, () =>
-      prisma.term.create({
-        data: { campusId, year, termNo, name, startDate, endDate, status: "PLANNED" },
+      prisma.semester.create({
+        data: { campusId, year, semesterNo, name, startDate, endDate, status: "PLANNED" },
       }),
     );
   });
 }
 
-/** A term is campus property, so its id is only honoured when it is the caller's own. */
-async function ownTerm(termId: string, campusId: number | null) {
-  const term = await prisma.term.findUnique({
-    where: { id: termId },
+/** A semester is campus property, so its id is only honoured when it is the caller's own. */
+async function ownSemester(semesterId: string, campusId: number | null) {
+  const semester = await prisma.semester.findUnique({
+    where: { id: semesterId },
     select: {
       id: true,
       campusId: true,
@@ -122,34 +122,34 @@ async function ownTerm(termId: string, campusId: number | null) {
       endDate: true,
     },
   });
-  if (!term || (campusId !== null && term.campusId !== campusId)) {
+  if (!semester || (campusId !== null && semester.campusId !== campusId)) {
     throw new FieldError(fieldErrors.notOnCampus);
   }
-  assertOpenYear(term.year);
-  return term;
+  assertOpenYear(semester.year);
+  return semester;
 }
 
-export async function updateTerm(formData: FormData) {
+export async function updateSemester(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
-    const term = await ownTerm(hiddenId(formData, "termId", copy.terms.heading), scope.campusId);
+    const semester = await ownSemester(hiddenId(formData, "semesterId", copy.semesters.heading), scope.campusId);
 
     const startDate = requiredDate(formData, "startDate", fieldLabel("startDate"));
     const endDate = requiredDate(formData, "endDate", fieldLabel("endDate"));
     orderedDates(startDate, endDate);
-    const status = enumField(formData, "status", TERM_STATUSES, fieldLabel("status"));
+    const status = enumField(formData, "status", SEMESTER_STATUSES, fieldLabel("status"));
 
-    // An ended term keeps its dates; the office can still record how it finished.
+    // An ended semester keeps its dates; the office can still record how it finished.
     const sameWindow =
-      startDate.getTime() === term.startDate.getTime() &&
-      endDate.getTime() === term.endDate.getTime();
-    if (!sameWindow) assertNotEnded(term.endDate);
+      startDate.getTime() === semester.startDate.getTime() &&
+      endDate.getTime() === semester.endDate.getTime();
+    if (!sameWindow) assertNotEnded(semester.endDate);
 
-    await assertNoOverlap(term.campusId, startDate, endDate, term.id);
+    await assertNoOverlap(semester.campusId, startDate, endDate, semester.id);
 
-    await prisma.term.update({
-      where: { id: term.id },
+    await prisma.semester.update({
+      where: { id: semester.id },
       data: { startDate, endDate, status },
     });
   });
@@ -159,9 +159,9 @@ export async function createIntake(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
-    const termId = hiddenId(formData, "termId", copy.terms.heading);
-    const term = await ownTerm(termId, scope.campusId);
-    assertNotEnded(term.endDate);
+    const semesterId = hiddenId(formData, "semesterId", copy.semesters.heading);
+    const semester = await ownSemester(semesterId, scope.campusId);
+    assertNotEnded(semester.endDate);
 
     const name = requiredText(formData, "name", fieldLabel("name"));
     const applicationDeadline = requiredDate(
@@ -174,21 +174,21 @@ export async function createIntake(formData: FormData) {
 
     await unique(fieldLabel("name"), () =>
       prisma.intake.create({
-        data: { termId: term.id, name, applicationDeadline, commenceAt },
+        data: { semesterId: semester.id, name, applicationDeadline, commenceAt },
       }),
     );
   });
 }
 
 /**
- * With a term on the form the entry belongs to that term's campus. Without one it is a
+ * With a semester on the form the entry belongs to that semester's campus. Without one it is a
  * college-wide entry, which only an administrator with no campus of their own may post.
  */
 export async function createEvent(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
-    const termId = text(formData, "termId");
+    const semesterId = text(formData, "semesterId");
     const title = requiredText(formData, "title", fieldLabel("title"));
     const type = enumField(formData, "type", EVENT_TYPES, fieldLabel("type"));
     const startsAt = requiredDate(formData, "startsAt", fieldLabel("startsAt"));
@@ -198,19 +198,19 @@ export async function createEvent(formData: FormData) {
     if (endsAt && endsAt < startsAt) throw new FieldError(fieldErrors.dateOrder);
 
     let campusId: number | null = null;
-    let linkedTermId: string | null = null;
+    let linkedSemesterId: string | null = null;
 
-    if (termId) {
-      const term = await ownTerm(termId, scope.campusId);
-      assertNotEnded(term.endDate);
-      campusId = term.campusId;
-      linkedTermId = term.id;
+    if (semesterId) {
+      const semester = await ownSemester(semesterId, scope.campusId);
+      assertNotEnded(semester.endDate);
+      campusId = semester.campusId;
+      linkedSemesterId = semester.id;
     } else if (scope.campusId !== null) {
       throw new FieldError(fieldErrors.notOnCampus);
     }
 
     await prisma.calendarEvent.create({
-      data: { termId: linkedTermId, campusId, title, description, type, startsAt, endsAt },
+      data: { semesterId: linkedSemesterId, campusId, title, description, type, startsAt, endsAt },
     });
   });
 }
@@ -226,18 +226,18 @@ export async function deleteEvent(formData: FormData) {
       select: {
         id: true,
         campusId: true,
-        term: { select: { campusId: true, year: true, endDate: true } },
+        semester: { select: { campusId: true, year: true, endDate: true } },
       },
     });
-    const owner = event?.campusId ?? event?.term?.campusId ?? null;
+    const owner = event?.campusId ?? event?.semester?.campusId ?? null;
 
     // A college-wide entry is the super admin's to remove; anything else goes to its campus.
     if (!event || (scope.campusId !== null && owner !== scope.campusId)) {
       throw new FieldError(fieldErrors.notOnCampus);
     }
-    if (event.term) {
-      assertOpenYear(event.term.year);
-      assertNotEnded(event.term.endDate);
+    if (event.semester) {
+      assertOpenYear(event.semester.year);
+      assertNotEnded(event.semester.endDate);
     }
 
     await prisma.calendarEvent.delete({ where: { id: event.id } });

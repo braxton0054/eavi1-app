@@ -1,9 +1,9 @@
 import {
   createEvent,
   createIntake,
-  createTerm,
+  createSemester,
   deleteEvent,
-  updateTerm,
+  updateSemester,
 } from "@/lib/actions/college/calendar";
 import { getCalendar } from "@/lib/dal/college";
 import { common, labels, pages } from "@/lib/content/dashboard";
@@ -17,7 +17,7 @@ import { formatDate, toDateInput } from "@/lib/format";
 
 const copy = pages.calendar;
 
-const termTone: Record<string, ChipTone> = {
+const semesterTone: Record<string, ChipTone> = {
   PLANNED: "info",
   ACTIVE: "success",
   COMPLETED: "neutral",
@@ -40,7 +40,7 @@ const cardTone: Record<string, ChipTone> = {
   REPLACED: "neutral",
 };
 
-/** A term normally runs one of each, but any number of sittings of either type is allowed. */
+/** A semester normally runs one of each, but any number of sittings of either type is allowed. */
 const EXAM_TYPES = ["CAT", "END_TERM"] as const;
 
 /** The year step control: a link while the window has road left, a plain label when it does not. */
@@ -95,7 +95,7 @@ export default async function CalendarPage({
     "h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
   // A campus admin is pinned to their own campus, so the campus select is not offered.
-  const termFields = copy.terms.create.fields.filter(
+  const semesterFields = copy.semesters.create.fields.filter(
     (field) => field.name !== "campusId" || collegeAdmin,
   );
 
@@ -172,65 +172,65 @@ export default async function CalendarPage({
 
       {view.editable ? (
         <DisclosureForm
-          id="new-term"
-          button={copy.terms.create.button}
-          title={copy.terms.create.title}
-          fields={termFields}
+          id="new-semester"
+          button={copy.semesters.create.button}
+          title={copy.semesters.create.title}
+          fields={semesterFields}
           options={options}
           values={{ year: String(view.year) }}
-          action={createTerm}
+          action={createSemester}
           submitLabel={common.create}
         />
       ) : null}
 
       {view.slots.map((slot) => {
-        const term = slot.term;
-        const heading = `${copy.terms.slot} ${slot.termNo} · ${view.year}`;
+        const semester = slot.semester;
+        const heading = `${copy.semesters.slot} ${slot.semesterNo} · ${view.year}`;
         const canEdit = view.editable && slot.editable;
 
         return (
-          <Panel key={slot.termNo} title={heading}>
-            {!term ? (
-              <EmptyState body={copy.terms.notConfigured} icon="calendar" />
+          <Panel key={slot.semesterNo} title={heading}>
+            {!semester ? (
+              <EmptyState body={copy.semesters.notConfigured} icon="calendar" />
             ) : (
               <div className="space-y-5 p-4">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <p className="text-sm font-medium">
-                    {copy.terms.window} {formatDate(term.startDate)} {copy.terms.through}{" "}
-                    {formatDate(term.endDate)}
+                    {copy.semesters.window} {formatDate(semester.startDate)} {copy.semesters.through}{" "}
+                    {formatDate(semester.endDate)}
                   </p>
-                  <StatusChip tone={termTone[term.status] ?? "neutral"}>
-                    {labels.termStatus[term.status]}
+                  <StatusChip tone={semesterTone[semester.status] ?? "neutral"}>
+                    {labels.semesterStatus[semester.status]}
                   </StatusChip>
                   {canEdit ? (
                     <RowForm
-                      id={`edit-term-${term.id}`}
-                      button={copy.terms.edit.button}
-                      fields={copy.terms.edit.fields}
+                      id={`edit-semester-${semester.id}`}
+                      button={copy.semesters.edit.button}
+                      fields={copy.semesters.edit.fields}
                       values={{
-                        startDate: toDateInput(term.startDate),
-                        endDate: toDateInput(term.endDate),
-                        status: term.status,
+                        startDate: toDateInput(semester.startDate),
+                        endDate: toDateInput(semester.endDate),
+                        status: semester.status,
                       }}
-                      hidden={{ termId: term.id }}
-                      action={updateTerm}
+                      hidden={{ semesterId: semester.id }}
+                      action={updateSemester}
                       submitLabel={common.save}
                     />
                   ) : (
                     <p className="text-xs text-eavi-muted-text">
-                      {copy.terms.endedNote(formatDate(term.endDate))}
+                      {copy.semesters.endedNote(formatDate(semester.endDate))}
                     </p>
                   )}
                 </div>
 
                 <div className="grid gap-5 md:grid-cols-2">
                   <section>
-                    <h3 className="text-sm font-semibold">{copy.terms.intakesHeading}</h3>
-                    {term.intakes.length === 0 ? (
-                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.terms.emptyIntakes}</p>
+                    <h3 className="text-sm font-semibold">{copy.semesters.intakesHeading}</h3>
+                    {semester.intakes.length === 0 ? (
+                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.semesters.emptyIntakes}</p>
                     ) : (
                       <ul className="mt-1 divide-y divide-eavi-border text-sm">
-                        {term.intakes.map((intake) => (
+                        {semester.intakes.map((intake) => (
                           <li key={intake.id} className="py-2">
                             <p className="font-medium">{intake.name}</p>
                             <p className="text-xs text-eavi-muted-text">
@@ -242,10 +242,10 @@ export default async function CalendarPage({
                     )}
                     {canEdit ? (
                       <RowForm
-                        id={`new-intake-${term.id}`}
-                        button={copy.terms.intake.button}
-                        fields={copy.terms.intake.fields}
-                        hidden={{ termId: term.id }}
+                        id={`new-intake-${semester.id}`}
+                        button={copy.semesters.intake.button}
+                        fields={copy.semesters.intake.fields}
+                        hidden={{ semesterId: semester.id }}
                         action={createIntake}
                         submitLabel={common.create}
                       />
@@ -253,13 +253,13 @@ export default async function CalendarPage({
                   </section>
 
                   <section>
-                    <h3 className="text-sm font-semibold">{copy.terms.examsHeading}</h3>
-                    {term.exams.length === 0 ? (
-                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.terms.emptyExams}</p>
+                    <h3 className="text-sm font-semibold">{copy.semesters.examsHeading}</h3>
+                    {semester.exams.length === 0 ? (
+                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.semesters.emptyExams}</p>
                     ) : (
                       <div className="mt-1 space-y-3">
                         {EXAM_TYPES.map((type) => {
-                          const papers = term.exams.filter((exam) => exam.type === type);
+                          const papers = semester.exams.filter((exam) => exam.type === type);
                           if (papers.length === 0) return null;
 
                           return (
@@ -288,9 +288,9 @@ export default async function CalendarPage({
                   </section>
 
                   <section>
-                    <h3 className="text-sm font-semibold">{copy.terms.cardsHeading}</h3>
+                    <h3 className="text-sm font-semibold">{copy.semesters.cardsHeading}</h3>
                     {slot.cards.length === 0 ? (
-                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.terms.emptyCards}</p>
+                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.semesters.emptyCards}</p>
                     ) : (
                       <ul className="mt-1 divide-y divide-eavi-border text-sm">
                         {slot.cards.map((card) => (
@@ -309,12 +309,12 @@ export default async function CalendarPage({
                   </section>
 
                   <section>
-                    <h3 className="text-sm font-semibold">{copy.terms.eventsHeading}</h3>
-                    {term.calendarEvents.length === 0 ? (
-                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.terms.emptyEvents}</p>
+                    <h3 className="text-sm font-semibold">{copy.semesters.eventsHeading}</h3>
+                    {semester.calendarEvents.length === 0 ? (
+                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.semesters.emptyEvents}</p>
                     ) : (
                       <ul className="mt-1 divide-y divide-eavi-border text-sm">
-                        {term.calendarEvents.map((event) => (
+                        {semester.calendarEvents.map((event) => (
                           <li key={event.id} className="flex items-center justify-between gap-3 py-2">
                             <span className="min-w-0">
                               <span className="block truncate font-medium">{event.title}</span>
@@ -345,10 +345,10 @@ export default async function CalendarPage({
                     )}
                     {canEdit ? (
                       <RowForm
-                        id={`new-event-${term.id}`}
+                        id={`new-event-${semester.id}`}
                         button={copy.events.create.button}
                         fields={copy.events.create.fields}
-                        hidden={{ termId: term.id }}
+                        hidden={{ semesterId: semester.id }}
                         action={createEvent}
                         submitLabel={common.create}
                       />

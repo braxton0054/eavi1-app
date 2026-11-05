@@ -15,7 +15,7 @@ import {
   requiredNumber,
   requiredText,
   text,
-  termOnCampus,
+  semesterOnCampus,
   unique,
 } from "@/lib/actions/college/_shared";
 
@@ -82,8 +82,8 @@ export async function createInvoice(formData: FormData) {
     if (campusId === null) throw new FieldError(fieldErrors.notOnCampus);
 
     const studentId = requiredText(formData, "studentId", fieldLabel("studentId"));
-    // The bill is raised against this campus's term, so a foreign term id is refused here.
-    const termId = await termOnCampus(formData, "termId", campusId);
+    // The bill is raised against this campus's semester, so a foreign semester id is refused here.
+    const semesterId = await semesterOnCampus(formData, "semesterId", campusId);
     const dueAt = dateField(formData, "dueAt");
     const note = text(formData, "note");
 
@@ -105,7 +105,7 @@ export async function createInvoice(formData: FormData) {
           where: {
             programId: enrollment.programId,
             isOptional: false,
-            termId,
+            semesterId,
           },
           orderBy: { label: "asc" },
           select: { label: true, amount: true },
@@ -121,7 +121,7 @@ export async function createInvoice(formData: FormData) {
             number,
             studentId,
             campusId,
-            termId,
+            semesterId,
             programId: enrollment?.programId ?? null,
             dueAt,
             note,

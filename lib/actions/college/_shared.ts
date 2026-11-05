@@ -151,10 +151,10 @@ export async function unique<T>(label: string, work: () => Promise<T>): Promise<
 }
 
 /**
- * A term runs on one campus only, so a form-supplied term id is honoured only when that term
- * is the caller's. Blank stays blank; a foreign term is refused rather than quietly dropped.
+ * A semester runs on one campus only, so a form-supplied semester id is honoured only when that semester
+ * is the caller's. Blank stays blank; a foreign semester is refused rather than quietly dropped.
  */
-export async function termOnCampus(
+export async function semesterOnCampus(
   formData: FormData,
   name: string,
   campusId: number | null,
@@ -162,15 +162,15 @@ export async function termOnCampus(
   const value = text(formData, name);
   if (!value) return null;
 
-  const term = await prisma.term.findUnique({
+  const semester = await prisma.semester.findUnique({
     where: { id: value },
     select: { id: true, campusId: true },
   });
-  if (!term || (campusId !== null && term.campusId !== campusId)) {
+  if (!semester || (campusId !== null && semester.campusId !== campusId)) {
     throw new FieldError(fieldErrors.notOnCampus);
   }
 
-  return term.id;
+  return semester.id;
 }
 
 /**

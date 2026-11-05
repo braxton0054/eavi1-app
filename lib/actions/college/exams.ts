@@ -16,7 +16,7 @@ import {
   requiredText,
   text,
   timeField,
-  termOnCampus,
+  semesterOnCampus,
 } from "@/lib/actions/college/_shared";
 
 const STATUSES = Object.keys(ExamStatus) as (keyof typeof ExamStatus)[];
@@ -53,8 +53,8 @@ export async function createExam(formData: FormData) {
     });
     if (!program) throw new FieldError(fieldErrors.notOnCampus);
 
-    // The paper sits inside this campus's term, so a term id from another campus is refused.
-    const termId = await termOnCampus(formData, "termId", campusId);
+    // The paper sits inside this campus's semester, so a semester id from another campus is refused.
+    const semesterId = await semesterOnCampus(formData, "semesterId", campusId);
 
     const type = enumField(formData, "type", TYPES, fieldLabel("type"));
     const date = requiredDate(formData, "date", fieldLabel("date"));
@@ -84,7 +84,7 @@ export async function createExam(formData: FormData) {
         title,
         programId,
         campusId,
-        termId,
+        semesterId,
         invigilatorId: invigilatorId ?? null,
         date,
         startAt,

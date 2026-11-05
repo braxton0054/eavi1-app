@@ -47,7 +47,7 @@ export type Field = {
     | "programs"
     | "students"
     | "tutors"
-    | "terms"
+    | "semesters"
     | "intakes"
     | "enrollments"
     | "invoices"
@@ -189,12 +189,12 @@ export const fieldErrors = {
   notOnCampus: "That record is not available on your account, so nothing was changed.",
   exhausted: "A new reference number could not be issued. Contact the college office.",
   yearClosed: "That academic year is closed for changes.",
-  termEnded: "That term has ended, so it can no longer be changed.",
+  semesterEnded: "That semester has ended, so it can no longer be changed.",
   datePast: "That date has already gone by.",
   reportingPassed: "That reporting date has passed, so it can no longer be changed.",
   dateNotInMonth: (month: string) => `The date must fall inside ${month}.`,
-  termSlot: (label: string) => `${label} must be Term 1, Term 2 or Term 3.`,
-  termExists: (slot: string, year: number) => `${slot} ${year} is already configured.`,
+  semesterSlot: (label: string) => `${label} must be Semester 1, Semester 2 or Semester 3.`,
+  semesterExists: (slot: string, year: number) => `${slot} ${year} is already configured.`,
   windowOverlap: (name: string) => `Those dates overlap ${name}.`,
 };
 
@@ -291,7 +291,7 @@ export const labels = {
     FINANCE: "Finance",
     MEETING: "Meeting",
   },
-  termStatus: {
+  semesterStatus: {
     PLANNED: "Planned",
     ACTIVE: "Running",
     COMPLETED: "Completed",
@@ -340,7 +340,7 @@ export const pages = {
     ] as const,
     lists: {
       deadlines: "Application deadlines",
-      deadlinesEmpty: "No intake deadlines on a running term.",
+      deadlinesEmpty: "No intake deadlines on a running semester.",
       events: "Coming up on the calendar",
       eventsEmpty: "Nothing scheduled.",
       exams: "Exams ahead",
@@ -641,7 +641,7 @@ export const pages = {
       show: "Show",
       previous: "Previous year",
       next: "Next year",
-      heading: "Term windows for",
+      heading: "Semester windows for",
       closed: "Closed for changes",
       closedTitle: "Changes closed",
       closedBody: (year: number) => `The calendar for ${year} can no longer be changed.`,
@@ -649,54 +649,54 @@ export const pages = {
     campus: {
       select: "Campus",
     },
-    terms: {
-      heading: "Terms",
+    semesters: {
+      heading: "Semesters",
       empty: "Nothing configured for this year yet.",
-      slot: "Term",
+      slot: "Semester",
       notConfigured: "Not configured.",
       window: "Runs",
       through: "to",
       configure: "Configure",
       endedNote: (date: string) => `Ended ${date}`,
       intakesHeading: "Intake windows",
-      emptyIntakes: "No intake window on this term.",
+      emptyIntakes: "No intake window on this semester.",
       examsHeading: "Exam dates",
-      emptyExams: "No exam dates on this term.",
+      emptyExams: "No exam dates on this semester.",
       cardsHeading: "Cards issued",
       emptyCards: "No cards issued in this window.",
       eventsHeading: "Events",
-      emptyEvents: "No events on this term.",
+      emptyEvents: "No events on this semester.",
       create: {
-        button: "Add term",
-        title: "New term",
+        button: "Add semester",
+        title: "New semester",
         fields: [
           { name: "campusId", label: "Campus", type: "select", required: true, optionKey: "campuses" },
           { name: "year", label: "Year", type: "select", required: true, optionKey: "years" },
           {
-            name: "termNo",
-            label: "Term",
+            name: "semesterNo",
+            label: "Semester",
             type: "select",
             required: true,
             options: [
-              { value: "1", label: "Term 1" },
-              { value: "2", label: "Term 2" },
-              { value: "3", label: "Term 3" },
+              { value: "1", label: "Semester 1" },
+              { value: "2", label: "Semester 2" },
+              { value: "3", label: "Semester 3" },
             ],
           },
-          { name: "startDate", label: "Term starts", type: "date", required: true },
-          { name: "endDate", label: "Term ends", type: "date", required: true },
+          { name: "startDate", label: "Semester starts", type: "date", required: true },
+          { name: "endDate", label: "Semester ends", type: "date", required: true },
         ] satisfies Field[],
-        created: "Term saved.",
+        created: "Semester saved.",
       },
       edit: {
         button: "Change dates",
-        title: "Change the term window",
+        title: "Change the semester window",
         fields: [
-          { name: "startDate", label: "Term starts", type: "date", required: true },
-          { name: "endDate", label: "Term ends", type: "date", required: true },
-          { name: "status", label: "Status", type: "select", required: true, options: toOptions(labels.termStatus) },
+          { name: "startDate", label: "Semester starts", type: "date", required: true },
+          { name: "endDate", label: "Semester ends", type: "date", required: true },
+          { name: "status", label: "Status", type: "select", required: true, options: toOptions(labels.semesterStatus) },
         ] satisfies Field[],
-        saved: "Term updated.",
+        saved: "Semester updated.",
       },
       intake: {
         button: "Add intake",
@@ -766,7 +766,7 @@ export const pages = {
       fields: [
         { name: "title", label: "Paper title", type: "text", required: true, wide: true },
         { name: "programId", label: "Programme", type: "select", required: true, optionKey: "programs" },
-        { name: "termId", label: "Term", type: "select", optionKey: "terms" },
+        { name: "semesterId", label: "Semester", type: "select", optionKey: "semesters" },
         {
           name: "type",
           label: "Type",
@@ -839,7 +839,7 @@ export const pages = {
       title: "New invoice",
       fields: [
         { name: "studentId", label: "Student", type: "select", required: true, optionKey: "students" },
-        { name: "termId", label: "Term", type: "select", optionKey: "terms" },
+        { name: "semesterId", label: "Semester", type: "select", optionKey: "semesters" },
         { name: "dueAt", label: "Due date", type: "date" },
         { name: "note", label: "Note on the invoice", type: "textarea", wide: true },
       ] satisfies Field[],

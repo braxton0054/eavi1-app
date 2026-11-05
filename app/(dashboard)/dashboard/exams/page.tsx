@@ -1,5 +1,5 @@
 import { createExam } from "@/lib/actions/college/exams";
-import { getExams, getProgramOptions, getTermOptions, getTutorOptions } from "@/lib/dal/college";
+import { getExams, getProgramOptions, getSemesterOptions, getTutorOptions } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
@@ -31,14 +31,14 @@ export default async function ExamsPage({
   const { q, invalid } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  const [exams, programOptions, tutorOptions, termOptions] = await Promise.all([
+  const [exams, programOptions, tutorOptions, semesterOptions] = await Promise.all([
     getExams({ q }),
     getProgramOptions(scope.campusId),
     getTutorOptions(scope.campusId),
-    getTermOptions(),
+    getSemesterOptions(),
   ]);
 
-  const options: OptionSets = { programs: programOptions, tutors: tutorOptions, terms: termOptions };
+  const options: OptionSets = { programs: programOptions, tutors: tutorOptions, semesters: semesterOptions };
 
   const rows: Row[] = exams.map((exam) => ({
     id: exam.id,

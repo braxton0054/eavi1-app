@@ -66,7 +66,7 @@ enum EntryGrade {
   E
 }
 
-enum TermStatus {
+enum SemesterStatus {
   PLANNED
   ACTIVE
   COMPLETED
@@ -155,7 +155,7 @@ model Campus {
   applications   Application[]
   enrollments    Enrollment[]
   calendarEvents  CalendarEvent[]
-  terms           Term[]
+  semesters       Semester[]
   timetableSlots  TimetableSlot[]
   exams           Exam[]
   invoices        Invoice[]
@@ -319,18 +319,18 @@ model Application {
   @@map("applications")
 }
 
-/// One of the three terms a campus runs in a calendar year. Campuses never share a term,
-/// so the identity of a term is (campus, year, term number).
-model Term {
+/// One of the three semesters a campus runs in a calendar year. Campuses never share a
+/// semester, so the identity of a semester is (campus, year, semester number).
+model Semester {
   id             String          @id @default(uuid())
   campusId       Int
   campus         Campus          @relation(fields: [campusId], references: [id])
   year           Int
-  termNo         Int
+  semesterNo     Int
   name           String
   startDate      DateTime
   endDate        DateTime
-  status         TermStatus      @default(PLANNED)
+  status         SemesterStatus  @default(PLANNED)
   intakes        Intake[]
   calendarEvents CalendarEvent[]
   exams          Exam[]
@@ -340,22 +340,22 @@ model Term {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  @@unique([campusId, year, termNo])
+  @@unique([campusId, year, semesterNo])
   @@index([campusId, startDate])
-  @@map("terms")
+  @@map("semesters")
 }
 
 /// An admission window inside a term (May, September, January intakes).
 model Intake {
   id                    String      @id @default(uuid())
   name                  String
-  termId                String
-  term                  Term        @relation(fields: [termId], references: [id])
+  semesterId            String
+  semester              Semester    @relation(fields: [semesterId], references: [id])
   applicationDeadline   DateTime
   commenceAt            DateTime
   enrollments           Enrollment[]
 
-  @@unique([termId, name])
+  @@unique([semesterId, name])
   @@map("intakes")
 }
 
@@ -382,8 +382,8 @@ model ReportingDate {
 model CalendarEvent {
   id          String            @id @default(uuid())
   /// Nullable so a super admin can post a college-wide entry that belongs to no campus term.
-  termId      String?
-  term        Term?             @relation(fields: [termId], references: [id])
+  semesterId  String?
+  semester    Semester?         @relation(fields: [semesterId], references: [id])
   campusId    Int?
   campus      Campus?           @relation(fields: [campusId], references: [id])
   title       String
@@ -428,8 +428,8 @@ model TimetableSlot {
   program         Program   @relation(fields: [programId], references: [id])
   tutorId         String?
   tutor           TutorProfile? @relation(fields: [tutorId], references: [id])
-  termId          String?
-  term            Term?     @relation(fields: [termId], references: [id])
+  semesterId      String?
+  semester        Semester? @relation(fields: [semesterId], references: [id])
   day             Weekday
   startAt         String
   endAt           String
@@ -448,8 +448,8 @@ model Exam {
   program         Program      @relation(fields: [programId], references: [id])
   campusId        Int
   campus          Campus       @relation(fields: [campusId], references: [id])
-  termId          String?
-  term            Term?        @relation(fields: [termId], references: [id])
+  semesterId      String?
+  semester        Semester?    @relation(fields: [semesterId], references: [id])
   invigilatorId   String?
   invigilator     TutorProfile? @relation("ExamInvigilator", fields: [invigilatorId], references: [id])
   date            DateTime
@@ -489,8 +489,8 @@ model FeeItem {
   id         String   @id @default(uuid())
   programId  String
   program    Program  @relation(fields: [programId], references: [id])
-  termId     String?
-  term       Term?    @relation(fields: [termId], references: [id])
+  semesterId String?
+  semester   Semester? @relation(fields: [semesterId], references: [id])
   label      String
   amount     Decimal  @db.Decimal(12, 2)
   isOptional Boolean  @default(false)
@@ -507,8 +507,8 @@ model Invoice {
   student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
   campusId  Int
   campus    Campus        @relation(fields: [campusId], references: [id])
-  termId    String?
-  term      Term?         @relation(fields: [termId], references: [id])
+  semesterId String?
+  semester   Semester?     @relation(fields: [semesterId], references: [id])
   programId String?
   dueAt     DateTime?
   status    InvoiceStatus @default(OPEN)

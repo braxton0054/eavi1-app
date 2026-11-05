@@ -56,7 +56,7 @@ export default async function EnrollmentsPage({
       admissionNo: enrollment.student.admissionNo,
       student: enrollment.student.user.fullName,
       program: `${enrollment.program.name} (${enrollment.program.code})`,
-      intake: enrollment.intake ? `${enrollment.intake.name} · ${enrollment.intake.term.name}` : common.notSet,
+      intake: enrollment.intake ? `${enrollment.intake.name} · ${enrollment.intake.semester.name}` : common.notSet,
       cohort: enrollment.cohort ?? common.notSet,
       status: (
         <StatusChip tone={enrollmentTone[enrollment.status] ?? "neutral"}>

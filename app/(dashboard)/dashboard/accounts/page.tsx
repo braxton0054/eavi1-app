@@ -8,7 +8,7 @@ import {
   getAccounts,
   getInvoiceOptions,
   getStudentOptions,
-  getTermOptions,
+  getSemesterOptions,
 } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
@@ -41,16 +41,16 @@ export default async function AccountsPage({
   const { q, status, page, invalid } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  const [list, studentOptions, termOptions, invoiceOptions] = await Promise.all([
+  const [list, studentOptions, semesterOptions, invoiceOptions] = await Promise.all([
     getAccounts({ q, status, page: Number(page) || 1 }),
     getStudentOptions(scope.campusId),
-    getTermOptions(),
+    getSemesterOptions(),
     getInvoiceOptions(scope.campusId),
   ]);
 
   const options: OptionSets = {
     students: studentOptions,
-    terms: termOptions,
+    semesters: semesterOptions,
     invoices: invoiceOptions,
   };
 
