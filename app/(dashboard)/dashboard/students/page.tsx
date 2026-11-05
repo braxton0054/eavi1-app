@@ -1,14 +1,12 @@
-import { createStudent } from "@/lib/actions/college/students";
-import { getStudents, getIntakeOptions, getProgramOptions } from "@/lib/dal/college";
+import { getStudents } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
-import { DisclosureForm } from "@/components/dashboard/record-form";
 import { ListFilters, Paginator, ResultCount } from "@/components/dashboard/list-tools";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { money } from "@/lib/format";
-import type { OptionSets } from "@/components/dashboard/record-form";
+
 
 
 const copy = pages.students;
@@ -30,13 +28,7 @@ export default async function StudentsPage({
   const { q, page, invalid } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  const [list, programOptions, intakeOptions] = await Promise.all([
-    getStudents({ q, page: Number(page) || 1 }),
-    getProgramOptions(scope.campusId),
-    getIntakeOptions(),
-  ]);
-
-  const options: OptionSets = { programs: programOptions, intakes: intakeOptions };
+  const list = await getStudents({ q, page: Number(page) || 1 });
 
   const rows: Row[] = list.rows.map((student) => {
     const program = student.enrollments[0]?.program;
@@ -86,16 +78,6 @@ export default async function StudentsPage({
       />
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
-
-      <DisclosureForm
-        id="new-student"
-        button={copy.create.button}
-        title={copy.create.title}
-        fields={copy.create.fields}
-        options={options}
-        action={createStudent}
-        submitLabel={common.create}
-      />
 
       <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
         <div className="space-y-4 p-4">
