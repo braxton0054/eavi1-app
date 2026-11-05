@@ -50,14 +50,17 @@ jobs:
         run: npm run db:deploy
 
       - run: npm run lint
-      - run: npx tsc --noEmit
 
       # The image build has no database to reach, so neither may the production build.
       # Port 1 is never listening: this fails loudly if any route touches Prisma at build.
+      # This also has to come before the type check, because `next build` is what writes
+      # next-env.d.ts and .next/types — the route types LayoutProps and PageProps live there.
       - name: Production build without a database
         env:
           DATABASE_URL: postgresql://none:none@127.0.0.1:1/none
         run: npm run build
+
+      - run: npx tsc --noEmit
 
   image:
     name: Docker image builds
