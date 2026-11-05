@@ -102,7 +102,6 @@ export const navGroups: {
       { href: "/dashboard/applications", label: "Applications", icon: "applications" },
       { href: "/dashboard/students", label: "Students", icon: "students" },
       { href: "/dashboard/enrollments", label: "Enrollments", icon: "enrollments" },
-      { href: "/dashboard/students/enrol", label: "Enrolment", icon: "students" },
     ],
   },
   {
