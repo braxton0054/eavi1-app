@@ -1,4 +1,4 @@
-import { createEnrollment, setEnrollmentStatus } from "@/lib/actions/college/enrollments";
+import { setEnrollmentStatus } from "@/lib/actions/college/enrollments";
 import {
   getApplications,
   getEnrollments,
@@ -16,7 +16,6 @@ import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/pa
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { formatDate } from "@/lib/format";
 import type { Column } from "@/lib/content/dashboard";
-import type { OptionSets } from "@/components/dashboard/record-form";
 
 
 const copy = pages.enrollments;
@@ -36,11 +35,8 @@ export default async function EnrollmentsPage({
   const { q, status, page, invalid } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  const [list, studentOptions, programOptions, intakeOptions, apps] = await Promise.all([
+  const [list, apps] = await Promise.all([
     getEnrollments({ q, status, page: Number(page) || 1 }),
-    getStudentOptions(scope.campusId),
-    getProgramOptions(scope.campusId),
-    getIntakeOptions(),
     getApplications({ page: 1 }),
   ]);
 
@@ -50,7 +46,6 @@ export default async function EnrollmentsPage({
   );
   const availableApps = apps.rows.filter((a) => !enrolledIds.has(a.id));
 
-  const options: OptionSets = { students: studentOptions, programs: programOptions, intakes: intakeOptions };
 
   const statuses = Object.entries(labels.enrollmentStatus).map(([value, label]) => ({
     value,
@@ -78,7 +73,6 @@ export default async function EnrollmentsPage({
           id={`enrollment-${enrollment.id}-status`}
           button={copy.update.title}
           fields={[copy.update.statusField]}
-          options={options}
           values={{ status: enrollment.status }}
           hidden={{ enrollmentId: enrollment.id }}
           action={setEnrollmentStatus}
@@ -116,16 +110,6 @@ export default async function EnrollmentsPage({
       )}
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
-
-      <DisclosureForm
-        id="new-enrollment"
-        button={copy.create.button}
-        title={copy.create.title}
-        fields={copy.create.fields}
-        options={options}
-        action={createEnrollment}
-        submitLabel={common.create}
-      />
 
       <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
         <div className="space-y-4 p-4">
