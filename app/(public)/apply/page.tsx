@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   description: applyPage.metaDescription,
 };
 
+/** Rendered per request: the build has no database, and the programme list changes. */
+export const dynamic = "force-dynamic";
+
 /** The programme list comes from the database, so it streams in after the page shell. */
 async function ApplyForm() {
   const options = await getApplyOptions();
