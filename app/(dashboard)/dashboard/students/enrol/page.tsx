@@ -95,7 +95,7 @@ export default async function EnrolStudentPage({
                   href={`/dashboard/students/enrol?application=${app.id}`}
                   className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
                 >
-                  Enrol
+                  Start enrolment
                 </Link>
               </li>
             ))}

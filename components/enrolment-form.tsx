@@ -382,7 +382,7 @@ export function EnrolmentForm({
             Previous
           </button>
           <button type="submit" className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill">
-            Enrol student
+            Complete enrolment
           </button>
         </div>
       </div>
