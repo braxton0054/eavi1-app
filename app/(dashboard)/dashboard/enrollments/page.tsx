@@ -30,7 +30,7 @@ export default async function EnrollmentsPage({
 
   const [list, apps] = await Promise.all([
     getEnrollments({ q, status, page: Number(page) || 1 }),
-    getApplications({ page: 1 }),
+    getApplications({ q, page: 1 }),
   ]);
 
   const enrolledIds = new Set(
@@ -78,7 +78,7 @@ export default async function EnrollmentsPage({
     <div className="space-y-6">
       <PageHeader
         title={copy.title}
-        description="Find an application to enrol, then manage the students already enrolled below."
+        description="Search once at the top — it filters both the pending applications and the enrolled students."
         action={
           <a
             href="/dashboard/students/enrol"
@@ -91,9 +91,22 @@ export default async function EnrollmentsPage({
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
-      {/* 1 — pending applications, no search needed: the full search lives on the Applications page */}
+      {/* THE one and only search — top of page, filters everything below */}
+      <Panel>
+        <div className="space-y-4 p-4">
+          <ListFilters
+            basePath="/dashboard/enrollments"
+            q={q}
+            status={status}
+            statuses={statuses}
+            searchLabel="Search applications and enrolled students…"
+          />
+        </div>
+      </Panel>
+
+      {/* Pending applications */}
       <Panel
-        title="1 · Applications waiting to be enrolled"
+        title="Applications waiting to be enrolled"
         description="Start the two-step enrolment form for one of these."
         aside={
           <span className="flex items-center gap-2">
@@ -104,47 +117,38 @@ export default async function EnrollmentsPage({
               href="/dashboard/applications"
               className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-3 text-xs font-medium text-eavi-primary-text hover:bg-eavi-muted"
             >
-              Search all applications →
+              All applications →
             </a>
           </span>
         }
       >
-        <div className="p-4">
-          {availableApps.length === 0 ? (
-            <p className="text-sm text-eavi-muted-text">No pending applications. New submissions will appear here once logged.</p>
-          ) : (
-            <ul className="divide-y divide-eavi-border rounded-xl border border-eavi-border">
-              {availableApps.map((app) => (
-                <li key={app.id} className="flex items-center justify-between gap-4 p-4">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{app.fullName}</p>
-                    <p className="truncate text-xs text-eavi-muted-text">
-                      {app.reference} · {app.program.name} ({app.program.code})
-                    </p>
-                  </div>
-                  <a
-                    href={`/dashboard/students/enrol?application=${app.id}`}
-                    className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
-                  >
-                    Start enrolment
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        {availableApps.length === 0 ? (
+          <p className="p-4 text-sm text-eavi-muted-text">No pending applications match. New submissions will appear here once logged.</p>
+        ) : (
+          <ul className="divide-y divide-eavi-border">
+            {availableApps.map((app) => (
+              <li key={app.id} className="flex items-center justify-between gap-4 p-4">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{app.fullName}</p>
+                  <p className="truncate text-xs text-eavi-muted-text">
+                    {app.reference} · {app.program.name} ({app.program.code})
+                  </p>
+                </div>
+                <a
+                  href={`/dashboard/students/enrol?application=${app.id}`}
+                  className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
+                >
+                  Start enrolment
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
       </Panel>
 
-      {/* 2 — enrolled students */}
-      <Panel title={`2 · Enrolled students`} description={pages.overview.scopeNote(scope.campusName)}>
-        <div className="space-y-4 p-4">
-          <ListFilters
-            basePath="/dashboard/enrollments"
-            q={q}
-            status={status}
-            statuses={statuses}
-            searchLabel={copy.searchLabel}
-          />
+      {/* Enrolled students */}
+      <Panel title="Enrolled students" description={pages.overview.scopeNote(scope.campusName)}>
+        <div className="border-b border-eavi-border p-4">
           <ResultCount total={list.total} />
         </div>
 
