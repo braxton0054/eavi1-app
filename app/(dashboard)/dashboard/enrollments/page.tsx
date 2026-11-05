@@ -23,14 +23,14 @@ const enrollmentTone: Record<string, ChipTone> = {
 export default async function EnrollmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string; aq?: string; invalid?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string; invalid?: string }>;
 }) {
-  const { q, status, page, aq, invalid } = await searchParams;
+  const { q, status, page, invalid } = await searchParams;
   const scope = await requireCollegeAdmin();
 
   const [list, apps] = await Promise.all([
     getEnrollments({ q, status, page: Number(page) || 1 }),
-    getApplications({ q: aq, page: 1 }),
+    getApplications({ page: 1 }),
   ]);
 
   const enrolledIds = new Set(
@@ -91,38 +91,25 @@ export default async function EnrollmentsPage({
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
-      {/* 1 — find the application first */}
+      {/* 1 — pending applications, no search needed: the full search lives on the Applications page */}
       <Panel
-        title="1 · Find application to enrol"
-        description="Search submitted applications, then start the two-step enrolment form."
+        title="1 · Applications waiting to be enrolled"
+        description="Start the two-step enrolment form for one of these."
         aside={
-          <span className="rounded-full bg-eavi-primary-soft px-3 py-1 text-xs font-medium text-eavi-primary-text">
-            {availableApps.length} pending
+          <span className="flex items-center gap-2">
+            <span className="rounded-full bg-eavi-primary-soft px-3 py-1 text-xs font-medium text-eavi-primary-text">
+              {availableApps.length} pending
+            </span>
+            <a
+              href="/dashboard/applications"
+              className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-3 text-xs font-medium text-eavi-primary-text hover:bg-eavi-muted"
+            >
+              Search all applications →
+            </a>
           </span>
         }
       >
-        <div className="space-y-4 p-4">
-          <form action="/dashboard/enrollments" method="get" className="flex flex-col gap-2 sm:flex-row">
-            {q ? <input type="hidden" name="q" value={q} /> : null}
-            {status ? <input type="hidden" name="status" value={status} /> : null}
-            <label htmlFor="enrol-search" className="sr-only">
-              Search applications
-            </label>
-            <input
-              id="enrol-search"
-              name="aq"
-              defaultValue={aq ?? ""}
-              placeholder="Search by name, reference, email or phone…"
-              className="h-11 flex-1 rounded-lg border border-input bg-eavi-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            />
-            <button
-              type="submit"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
-            >
-              {common.search}
-            </button>
-          </form>
-
+        <div className="p-4">
           {availableApps.length === 0 ? (
             <p className="text-sm text-eavi-muted-text">No pending applications. New submissions will appear here once logged.</p>
           ) : (
