@@ -48,11 +48,17 @@ jobs:
           fi
 
       - name: Sync the deployment to that commit
+        env:
+          # Job-scoped token (contents:read). Passed to git through an inline
+          # askpass rather than written into the remote URL, so nothing is
+          # persisted in the deployment's .git/config.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eu
           cd "$DEPLOY_PATH"
           # The tracked tree is reset; .env is untracked and survives.
-          git fetch --prune origin main
+          git -c credential.helper='!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' \
+            fetch --prune origin main
           git reset --hard "${{ steps.target.outputs.sha }}"
           echo "deploying $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
 
