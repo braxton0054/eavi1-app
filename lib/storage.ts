@@ -32,8 +32,12 @@ export async function uploadFile(key: string, body: Buffer, contentType: string)
       ACL: "public-read",
     }),
   );
-  // Public URL (path-style when forced).
   const endpoint = process.env.S3_ENDPOINT!.replace(/\/$/, "");
+  // Contabo public object URLs include the account id prefix.
+  const accountId = process.env.S3_ACCOUNT_ID;
+  if (accountId) {
+    return `${endpoint}/${accountId}:${bucket}/${key}`;
+  }
   if (process.env.S3_FORCE_PATH_STYLE === "true") {
     return `${endpoint}/${bucket}/${key}`;
   }
