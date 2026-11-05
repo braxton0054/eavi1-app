@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { enrolStudent } from "@/lib/actions/college/enrolment";
 import { KENYA_COUNTIES } from "@/lib/data/kenya-locations";
 
@@ -17,37 +17,92 @@ type Application = {
   reference?: string;
 };
 
-type Guardian = { fullName: string; relationship: string; phone: string; altPhone: string; email: string; occupation: string; address: string };
-type Emergency = { fullName: string; relationship: string; phone: string; altPhone: string; address: string };
+type Guardian = { fullName: string; relationship: string; phone: string; altPhone: string; email: string; occupation: string };
+type Emergency = { fullName: string; relationship: string; phone: string; altPhone: string };
 
-const emptyGuardian: Guardian = { fullName: "", relationship: "Guardian", phone: "", altPhone: "", email: "", occupation: "", address: "" };
-const emptyEmergency: Emergency = { fullName: "", relationship: "Emergency", phone: "", altPhone: "", address: "" };
+const emptyGuardian: Guardian = { fullName: "", relationship: "Guardian", phone: "", altPhone: "", email: "", occupation: "" };
+const emptyEmergency: Emergency = { fullName: "", relationship: "Emergency", phone: "", altPhone: "" };
 
-const inputCls = "h-11 w-full rounded-lg border border-input bg-eavi-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+const inputCls =
+  "h-11 w-full rounded-lg border border-input bg-eavi-card px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50";
 const labelCls = "text-sm font-medium text-eavi-text";
+
+function Section({ step, title, hint, children }: { step?: string; title: string; hint?: string; children: ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-eavi-border bg-eavi-card p-4 shadow-eavi-card sm:p-5">
+      <div className="mb-4 flex items-start gap-3">
+        {step ? (
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-eavi-primary-soft text-xs font-bold text-eavi-primary-text">
+            {step}
+          </span>
+        ) : null}
+        <div>
+          <h2 className="text-base font-semibold text-eavi-text">{title}</h2>
+          {hint ? <p className="mt-0.5 text-xs text-eavi-muted-text">{hint}</p> : null}
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
+function Field({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
+  return (
+    <div className={"flex flex-col gap-1.5" + (wide ? " sm:col-span-2" : "")}>
+      <label className={labelCls}>{label}</label>
+      {children}
+    </div>
+  );
+}
 
 function LocationPicker({ prefix, label = "Residential address" }: { prefix: string; label?: string }) {
   const [county, setCounty] = useState("");
   const [subCounty, setSubCounty] = useState("");
   const countyObj = KENYA_COUNTIES.find((c) => c.name === county);
   return (
-    <div className="sm:col-span-2 space-y-2">
+    <div className="space-y-2 sm:col-span-2">
       <span className={labelCls}>{label}</span>
       <div className="grid gap-3 sm:grid-cols-3">
-        <select name={`${prefix}County`} value={county} onChange={(e) => { setCounty(e.target.value); setSubCounty(""); }} className={inputCls}>
-          <option value="">Select county (47)</option>
-          {KENYA_COUNTIES.map((c) => (<option key={c.name} value={c.name}>{c.name}</option>))}
+        <select
+          name={`${prefix}County`}
+          value={county}
+          onChange={(e) => {
+            setCounty(e.target.value);
+            setSubCounty("");
+          }}
+          className={inputCls}
+        >
+          <option value="">County (47)…</option>
+          {KENYA_COUNTIES.map((c) => (
+            <option key={c.name} value={c.name}>
+              {c.name}
+            </option>
+          ))}
         </select>
-        <select name={`${prefix}SubCounty`} value={subCounty} onChange={(e) => setSubCounty(e.target.value)} className={inputCls} disabled={!countyObj}>
-          <option value="">{countyObj ? `Select sub-county (${countyObj.subCounties.length})` : "Select county first"}</option>
-          {countyObj?.subCounties.map((s) => (<option key={s} value={s}>{s}</option>))}
+        <select
+          name={`${prefix}SubCounty`}
+          value={subCounty}
+          onChange={(e) => setSubCounty(e.target.value)}
+          className={inputCls}
+          disabled={!countyObj}
+        >
+          <option value="">{countyObj ? `Sub-county (${countyObj.subCounties.length})…` : "Pick county first…"}</option>
+          {countyObj?.subCounties.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
         </select>
         <input name={`${prefix}Detail`} placeholder="Town / estate / street" className={inputCls} />
       </div>
-      <p className="text-xs text-eavi-muted-text">Choose the county, then only its sub-counties appear. Add the specific town or estate in the last box.</p>
     </div>
   );
 }
+
+const STEPS = [
+  { n: 1, label: "Student", hint: "Identity, schooling & credentials" },
+  { n: 2, label: "Family", hint: "Guardians & emergency contacts" },
+] as const;
 
 export function EnrolmentForm({
   application: initialApplication,
@@ -69,288 +124,296 @@ export function EnrolmentForm({
   const [emergencies, setEmergencies] = useState<Emergency[]>([{ ...emptyEmergency }]);
 
   return (
-    <form action={enrolStudent} className="space-y-6" key={selectedApp?.id ?? "new"}>
+    <form action={enrolStudent} className="space-y-5" key={selectedApp?.id ?? "new"}>
       <input type="hidden" name="applicationId" value={selectedApp?.id ?? ""} />
 
-      {/* Application selector */}
+      {/* Stepper */}
+      <ol className="flex items-center gap-2 rounded-2xl border border-eavi-border bg-eavi-card p-3 shadow-eavi-card" aria-label="Enrolment progress">
+        {STEPS.map((s, i) => (
+          <li key={s.n} className="flex flex-1 items-center gap-2 last:flex-none">
+            <button
+              type="button"
+              onClick={() => setStep(s.n)}
+              className={
+                "flex flex-1 items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors " +
+                (step === s.n ? "bg-eavi-primary-soft" : "hover:bg-eavi-muted")
+              }
+              aria-current={step === s.n ? "step" : undefined}
+            >
+              <span
+                className={
+                  "flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold " +
+                  (step > s.n
+                    ? "bg-eavi-success-fill text-eavi-on-success"
+                    : step === s.n
+                      ? "bg-eavi-fill text-eavi-on-fill"
+                      : "bg-eavi-muted text-eavi-muted-text")
+                }
+              >
+                {step > s.n ? "✓" : s.n}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-eavi-text">
+                  {i + 1}. {s.label}
+                </span>
+                <span className="block truncate text-xs text-eavi-muted-text">{s.hint}</span>
+              </span>
+            </button>
+            {i < STEPS.length - 1 && <span className="hidden h-px w-6 bg-eavi-border sm:block" aria-hidden />}
+          </li>
+        ))}
+      </ol>
+
+      {/* Application picker */}
       {applications.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <label className={labelCls}>Enrol from existing application (optional)</label>
-          <select
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            className={inputCls}
-          >
-            <option value="">— New enrolment (enter details manually) —</option>
-            {applications.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.reference ? `${a.reference} · ` : ""}{a.fullName} · {a.program.name}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-eavi-muted-text">Selecting an application auto-fills the student details below.</p>
+        <div className="rounded-2xl border border-dashed border-eavi-border bg-eavi-muted/40 p-4">
+          <div className="flex flex-col gap-1.5">
+            <label className={labelCls} htmlFor="enrol-application">
+              Enrol from application
+            </label>
+            <select id="enrol-application" value={selectedId} onChange={(e) => setSelectedId(e.target.value)} className={inputCls + " bg-eavi-card"}>
+              <option value="">— Fill in manually —</option>
+              {applications.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.reference ? `${a.reference} · ` : ""}
+                  {a.fullName} · {a.program.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-eavi-muted-text">
+              {selectedApp ? `Auto-filled from ${selectedApp.reference ?? "application"}. Review and edit below.` : "Pick a submitted application to auto-fill the form."}
+            </p>
+          </div>
         </div>
       )}
 
-      {/* Progress indicator */}
-      <div className="flex items-center gap-3">
-        {[1, 2].map((n) => (
-          <div key={n} className="flex items-center gap-2">
-            <span className={"flex size-8 items-center justify-center rounded-full text-sm font-semibold " + (step === n ? "bg-eavi-fill text-eavi-on-fill" : step > n ? "bg-eavi-secondary text-eavi-on-success" : "bg-eavi-muted text-eavi-muted-text")}>{n}</span>
-            <span className={step === n ? "text-sm font-semibold text-eavi-text" : "text-sm text-eavi-muted-text"}>{n === 1 ? "Student details" : "Parent & emergency"}</span>
-            {n < 2 && <span className="mx-2 h-px w-8 bg-eavi-border" />}
-          </div>
-        ))}
-      </div>
+      {/* STEP 1 */}
+      <div className={step === 1 ? "space-y-5" : "hidden"}>
+        <Section step="A" title="Student identity" hint="From the application — review and edit.">
+          <Field label="Full name">
+            <input name="fullName" defaultValue={selectedApp?.fullName ?? ""} required className={inputCls} />
+          </Field>
+          <Field label="Email (sign-in)">
+            <input name="email" type="email" defaultValue={selectedApp?.email ?? ""} required className={inputCls} />
+          </Field>
+          <Field label="Phone">
+            <input name="phone" defaultValue={selectedApp?.phone ?? ""} className={inputCls} />
+          </Field>
+          <Field label="Gender">
+            <select name="gender" defaultValue={selectedApp?.gender ?? ""} className={inputCls}>
+              <option value="">—</option>
+              <option value="MALE">Male</option>
+              <option value="FEMALE">Female</option>
+              <option value="OTHER">Other</option>
+              <option value="UNDECLARED">Prefer not to say</option>
+            </select>
+          </Field>
+          <Field label="Date of birth">
+            <input name="dateOfBirth" type="date" className={inputCls} />
+          </Field>
+          <Field label="National ID / birth cert no.">
+            <input name="nationalId" className={inputCls} />
+          </Field>
+        </Section>
 
-      {/* Step 1 */}
-      <div className={step === 1 ? "space-y-6" : "hidden"}>
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-eavi-text">Student information</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Full name</label>
-              <input name="fullName" defaultValue={selectedApp?.fullName ?? ""} required className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Email</label>
-              <input name="email" type="email" defaultValue={selectedApp?.email ?? ""} required className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Phone</label>
-              <input name="phone" defaultValue={selectedApp?.phone ?? ""} className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Gender</label>
-              <select name="gender" defaultValue={selectedApp?.gender ?? ""} className={inputCls}>
-                <option value="">—</option>
-                <option value="MALE">Male</option>
-                <option value="FEMALE">Female</option>
-                <option value="OTHER">Other</option>
-                <option value="UNDECLARED">Prefer not to say</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Date of birth</label>
-              <input name="dateOfBirth" type="date" className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>National ID / birth cert no.</label>
-              <input name="nationalId" className={inputCls} />
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <h3 className="text-base font-semibold text-eavi-text">Previous education</h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Primary school</label>
-              <input name="primarySchool" className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Secondary school</label>
-              <input name="secondarySchool" className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Primary school document (PDF, optional)</label>
-              <input name="primarySchoolDoc" type="file" accept="application/pdf" className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Secondary school document (PDF, optional)</label>
-              <input name="secondarySchoolDoc" type="file" accept="application/pdf" className={inputCls} />
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <h3 className="text-base font-semibold text-eavi-text">Birth certificate</h3>
-          <div className="flex flex-col gap-1.5">
-            <label className={labelCls}>Birth certificate (PDF)</label>
-            <input name="birthCertificate" type="file" accept="application/pdf" className={inputCls} />
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <h3 className="text-base font-semibold text-eavi-text">Medical information</h3>
-          <div className="flex flex-col gap-1.5">
-            <label className={labelCls}>Medical conditions</label>
-            <textarea name="medicalInfo" rows={3} className="w-full rounded-lg border border-input bg-eavi-card px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" />
-          </div>
-          <label className="flex items-center gap-2 text-sm text-eavi-text">
-            <input type="checkbox" name="hasNoMedicalConditions" value="yes" className="size-4 accent-eavi-fill" />
-            No known medical conditions
-          </label>
-        </section>
-
-        <section className="space-y-4">
-          <h3 className="text-base font-semibold text-eavi-text">Admission category</h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Category</label>
-              <select name="admissionCategory" className={inputCls}>
-                <option value="NEW">New student</option>
-                <option value="TRANSFER">Transfer student</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Previous institution (if transfer)</label>
-              <input name="previousInstitution" className={inputCls} />
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <h3 className="text-base font-semibold text-eavi-text">Student profile photo</h3>
-          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-            <div className="relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-eavi-primary-soft ring-2 ring-eavi-border">
+        <Section step="B" title="Photo" hint="Shows as the student's avatar across the portal.">
+          <div className="flex items-center gap-4 sm:col-span-2">
+            <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-eavi-primary-soft ring-2 ring-eavi-border" aria-hidden>
               {photoPreview ? (
-                <img src={photoPreview} alt="preview" className="size-full object-cover" />
+                <img src={photoPreview} alt="" className="size-full object-cover" />
               ) : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-12 text-eavi-primary-text" aria-hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-12 text-eavi-primary-text">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                 </svg>
               )}
             </div>
-            <div className="flex flex-1 flex-col gap-2">
-              <label className={labelCls}>Upload student photograph</label>
-              <input name="profilePhoto" type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) setPhotoPreview(URL.createObjectURL(f)); }} className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1.5 file:text-eavi-primary-text" />
-              <p className="text-xs text-eavi-muted-text">JPG or PNG. Used as the student's profile avatar throughout the system.</p>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <label className={labelCls} htmlFor="profile-photo">Student photograph</label>
+              <input
+                id="profile-photo"
+                name="profilePhoto"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setPhotoPreview(URL.createObjectURL(f));
+                }}
+                className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1.5 file:text-eavi-primary-text"
+              />
+              <p className="text-xs text-eavi-muted-text">JPG or PNG.</p>
             </div>
           </div>
-        </section>
+        </Section>
 
-        <section className="space-y-4">
-          <h3 className="text-base font-semibold text-eavi-text">Admission credentials</h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Campus</label>
-              <input value={selectedApp?.campus?.name ?? ""} readOnly className={inputCls + " bg-eavi-muted"} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Programme</label>
-              <select name="programId" defaultValue={selectedApp?.program.id ?? (programs[0]?.value ?? "")} required className={inputCls}>
-                {programs.map((p) => (<option key={p.value} value={p.value}>{p.label}</option>))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Admission number (blank = auto)</label>
-              <input name="admissionNo" className={inputCls} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Intake</label>
-              <select name="intakeId" className={inputCls}>
-                <option value="">—</option>
-                {intakes.map((i) => (<option key={i.value} value={i.value}>{i.label}</option>))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Temporary password</label>
-              <input name="password" type="text" required minLength={10} className={inputCls} />
-            </div>
-            <LocationPicker prefix="address" />
-          </div>
-        </section>
+        <Section step="C" title="Schooling & documents" hint="PDF uploads where available.">
+          <Field label="Primary school">
+            <input name="primarySchool" className={inputCls} />
+          </Field>
+          <Field label="Secondary school">
+            <input name="secondarySchool" className={inputCls} />
+          </Field>
+          <Field label="Primary school document (PDF, optional)">
+            <input name="primarySchoolDoc" type="file" accept="application/pdf" className={inputCls} />
+          </Field>
+          <Field label="Secondary school document (PDF, optional)">
+            <input name="secondarySchoolDoc" type="file" accept="application/pdf" className={inputCls} />
+          </Field>
+          <Field label="Birth certificate (PDF)" wide>
+            <input name="birthCertificate" type="file" accept="application/pdf" className={inputCls} />
+          </Field>
+        </Section>
 
-        <div className="flex justify-end">
-          <button type="button" onClick={() => setStep(2)} className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill">
-            Next: parent &amp; emergency
+        <Section step="D" title="Medical" hint="Visible to authorised staff only.">
+          <Field label="Medical conditions" wide>
+            <textarea
+              name="medicalInfo"
+              rows={3}
+              placeholder="Allergies, conditions, medication…"
+              className="w-full rounded-lg border border-input bg-eavi-card px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+          </Field>
+          <label className="flex items-center gap-2 text-sm text-eavi-text sm:col-span-2">
+            <input type="checkbox" name="hasNoMedicalConditions" value="yes" className="size-4 accent-eavi-fill" />
+            No known medical conditions
+          </label>
+        </Section>
+
+        <Section step="E" title="Admission" hint="Category, programme and sign-in credentials.">
+          <Field label="Category">
+            <select name="admissionCategory" className={inputCls}>
+              <option value="NEW">New student</option>
+              <option value="TRANSFER">Transfer student</option>
+            </select>
+          </Field>
+          <Field label="Previous institution (if transfer)">
+            <input name="previousInstitution" className={inputCls} />
+          </Field>
+          <Field label="Campus">
+            <input value={selectedApp?.campus?.name ?? ""} readOnly placeholder="Applicant's campus" className={inputCls + " bg-eavi-muted"} />
+          </Field>
+          <Field label="Programme">
+            <select name="programId" defaultValue={selectedApp?.program.id ?? (programs[0]?.value ?? "")} required className={inputCls}>
+              {programs.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Admission number (blank = auto)">
+            <input name="admissionNo" className={inputCls} />
+          </Field>
+          <Field label="Intake">
+            <select name="intakeId" className={inputCls}>
+              <option value="">—</option>
+              {intakes.map((i) => (
+                <option key={i.value} value={i.value}>
+                  {i.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Temporary password (min 10 chars)" wide>
+            <input name="password" type="text" required minLength={10} placeholder="Student changes this on first login" className={inputCls} />
+          </Field>
+          <LocationPicker prefix="address" />
+        </Section>
+
+        <div className="sticky bottom-0 flex justify-end rounded-2xl border border-eavi-border bg-eavi-card/95 p-3 shadow-eavi-card backdrop-blur">
+          <button type="button" onClick={() => { setStep(2); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-6 text-sm font-medium text-eavi-on-fill">
+            Continue to family →
           </button>
         </div>
       </div>
 
-      {/* Step 2 */}
-      <div className={step === 2 ? "space-y-6" : "hidden"}>
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-eavi-text">Parent / guardian</h2>
-          {guardians.map((g, idx) => (
-            <div key={idx} className="space-y-3 rounded-xl border border-eavi-border bg-eavi-card p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-eavi-text">Guardian {idx + 1}</h3>
-                {guardians.length > 1 && (
-                  <button type="button" onClick={() => setGuardians((gs) => gs.filter((_, i) => i !== idx))} className="text-xs text-eavi-destructive">Remove</button>
-                )}
+      {/* STEP 2 */}
+      <div className={step === 2 ? "space-y-5" : "hidden"}>
+        <Section step="F" title="Parent / guardian" hint="Add more than one where needed.">
+          <div className="space-y-4 sm:col-span-2">
+            {guardians.map((g, idx) => (
+              <div key={idx} className="space-y-4 rounded-xl border border-eavi-border p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-eavi-text">Guardian {idx + 1}</h3>
+                  {guardians.length > 1 && (
+                    <button type="button" onClick={() => setGuardians((gs) => gs.filter((_, i) => i !== idx))} className="text-xs font-medium text-eavi-destructive">
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Full name">
+                    <input name="guardianFullName" defaultValue={g.fullName} className={inputCls} />
+                  </Field>
+                  <Field label="Relationship">
+                    <select name="guardianRelationship" defaultValue={g.relationship} className={inputCls}>
+                      <option value="Father">Father</option>
+                      <option value="Mother">Mother</option>
+                      <option value="Guardian">Guardian</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </Field>
+                  <Field label="Phone">
+                    <input name="guardianPhone" className={inputCls} />
+                  </Field>
+                  <Field label="Alternative phone">
+                    <input name="guardianAltPhone" className={inputCls} />
+                  </Field>
+                  <Field label="Email">
+                    <input name="guardianEmail" type="email" className={inputCls} />
+                  </Field>
+                  <Field label="Occupation (optional)">
+                    <input name="guardianOccupation" className={inputCls} />
+                  </Field>
+                  <LocationPicker prefix="guardian" label="Residential address" />
+                </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Full name</label>
-                  <input name="guardianFullName" defaultValue={g.fullName} className={inputCls} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Relationship</label>
-                  <select name="guardianRelationship" defaultValue={g.relationship} className={inputCls}>
-                    <option value="Father">Father</option>
-                    <option value="Mother">Mother</option>
-                    <option value="Guardian">Guardian</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Phone</label>
-                  <input name="guardianPhone" className={inputCls} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Alternative phone</label>
-                  <input name="guardianAltPhone" className={inputCls} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Email</label>
-                  <input name="guardianEmail" type="email" className={inputCls} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Occupation (optional)</label>
-                  <input name="guardianOccupation" className={inputCls} />
-                </div>
-                <LocationPicker prefix="guardian" label="Residential address" />
-              </div>
-            </div>
-          ))}
-          <button type="button" onClick={() => setGuardians((gs) => [...gs, { ...emptyGuardian }])} className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text">
-            + Add another guardian
-          </button>
-        </section>
+            ))}
+            <button type="button" onClick={() => setGuardians((gs) => [...gs, { ...emptyGuardian }])} className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted">
+              + Add another guardian
+            </button>
+          </div>
+        </Section>
 
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-eavi-text">Emergency contact</h2>
-          {emergencies.map((e, idx) => (
-            <div key={idx} className="space-y-3 rounded-xl border border-eavi-border bg-eavi-card p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-eavi-text">Emergency contact {idx + 1}</h3>
-                {emergencies.length > 1 && (
-                  <button type="button" onClick={() => setEmergencies((es) => es.filter((_, i) => i !== idx))} className="text-xs text-eavi-destructive">Remove</button>
-                )}
+        <Section step="G" title="Emergency contact" hint="Kept separate from the guardian above.">
+          <div className="space-y-4 sm:col-span-2">
+            {emergencies.map((e, idx) => (
+              <div key={idx} className="space-y-4 rounded-xl border border-eavi-border p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-eavi-text">Emergency contact {idx + 1}</h3>
+                  {emergencies.length > 1 && (
+                    <button type="button" onClick={() => setEmergencies((es) => es.filter((_, i) => i !== idx))} className="text-xs font-medium text-eavi-destructive">
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Full name">
+                    <input name="emergencyFullName" className={inputCls} />
+                  </Field>
+                  <Field label="Relationship">
+                    <input name="emergencyRelationship" placeholder="e.g. Uncle, Aunt" className={inputCls} />
+                  </Field>
+                  <Field label="Primary phone">
+                    <input name="emergencyPhone" className={inputCls} />
+                  </Field>
+                  <Field label="Alternative phone">
+                    <input name="emergencyAltPhone" className={inputCls} />
+                  </Field>
+                  <LocationPicker prefix="emergency" label="Residential address (optional)" />
+                </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Full name</label>
-                  <input name="emergencyFullName" className={inputCls} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Relationship</label>
-                  <input name="emergencyRelationship" className={inputCls} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Primary phone</label>
-                  <input name="emergencyPhone" className={inputCls} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Alternative phone</label>
-                  <input name="emergencyAltPhone" className={inputCls} />
-                </div>
-                <LocationPicker prefix="emergency" label="Residential address (optional)" />
-              </div>
-            </div>
-          ))}
-          <button type="button" onClick={() => setEmergencies((es) => [...es, { ...emptyEmergency }])} className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text">
-            + Add another emergency contact
-          </button>
-        </section>
+            ))}
+            <button type="button" onClick={() => setEmergencies((es) => [...es, { ...emptyEmergency }])} className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted">
+              + Add another emergency contact
+            </button>
+          </div>
+        </Section>
 
-        <div className="flex justify-between">
-          <button type="button" onClick={() => setStep(1)} className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text">
-            Previous
+        <div className="sticky bottom-0 flex items-center justify-between rounded-2xl border border-eavi-border bg-eavi-card/95 p-3 shadow-eavi-card backdrop-blur">
+          <button type="button" onClick={() => { setStep(1); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted">
+            ← Back
           </button>
-          <button type="submit" className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill">
+          <button type="submit" className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-6 text-sm font-medium text-eavi-on-fill">
             Complete enrolment
           </button>
         </div>
