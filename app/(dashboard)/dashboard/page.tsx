@@ -4,14 +4,15 @@ import { formatDate, money } from "@/lib/format";
 import { getOverview } from "@/lib/dal/college";
 import { common, labels, pages } from "@/lib/content/dashboard";
 
+
 const toneFor = {
   application: (status: string) =>
-    status === "APPROVED" ? "success" : status === "REJECTED" || status === "WITHDRAWN" ? "danger" : "info",
+    status === "REJECTED" || status === "WITHDRAWN" ? "danger" : "info",
   exam: (status: string) => (status === "RELEASED" ? "success" : status === "DRAFT" ? "neutral" : "info"),
 } as const;
 
 export default async function OverviewPage() {
-  const { scope, stats, deadlines, events, exams, recentStudents, announcements } = await getOverview();
+  const { stats, deadlines, events, exams, recentStudents, announcements } = await getOverview();
   const kpis = pages.overview.kpis;
   const values: Record<(typeof kpis)[number]["key"], string> = {
     students: String(stats.students),
@@ -26,11 +27,7 @@ export default async function OverviewPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={pages.overview.title}
-        description={pages.overview.description}
-        meta={<p className="mt-2 text-xs text-eavi-muted-text">{pages.overview.scopeNote(scope.campusName)}</p>}
-      />
+      <PageHeader title={pages.overview.title} />
 
       <section aria-label={pages.overview.title} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((kpi) => (
@@ -38,7 +35,6 @@ export default async function OverviewPage() {
             key={kpi.key}
             label={kpi.label}
             value={values[kpi.key]}
-            hint={kpi.hint}
             icon={kpi.icon}
             tone={kpi.key === "applicationsOpen" || kpi.key === "cardsPending" ? "attention" : kpi.key === "collected" ? "money" : "neutral"}
           />

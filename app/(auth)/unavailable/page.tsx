@@ -9,7 +9,6 @@ export const metadata = {
 };
 
 // Reads `?reason=` from the guard redirect, so the route blocks rather than streams.
-export const instant = false;
 
 /**
  * Outside the portal route group on purpose: this screen is for people the portal guard

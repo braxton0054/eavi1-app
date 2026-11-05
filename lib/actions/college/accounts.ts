@@ -15,6 +15,7 @@ import {
   requiredNumber,
   requiredText,
   text,
+  termOnCampus,
   unique,
 } from "@/lib/actions/college/_shared";
 
@@ -81,7 +82,8 @@ export async function createInvoice(formData: FormData) {
     if (campusId === null) throw new FieldError(fieldErrors.notOnCampus);
 
     const studentId = requiredText(formData, "studentId", fieldLabel("studentId"));
-    const termId = text(formData, "termId");
+    // The bill is raised against this campus's term, so a foreign term id is refused here.
+    const termId = await termOnCampus(formData, "termId", campusId);
     const dueAt = dateField(formData, "dueAt");
     const note = text(formData, "note");
 
@@ -90,11 +92,6 @@ export async function createInvoice(formData: FormData) {
       select: { id: true },
     });
     if (!student) throw new FieldError(fieldErrors.notOnCampus);
-
-    if (termId) {
-      const term = await prisma.term.findUnique({ where: { id: termId }, select: { id: true } });
-      if (!term) throw new FieldError(fieldErrors.choice(fieldLabel("termId")));
-    }
 
     // The programme is whatever the student is actually studying, not a value off the form.
     const enrollment = await prisma.enrollment.findFirst({
@@ -108,7 +105,7 @@ export async function createInvoice(formData: FormData) {
           where: {
             programId: enrollment.programId,
             isOptional: false,
-            termId: termId ?? null,
+            termId,
           },
           orderBy: { label: "asc" },
           select: { label: true, amount: true },
@@ -124,7 +121,7 @@ export async function createInvoice(formData: FormData) {
             number,
             studentId,
             campusId,
-            termId: termId ?? null,
+            termId,
             programId: enrollment?.programId ?? null,
             dueAt,
             note,

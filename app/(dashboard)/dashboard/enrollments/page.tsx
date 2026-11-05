@@ -16,6 +16,7 @@ import { formatDate } from "@/lib/format";
 import type { Column } from "@/lib/content/dashboard";
 import type { OptionSets } from "@/components/dashboard/record-form";
 
+
 const copy = pages.enrollments;
 
 const enrollmentTone: Record<string, ChipTone> = {

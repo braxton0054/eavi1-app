@@ -18,14 +18,6 @@ const enrollmentTone: Record<string, ChipTone> = {
   WITHDRAWN: "danger",
 };
 
-const applicationTone: Record<string, ChipTone> = {
-  SUBMITTED: "info",
-  REVIEWING: "warning",
-  APPROVED: "success",
-  REJECTED: "danger",
-  WITHDRAWN: "neutral",
-};
-
 const cardTone: Record<string, ChipTone> = {
   PENDING: "neutral",
   PRINTING: "info",
@@ -111,20 +103,6 @@ export default async function StudentProfilePage({
     },
   }));
 
-  const applicationRows: Row[] = student.applications.map((application) => ({
-    id: application.id,
-    cells: {
-      reference: application.reference,
-      program: application.program.name,
-      status: (
-        <StatusChip tone={applicationTone[application.status] ?? "neutral"}>
-          {labels.applicationStatus[application.status]}
-        </StatusChip>
-      ),
-      decidedAt: formatDate(application.decidedAt),
-    },
-  }));
-
   const invoiceRows: Row[] = student.invoices.map((invoice) => {
     const billed = sum(invoice.lines);
     const paid = sum(invoice.payments);
@@ -196,21 +174,6 @@ export default async function StudentProfilePage({
             columns={ordered(pages.enrollments.columns, ["program", "intake", "cohort", "status", "enrolledAt"])}
             rows={enrollmentRows}
             caption={copy.profile.enrollments}
-          />
-        )}
-      </Panel>
-
-      <Panel title={copy.profile.academic}>
-        {applicationRows.length === 0 ? (
-          <EmptyState title={pages.applications.empty.title} body={pages.applications.empty.body} icon="applications" />
-        ) : (
-          <DataTable
-            columns={[
-              ...ordered(pages.applications.columns, ["reference", "program", "status"]),
-              { key: "decidedAt", label: pages.applications.detail.decidedAt },
-            ]}
-            rows={applicationRows}
-            caption={copy.profile.academic}
           />
         )}
       </Panel>

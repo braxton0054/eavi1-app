@@ -137,3 +137,31 @@ export function ResultCount({ total }: { total: number }) {
     </p>
   );
 }
+
+/** A year step: a link while the window has road left, a plain label once it does not. */
+export function StepLink({
+  href,
+  label,
+  ariaLabel,
+}: {
+  href: string | null;
+  label: string;
+  ariaLabel: string;
+}) {
+  const className =
+    "inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-3 text-sm font-medium";
+
+  return href ? (
+    <a
+      href={href}
+      aria-label={ariaLabel}
+      className={`${className} text-eavi-primary-text hover:bg-eavi-muted`}
+    >
+      {label}
+    </a>
+  ) : (
+    <span aria-disabled="true" aria-label={ariaLabel} className={`${className} opacity-50`}>
+      {label}
+    </span>
+  );
+}

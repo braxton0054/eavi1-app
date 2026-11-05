@@ -10,7 +10,6 @@ export const metadata: Metadata = {
 
 // The `?next=` destination has to be read before the form renders, so this route
 // blocks instead of streaming. Without it the post-login redirect is refused.
-export const instant = false;
 
 export default async function LoginPage({
   searchParams,

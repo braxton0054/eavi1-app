@@ -30,7 +30,7 @@ export function CtaBand() {
               size="lg"
               className="w-full rounded-full bg-eavi-plate text-eavi-primary-text hover:bg-eavi-primary-soft hover:text-eavi-primary-text sm:w-auto"
             >
-              <Link href="/register">
+              <Link href="/apply">
                 {ctaSection.apply}
                 <ArrowRightIcon data-icon="inline-end" />
               </Link>

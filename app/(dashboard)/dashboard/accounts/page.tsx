@@ -154,7 +154,7 @@ export default async function AccountsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} />
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
@@ -172,7 +172,6 @@ export default async function AccountsPage({
         options={options}
         action={createInvoice}
         submitLabel={common.create}
-        note={copy.create.linesHint}
       />
 
       <DisclosureForm
@@ -185,7 +184,7 @@ export default async function AccountsPage({
         submitLabel={common.record}
       />
 
-      <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
+      <Panel title={copy.title}>
         <div className="space-y-4 p-4">
           <ListFilters
             basePath="/dashboard/accounts"

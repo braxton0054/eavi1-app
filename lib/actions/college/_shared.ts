@@ -151,6 +151,47 @@ export async function unique<T>(label: string, work: () => Promise<T>): Promise<
 }
 
 /**
+ * A term runs on one campus only, so a form-supplied term id is honoured only when that term
+ * is the caller's. Blank stays blank; a foreign term is refused rather than quietly dropped.
+ */
+export async function termOnCampus(
+  formData: FormData,
+  name: string,
+  campusId: number | null,
+): Promise<string | null> {
+  const value = text(formData, name);
+  if (!value) return null;
+
+  const term = await prisma.term.findUnique({
+    where: { id: value },
+    select: { id: true, campusId: true },
+  });
+  if (!term || (campusId !== null && term.campusId !== campusId)) {
+    throw new FieldError(fieldErrors.notOnCampus);
+  }
+
+  return term.id;
+}
+
+/**
+ * This year and the one being planned ahead are the only ones still open for changes;
+ * anything older stays readable but closed.
+ */
+export function assertOpenYear(year: number) {
+  const currentYear = new Date().getFullYear();
+  if (!Number.isInteger(year) || year < currentYear || year > currentYear + 1) {
+    throw new FieldError(fieldErrors.yearClosed);
+  }
+}
+
+/** Midnight this morning, so a day only counts as gone once it is fully behind us. */
+export function startOfToday(): Date {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+/**
  * Walks upward from the row count until the formatted code is free, so a deleted record
  * never causes a collision on the number printed on a student's invoice.
  */

@@ -6,7 +6,7 @@
 
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { campusWhere, requireCollegeAdmin } from "@/lib/session";
+import { campusWhere, requireCollegeAdmin, type AdminScope } from "@/lib/session";
 import { pagination } from "@/lib/content/dashboard";
 
 export type ListQuery = { q?: string; status?: string; page?: number };
@@ -220,10 +220,6 @@ export async function getStudent(id: string) {
     where: { id, ...campusWhere(scope.campusId) },
     include: {
       ...studentInclude(),
-      applications: {
-        orderBy: { createdAt: "desc" },
-        include: { program: { select: { name: true } }, decidedBy: { select: { fullName: true } } },
-      },
       enrollments: {
         orderBy: { enrolledAt: "desc" },
         include: { program: { select: { name: true, code: true } }, intake: { select: { name: true } } },
@@ -272,7 +268,6 @@ export async function getApplications(query: ListQuery) {
 const APPLICABLE = {
   SUBMITTED: "",
   REVIEWING: "",
-  APPROVED: "",
   REJECTED: "",
   WITHDRAWN: "",
 };
@@ -285,11 +280,61 @@ export async function getApplication(id: string) {
       program: { select: { name: true, code: true, id: true } },
       campus: { select: { name: true } },
       decidedBy: { select: { fullName: true } },
-      student: { select: { admissionNo: true } },
     },
   });
   if (!row) throw new Error("not_found");
   return assertCampus(row, scope.campusId);
+}
+
+/* ---------------------------------------------------------------- reporting */
+
+/** Admission runs monthly, so a reporting year always reads as its twelve months. */
+const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+
+export async function getReportingDates(yearParam?: string, campusParam?: string) {
+  const scope = await requireCollegeAdmin();
+  const context = await campusContext(scope, campusParam);
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const requested = Number(yearParam);
+  const year = Number.isInteger(requested) ? clampYear(requested, currentYear) : currentYear;
+  const firstYear = currentYear - HISTORY_YEARS;
+  const lastYear = currentYear + OPEN_YEARS;
+  const years = Array.from({ length: lastYear - firstYear + 1 }, (_, index) => firstYear + index);
+
+  const rows = await prisma.reportingDate.findMany({
+    where: { campusId: context.campusId, year },
+  });
+
+  const months = MONTHS.map((month) => {
+    const row = rows.find((entry) => entry.month === month) ?? null;
+    const reported = row !== null && row.date < startOfToday;
+
+    return {
+      month,
+      row,
+      reported,
+      // A month closes for changes once its own reporting day has gone by.
+      editable:
+        !reported &&
+        (year > currentYear || (year === currentYear && month >= currentMonth)),
+    };
+  });
+
+  return {
+    ...context,
+    year,
+    years,
+    editable: year >= currentYear,
+    canPrevious: year > firstYear,
+    canNext: year < lastYear,
+    months,
+  };
 }
 
 /* --------------------------------------------------------------- enrollments */
@@ -428,29 +473,123 @@ export async function getTimetable() {
 
 /* ------------------------------------------------------------------ calendar */
 
-export async function getCalendar(month?: string) {
+/** The three term slots every campus is expected to run inside one calendar year. */
+const TERM_SLOTS = [1, 2, 3] as const;
+
+/** How far back a closed year can still be read, and how far ahead one may be planned. */
+const HISTORY_YEARS = 5;
+const OPEN_YEARS = 1;
+
+const clampYear = (value: number, current: number) =>
+  Math.min(current + OPEN_YEARS, Math.max(current - HISTORY_YEARS, value));
+
+/**
+ * A term belongs to exactly one campus, so a calendar read always resolves to a single
+ * campus: a campus admin is pinned to their own, and a super admin chooses one, because
+ * "all campuses" has no meaning for a window only one campus runs.
+ */
+async function campusContext(scope: AdminScope, requested?: string) {
+  if (scope.campusId !== null) {
+    return { campusId: scope.campusId, campusName: scope.campusName, campuses: [] };
+  }
+
+  const rows = await prisma.campus.findMany({
+    orderBy: { id: "asc" },
+    select: { id: true, name: true },
+  });
+  if (rows.length === 0) throw new Error("not_found");
+
+  const wanted = rows.find((row) => row.id === Number(requested)) ?? rows[0];
+  return {
+    campusId: wanted.id,
+    campusName: wanted.name,
+    campuses: rows.map((row) => ({ value: String(row.id), label: row.name })),
+  };
+}
+
+export async function getCalendar(yearParam?: string, campusParam?: string) {
   const scope = await requireCollegeAdmin();
-  const anchor = month ? new Date(`${month}-01T00:00:00`) : new Date();
-  const start = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-  const end = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0, 23, 59, 59);
+  const context = await campusContext(scope, campusParam);
 
-  const terms = await prisma.term.findMany({
-    orderBy: { startDate: "desc" },
-    include: { intakes: { orderBy: { applicationDeadline: "asc" } } },
+  const currentYear = new Date().getFullYear();
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const requested = Number(yearParam);
+  const year = Number.isInteger(requested) ? clampYear(requested, currentYear) : currentYear;
+  const firstYear = currentYear - HISTORY_YEARS;
+  const lastYear = currentYear + OPEN_YEARS;
+  const years = Array.from({ length: lastYear - firstYear + 1 }, (_, index) => firstYear + index);
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd = new Date(year, 11, 31, 23, 59, 59);
+
+  const [terms, collegeEvents, cards] = await Promise.all([
+    prisma.term.findMany({
+      where: { campusId: context.campusId, year },
+      orderBy: { termNo: "asc" },
+      include: {
+        intakes: { orderBy: { applicationDeadline: "asc" } },
+        exams: {
+          orderBy: { date: "asc" },
+          select: {
+            id: true,
+            title: true,
+            date: true,
+            startAt: true,
+            room: true,
+            status: true,
+            type: true,
+          },
+        },
+        calendarEvents: {
+          where: { campusId: context.campusId },
+          orderBy: { startsAt: "asc" },
+        },
+      },
+    }),
+    prisma.calendarEvent.findMany({
+      where: { campusId: null, termId: null, startsAt: { gte: yearStart, lte: yearEnd } },
+      orderBy: { startsAt: "asc" },
+    }),
+    prisma.idCard.findMany({
+      where: { campusId: context.campusId, issuedAt: { not: null } },
+      orderBy: { issuedAt: "asc" },
+      select: {
+        id: true,
+        serial: true,
+        issuedAt: true,
+        status: true,
+        student: { select: { admissionNo: true, user: { select: { fullName: true } } } },
+      },
+    }),
+  ]);
+
+  // A card belongs to the term whose window covers the day it was issued.
+  const cardsIn = (from: Date, to: Date) =>
+    cards.filter((card) => card.issuedAt! >= from && card.issuedAt! <= to);
+
+  const slots = TERM_SLOTS.map((termNo) => {
+    const term = terms.find((row) => row.termNo === termNo) ?? null;
+    return {
+      termNo,
+      term,
+      // A term stops taking changes the day its window closes.
+      editable: year >= currentYear && (!term || term.endDate >= startOfToday),
+      cards: term ? cardsIn(term.startDate, term.endDate) : [],
+    };
   });
 
-  const events = await prisma.calendarEvent.findMany({
-    where: {
-      AND: [
-        { OR: [{ campusId: null }, campusWhere(scope.campusId)] },
-        { startsAt: { lte: end }, OR: [{ endsAt: null }, { endsAt: { gte: start } }] },
-      ],
-    },
-    orderBy: { startsAt: "asc" },
-    include: { campus: { select: { name: true } }, term: { select: { name: true } } },
-  });
-
-  return { terms, events, start, end, monthKey: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}` };
+  return {
+    ...context,
+    year,
+    years,
+    // A year stops accepting changes the moment it is history, but stays readable.
+    editable: year >= currentYear,
+    openYears: Array.from({ length: OPEN_YEARS + 1 }, (_, index) => currentYear + index),
+    canPrevious: year > firstYear,
+    canNext: year < lastYear,
+    slots,
+    collegeEvents,
+  };
 }
 
 /* --------------------------------------------------------------------- exams */
@@ -756,14 +895,28 @@ export async function getTutorOptions(campusId: number | null) {
   return rows.map((row) => ({ value: row.id, label: `${row.user.fullName} (${row.staffNo})` }));
 }
 
+/**
+ * A term is one campus's, so this select never offers another campus's window. A super
+ * admin is not pinned to a campus and sees every term, labelled with the campus it runs on.
+ */
 export async function getTermOptions() {
-  const rows = await prisma.term.findMany({ orderBy: { startDate: "desc" }, select: { id: true, name: true } });
-  return rows.map((row) => ({ value: row.id, label: row.name }));
+  const scope = await requireCollegeAdmin();
+  const rows = await prisma.term.findMany({
+    where: campusWhere(scope.campusId),
+    orderBy: [{ year: "desc" }, { termNo: "desc" }],
+    select: { id: true, name: true, campus: { select: { name: true } } },
+  });
+
+  return rows.map((row) => ({
+    value: row.id,
+    label: scope.campusId === null ? `${row.name} · ${row.campus.name}` : row.name,
+  }));
 }
 
 export async function getIntakeOptions() {
+  const scope = await requireCollegeAdmin();
   const rows = await prisma.intake.findMany({
-    where: { term: { status: { in: ["ACTIVE", "PLANNED"] } } },
+    where: { term: { status: { in: ["ACTIVE", "PLANNED"] }, ...campusWhere(scope.campusId) } },
     orderBy: { applicationDeadline: "desc" },
     include: { term: { select: { name: true } } },
   });

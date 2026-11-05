@@ -31,7 +31,7 @@ export function Hero() {
               size="lg"
               className="w-full rounded-full hover:bg-eavi-fill-hover sm:w-auto"
             >
-              <Link href="/register">
+              <Link href="/apply">
                 {hero.apply}
                 <ArrowRightIcon data-icon="inline-end" />
               </Link>

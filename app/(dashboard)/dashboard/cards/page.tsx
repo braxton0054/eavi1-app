@@ -10,6 +10,7 @@ import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { formatDate } from "@/lib/format";
 import type { Column } from "@/lib/content/dashboard";
 
+
 const copy = pages.cards;
 
 const cardTone: Record<string, ChipTone> = {
@@ -76,7 +77,6 @@ export default async function CardsPage({
               hidden={{ cardId: card.id }}
               action={moveCard}
               submitLabel={common.update}
-              note={copy.move.issuedAtNote}
             />
 
             <details>
@@ -93,7 +93,6 @@ export default async function CardsPage({
                     </div>
                   ))}
                 </dl>
-                <p className="mt-3 text-xs text-eavi-muted-text">{copy.print.note}</p>
               </div>
             </details>
           </div>

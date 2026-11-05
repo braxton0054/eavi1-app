@@ -10,6 +10,7 @@ import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import type { Column } from "@/lib/content/dashboard";
 import type { OptionSets } from "@/components/dashboard/record-form";
 
+
 const copy = pages.tutors;
 
 /** The account behind a tutor decides whether they can sign in yet. */
@@ -76,7 +77,7 @@ export default async function TutorsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} />
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
@@ -90,7 +91,7 @@ export default async function TutorsPage({
         submitLabel={common.create}
       />
 
-      <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
+      <Panel title={copy.title}>
         <div className="p-4">
           <ListFilters basePath="/dashboard/tutors" q={q} searchLabel={copy.searchLabel} />
         </div>

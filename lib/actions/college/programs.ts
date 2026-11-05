@@ -12,6 +12,7 @@ import {
   requiredNumber,
   requiredText,
   text,
+  termOnCampus,
   unique,
 } from "@/lib/actions/college/_shared";
 
@@ -61,7 +62,6 @@ export async function createFeeItem(formData: FormData) {
 
   return onSave("/dashboard/programs", ["/dashboard/programs"], async () => {
     const programId = requiredText(formData, "programId", fieldLabel("programId"));
-    const termId = text(formData, "termId");
     const itemLabel = requiredText(formData, "label", fieldLabel("label"));
     const amount = requiredNumber(formData, "amount", fieldLabel("amount"));
     if (amount < 0) throw new FieldError(fieldErrors.number(fieldLabel("amount")));
@@ -75,10 +75,13 @@ export async function createFeeItem(formData: FormData) {
     });
     if (!visible) throw new FieldError(fieldErrors.notOnCampus);
 
+    // A fee is tied to this campus's term, or to no term at all when left blank.
+    const termId = await termOnCampus(formData, "termId", scope.campusId);
+
     await prisma.feeItem.create({
       data: {
         programId,
-        termId: termId || null,
+        termId,
         label: itemLabel,
         amount,
         isOptional: checked(formData, "isOptional"),

@@ -51,7 +51,9 @@ export type Field = {
     | "intakes"
     | "enrollments"
     | "invoices"
-    | "feeItems";
+    | "feeItems"
+    | "campuses"
+    | "years";
 };
 
 export type Column = { key: string; label: string; align?: "end" };
@@ -63,20 +65,16 @@ export const shell = {
   skipToContent: "Skip to content",
   openMenu: "Open section menu",
   closeMenu: "Close section menu",
-  campusScope: "Viewing",
   allCampuses: "All campuses",
   account: {
     label: "Account",
-    signedInAs: "Signed in as",
     role: "Role",
     signOut: "Sign out",
-    home: "Go to eavi.ac.ke",
   },
   unavailable: {
-    title: "This portal is not open yet",
-    body: "The tutor and student portals are being built. Sign in again with a college administration account to use this area.",
-    unassigned:
-      "This administrator account is not attached to a campus yet, so there is nothing to show. A super admin must assign the campus before signing in again.",
+    title: "Administration area",
+    body: "Sign in with a college administration account to use this area.",
+    unassigned: "This account has no campus assigned yet. Contact the college office.",
   },
 };
 
@@ -168,19 +166,18 @@ export const common = {
   total: "Total",
   balance: "Balance",
   errorTitle: "Could not save",
-  invalidSubmit:
-    "Some answers are missing or in the wrong format. Check the fields and send the form again — nothing was saved.",
+  invalidSubmit: "Some answers are missing or in the wrong format. Nothing was saved.",
   retry: "Try again",
-  loadError: "The portal could not read this screen from the college records.",
-  notFoundTitle: "Not on this campus",
-  notFoundBody: "Either the record does not exist or it belongs to another campus.",
+  loadError: "This screen could not be loaded. Try again.",
+  notFoundTitle: "Record not available",
+  notFoundBody: "This record is not available on your account.",
 };
 
 /** Wording for a form the administrator filled in wrongly. The field name is supplied. */
 export const fieldErrors = {
   required: (label: string) => `${label} is required.`,
   number: (label: string) => `${label} must be a number.`,
-  date: (label: string) => `${label} is not a date I can read.`,
+  date: (label: string) => `${label} is not a valid date.`,
   choice: (label: string) => `${label} is not one of the listed choices.`,
   time: (label: string) => `${label} must be a 24-hour time such as 09:30.`,
   timeOrder: "The end time must be later than the start time.",
@@ -189,8 +186,16 @@ export const fieldErrors = {
   email: (label: string) => `${label} is not a valid email address.`,
   phone: (label: string) => `${label} is not a Kenyan phone number.`,
   duplicate: (label: string) => `That ${label} is already on file.`,
-  notOnCampus: "That record is not on your campus, so it was not changed.",
-  exhausted: "There are too many records to issue a fresh reference number. Contact the software team.",
+  notOnCampus: "That record is not available on your account, so nothing was changed.",
+  exhausted: "A new reference number could not be issued. Contact the college office.",
+  yearClosed: "That academic year is closed for changes.",
+  termEnded: "That term has ended, so it can no longer be changed.",
+  datePast: "That date has already gone by.",
+  reportingPassed: "That reporting date has passed, so it can no longer be changed.",
+  dateNotInMonth: (month: string) => `The date must fall inside ${month}.`,
+  termSlot: (label: string) => `${label} must be Term 1, Term 2 or Term 3.`,
+  termExists: (slot: string, year: number) => `${slot} ${year} is already configured.`,
+  windowOverlap: (name: string) => `Those dates overlap ${name}.`,
 };
 
 /** Enum value -> the wording a college administrator reads. */
@@ -206,7 +211,6 @@ export const labels = {
   applicationStatus: {
     SUBMITTED: "Submitted",
     REVIEWING: "Under review",
-    APPROVED: "Approved",
     REJECTED: "Rejected",
     WITHDRAWN: "Withdrawn",
   },
@@ -228,6 +232,10 @@ export const labels = {
     SCHEDULED: "Scheduled",
     COMPLETED: "Completed",
     RELEASED: "Released",
+  },
+  examType: {
+    CAT: "CAT",
+    END_TERM: "End of term",
   },
   invoiceStatus: {
     OPEN: "Unpaid",
@@ -254,6 +262,21 @@ export const labels = {
     FRIDAY: "Friday",
     SATURDAY: "Saturday",
   },
+  /** Index 0 is January; a reporting date is stored by its calendar month. */
+  months: [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ],
   calendarEventType: {
     ACADEMIC: "Academic",
     HOLIDAY: "Holiday",
@@ -273,6 +296,21 @@ export const labels = {
     OTHER: "Other",
     UNDECLARED: "Prefer not to say",
   },
+  /** Kenya Certificate of Secondary Education grades, as an applicant states one. */
+  entryGrade: {
+    A: "A",
+    A_MINUS: "A-",
+    B_PLUS: "B+",
+    B: "B",
+    B_MINUS: "B-",
+    C_PLUS: "C+",
+    C: "C",
+    C_MINUS: "C-",
+    D_PLUS: "D+",
+    D: "D",
+    D_MINUS: "D-",
+    E: "E",
+  },
   userStatus: {
     ACTIVE: "Active",
     PENDING: "Awaiting approval",
@@ -283,27 +321,26 @@ export const labels = {
 export const pages = {
   overview: {
     title: "Overview",
-    description: "The numbers your campus is sitting on right now.",
-    scopeNote: (campusName: string) => `Figures cover ${campusName} only.`,
+    scopeNote: (campusName: string) => `Scope: ${campusName}`,
     kpis: [
-      { key: "students", label: "Students", icon: "students", hint: "Admitted profiles" },
-      { key: "activeEnrollments", label: "Active enrollments", icon: "enrollments", hint: "Currently studying" },
-      { key: "applicationsOpen", label: "Applications to review", icon: "applications", hint: "Submitted or in review" },
-      { key: "tutors", label: "Tutors", icon: "tutors", hint: "Attached to this campus" },
-      { key: "billed", label: "Billed", icon: "accounts", hint: "Invoice totals" },
-      { key: "collected", label: "Collected", icon: "accounts", hint: "Payments recorded" },
-      { key: "outstanding", label: "Outstanding", icon: "accounts", hint: "Billed minus collected" },
-      { key: "cardsPending", label: "Cards pending", icon: "cards", hint: "Not yet issued" },
+      { key: "students", label: "Students", icon: "students" },
+      { key: "activeEnrollments", label: "Active enrollments", icon: "enrollments" },
+      { key: "applicationsOpen", label: "Applications to review", icon: "applications" },
+      { key: "tutors", label: "Tutors", icon: "tutors" },
+      { key: "billed", label: "Billed", icon: "accounts" },
+      { key: "collected", label: "Collected", icon: "accounts" },
+      { key: "outstanding", label: "Outstanding", icon: "accounts" },
+      { key: "cardsPending", label: "Cards pending", icon: "cards" },
     ] as const,
     lists: {
       deadlines: "Application deadlines",
       deadlinesEmpty: "No intake deadlines on a running term.",
       events: "Coming up on the calendar",
-      eventsEmpty: "Nothing scheduled. Add entries under Academic calendar.",
+      eventsEmpty: "Nothing scheduled.",
       exams: "Exams ahead",
       examsEmpty: "No exams scheduled yet.",
       recentStudents: "Most recent admissions",
-      recentStudentsEmpty: "No students admitted yet. Use Students to add the first one.",
+      recentStudentsEmpty: "No students admitted yet.",
       announcements: "Latest notices",
       announcementsEmpty: "No notices published from this campus.",
     },
@@ -311,7 +348,7 @@ export const pages = {
 
   applications: {
     title: "Applications",
-    description: "Prospective students, in the order they arrived.",
+    description: "Enquiries and submissions for this campus.",
     searchLabel: "Search by name, reference, email or phone",
     columns: [
       { key: "reference", label: "Reference" },
@@ -323,7 +360,7 @@ export const pages = {
     ] satisfies Column[],
     empty: {
       title: "No applications match",
-      body: "Log a walk-in application with the form above, or clear the filters.",
+      body: "Log an application or clear the filters.",
     },
     detail: {
       previousQualification: "Previous qualification",
@@ -331,17 +368,28 @@ export const pages = {
       decision: "Decision",
       decidedBy: "Decided by",
       decidedAt: "Decided on",
-      student: "Admitted student",
-      admit: "Admit to this campus",
-      enrollNote: "Approving creates the student record and an active enrollment.",
     },
     create: {
       button: "Log an application",
       title: "New application",
       fields: [
         { name: "fullName", label: "Applicant name", type: "text", required: true },
-        { name: "email", label: "Email", type: "email", required: true },
         { name: "phone", label: "Phone", type: "tel", required: true },
+        { name: "email", label: "Email", type: "email" },
+        {
+          name: "gender",
+          label: "Gender",
+          type: "select",
+          required: true,
+          options: toOptions(labels.gender),
+        },
+        {
+          name: "grade",
+          label: "KCSE grade",
+          type: "select",
+          required: true,
+          options: toOptions(labels.entryGrade),
+        },
         { name: "programId", label: "Programme", type: "select", required: true, optionKey: "programs" },
         { name: "previousQualification", label: "Previous qualification", type: "text", wide: true },
         { name: "notes", label: "Notes", type: "textarea", wide: true },
@@ -349,20 +397,48 @@ export const pages = {
     },
     decision: {
       button: "Record decision",
-      approve: "Approve and admit",
       reject: "Reject",
       review: "Move to review",
+      hold: "Make a decision to move this application forward.",
       status: "Decision",
       statusField: { name: "decision", label: "Decision", type: "select", required: true } satisfies Field,
       note: { name: "decisionNote", label: "Reason or note for the file", type: "textarea", wide: true },
-      admitted: "Application approved and the student record created.",
       saved: "Decision saved.",
+    },
+
+    /** Admission runs monthly, so each campus month carries the day its students report. */
+    dateSetting: {
+      heading: "Application date setting",
+      description: "Set monthly reporting dates for admitted students.",
+      year: {
+        select: "Year",
+        show: "Show",
+        previous: "Previous year",
+        next: "Next year",
+        heading: "Application dates for",
+        closed: "Closed for changes",
+        closedTitle: "Changes closed",
+        closedBody: (year: number) => `Reporting dates for ${year} can no longer be changed.`,
+      },
+      campus: { select: "Campus" },
+      months: "Months",
+      notSet: "No reporting date set.",
+      reported: "Reported",
+      upcoming: "Upcoming",
+      passedNote: (month: string) => `Reporting for ${month} has passed.`,
+      set: {
+        button: "Set date",
+        field: { name: "date", label: "Reporting date", type: "date", required: true } satisfies Field,
+        saved: "Reporting date saved.",
+      },
+      change: { button: "Change date" },
+      remove: { button: "Clear date" },
     },
   },
 
   students: {
     title: "Students",
-    description: "Every student admitted to this campus.",
+    description: "Registered students at this campus.",
     searchLabel: "Search by name, admission number or guardian",
     columns: [
       { key: "admissionNo", label: "Admission no." },
@@ -374,7 +450,7 @@ export const pages = {
     ] satisfies Column[],
     empty: {
       title: "No students yet",
-      body: "Admit an approved application, or register a student directly with the form above.",
+      body: "Register a student.",
     },
     create: {
       button: "Register a student",
@@ -385,8 +461,8 @@ export const pages = {
         { name: "phone", label: "Phone", type: "tel" },
         { name: "programId", label: "Programme", type: "select", required: true, optionKey: "programs" },
         { name: "intakeId", label: "Intake", type: "select", optionKey: "intakes" },
-        { name: "admissionNo", label: "Admission number", type: "text", hint: "Leave blank to have the system issue one." },
-        { name: "password", label: "Temporary password", type: "text", required: true, hint: "Minimum 10 characters. The student changes it after signing in." },
+        { name: "admissionNo", label: "Admission number", type: "text", hint: "Leave blank to issue one automatically." },
+        { name: "password", label: "Temporary password", type: "text", required: true, hint: "Minimum 10 characters." },
         { name: "gender", label: "Gender", type: "select", options: toOptions(labels.gender) },
         { name: "dateOfBirth", label: "Date of birth", type: "date" },
         { name: "nationalId", label: "ID or birth certificate no.", type: "text" },
@@ -400,7 +476,6 @@ export const pages = {
     profile: {
       guardian: "Guardian",
       personal: "Personal details",
-      academic: "Academic",
       finance: "Fees",
       cards: "Cards",
       enrollments: "Enrollments",
@@ -410,7 +485,7 @@ export const pages = {
 
   enrollments: {
     title: "Enrollments",
-    description: "Which student is studying which programme, and in which cohort.",
+    description: "Active and historical enrolments on this campus.",
     searchLabel: "Search by admission number or cohort",
     columns: [
       { key: "admissionNo", label: "Admission no." },
@@ -423,7 +498,7 @@ export const pages = {
     ] satisfies Column[],
     empty: {
       title: "No enrollments",
-      body: "Approving an application creates one automatically, or enroll an existing student here.",
+      body: "Enroll a student.",
     },
     create: {
       button: "Enroll a student",
@@ -445,7 +520,7 @@ export const pages = {
 
   programs: {
     title: "Programmes",
-    description: "The catalogue your campus teaches.",
+    description: "Courses on offer at this campus.",
     columns: [
       { key: "code", label: "Code" },
       { key: "name", label: "Programme" },
@@ -456,7 +531,7 @@ export const pages = {
     ] satisfies Column[],
     empty: {
       title: "No programmes yet",
-      body: "Add the programmes this campus runs before admissions can be logged.",
+      body: "Add a programme.",
     },
     create: {
       button: "Add programme",
@@ -473,7 +548,7 @@ export const pages = {
     duration: (months: number) => `${months} months`,
     feeItems: {
       heading: "Fee components",
-      description: "What a student on each programme is billed for. Invoices copy these lines.",
+      description: "Standard charges per programme.",
       columns: [
         { key: "program", label: "Programme" },
         { key: "label", label: "Item" },
@@ -498,7 +573,6 @@ export const pages = {
 
   tutors: {
     title: "Tutors",
-    description: "Teaching staff attached to this campus.",
     searchLabel: "Search by name, staff number or department",
     columns: [
       { key: "staffNo", label: "Staff no." },
@@ -511,7 +585,7 @@ export const pages = {
     ] satisfies Column[],
     empty: {
       title: "No tutors on this campus",
-      body: "Tutors register themselves and wait for approval, or create the account here.",
+      body: "Add a tutor.",
     },
     create: {
       button: "Add tutor",
@@ -520,11 +594,11 @@ export const pages = {
         { name: "fullName", label: "Full name", type: "text", required: true },
         { name: "email", label: "Email (sign-in)", type: "email", required: true },
         { name: "phone", label: "Phone", type: "tel" },
-        { name: "staffNo", label: "Staff number", type: "text", hint: "Leave blank to have the system issue one." },
+        { name: "staffNo", label: "Staff number", type: "text", hint: "Leave blank to issue one automatically." },
         { name: "password", label: "Temporary password", type: "text", required: true, hint: "Minimum 10 characters." },
         { name: "title", label: "Title", type: "text", placeholder: "Asst. Lecturer" },
         { name: "department", label: "Department", type: "text" },
-        { name: "programIds", label: "Programmes taught", type: "select", optionKey: "programs", hint: "Pick one; add more after saving." },
+        { name: "programIds", label: "Programme taught", type: "select", optionKey: "programs" },
       ] satisfies Field[],
       created: "Tutor saved.",
     },
@@ -536,7 +610,6 @@ export const pages = {
 
   timetable: {
     title: "Timetable",
-    description: "Weekly class grid for this campus.",
     days: Object.keys(labels.weekday) as (keyof typeof labels.weekday)[],
     create: {
       button: "Add class",
@@ -559,32 +632,72 @@ export const pages = {
 
   calendar: {
     title: "Academic calendar",
-    description: "Terms, intake windows and dated events.",
+    year: {
+      select: "Year",
+      show: "Show",
+      previous: "Previous year",
+      next: "Next year",
+      heading: "Term windows for",
+      closed: "Closed for changes",
+      closedTitle: "Changes closed",
+      closedBody: (year: number) => `The calendar for ${year} can no longer be changed.`,
+    },
+    campus: {
+      select: "Campus",
+    },
     terms: {
       heading: "Terms",
-      columns: [
-        { key: "name", label: "Term" },
-        { key: "window", label: "Dates" },
-        { key: "status", label: "Status" },
-        { key: "intakes", label: "Intakes" },
-      ] satisfies Column[],
-      empty: "No terms recorded. Add one before scheduling events.",
+      empty: "Nothing configured for this year yet.",
+      slot: "Term",
+      notConfigured: "Not configured.",
+      window: "Runs",
+      through: "to",
+      configure: "Configure",
+      endedNote: (date: string) => `Ended ${date}`,
+      intakesHeading: "Intake windows",
+      emptyIntakes: "No intake window on this term.",
+      examsHeading: "Exam dates",
+      emptyExams: "No exam dates on this term.",
+      cardsHeading: "Cards issued",
+      emptyCards: "No cards issued in this window.",
+      eventsHeading: "Events",
+      emptyEvents: "No events on this term.",
       create: {
         button: "Add term",
         title: "New term",
         fields: [
-          { name: "name", label: "Name", type: "text", required: true, placeholder: "2026 Long Semester 1", wide: true },
-          { name: "startDate", label: "Starts", type: "date", required: true },
-          { name: "endDate", label: "Ends", type: "date", required: true },
-          { name: "status", label: "Status", type: "select", required: true, options: toOptions(labels.termStatus) },
+          { name: "campusId", label: "Campus", type: "select", required: true, optionKey: "campuses" },
+          { name: "year", label: "Year", type: "select", required: true, optionKey: "years" },
+          {
+            name: "termNo",
+            label: "Term",
+            type: "select",
+            required: true,
+            options: [
+              { value: "1", label: "Term 1" },
+              { value: "2", label: "Term 2" },
+              { value: "3", label: "Term 3" },
+            ],
+          },
+          { name: "startDate", label: "Term starts", type: "date", required: true },
+          { name: "endDate", label: "Term ends", type: "date", required: true },
         ] satisfies Field[],
         created: "Term saved.",
+      },
+      edit: {
+        button: "Change dates",
+        title: "Change the term window",
+        fields: [
+          { name: "startDate", label: "Term starts", type: "date", required: true },
+          { name: "endDate", label: "Term ends", type: "date", required: true },
+          { name: "status", label: "Status", type: "select", required: true, options: toOptions(labels.termStatus) },
+        ] satisfies Field[],
+        saved: "Term updated.",
       },
       intake: {
         button: "Add intake",
         title: "New intake",
         fields: [
-          { name: "termId", label: "Term", type: "select", required: true, optionKey: "terms" },
           { name: "name", label: "Name", type: "text", required: true, placeholder: "September 2026" },
           { name: "applicationDeadline", label: "Applications close", type: "date", required: true },
           { name: "commenceAt", label: "Classes start", type: "date", required: true },
@@ -594,20 +707,32 @@ export const pages = {
     },
     events: {
       heading: "Events",
-      empty: "No events for this month.",
+      empty: "No events for this year.",
       create: {
         button: "Add event",
         title: "New event",
         fields: [
-          { name: "termId", label: "Term", type: "select", required: true, optionKey: "terms" },
           { name: "title", label: "Title", type: "text", required: true, wide: true },
           { name: "type", label: "Type", type: "select", required: true, options: toOptions(labels.calendarEventType) },
           { name: "startsAt", label: "Starts", type: "date", required: true },
           { name: "endsAt", label: "Ends", type: "date" },
-          { name: "scope", label: "Applies to", type: "select", options: [{ value: "campus", label: "This campus" }, { value: "college", label: "All campuses" }] },
           { name: "description", label: "Detail", type: "textarea", wide: true },
         ] satisfies Field[],
         created: "Event saved.",
+      },
+      college: {
+        heading: "College-wide entries",
+        empty: "Nothing posted to every campus.",
+        button: "Add college-wide entry",
+        title: "New college-wide entry",
+        fields: [
+          { name: "title", label: "Title", type: "text", required: true, wide: true },
+          { name: "type", label: "Type", type: "select", required: true, options: toOptions(labels.calendarEventType) },
+          { name: "startsAt", label: "Starts", type: "date", required: true },
+          { name: "endsAt", label: "Ends", type: "date" },
+          { name: "description", label: "Detail", type: "textarea", wide: true },
+        ] satisfies Field[],
+        created: "Entry saved.",
       },
       collegeWide: "All campuses",
       thisCampus: "This campus",
@@ -616,11 +741,11 @@ export const pages = {
 
   exams: {
     title: "Exams",
-    description: "Assessment schedule and the marks behind it.",
     searchLabel: "Search by paper title or room",
     columns: [
       { key: "title", label: "Paper" },
       { key: "program", label: "Programme" },
+      { key: "type", label: "Type" },
       { key: "date", label: "Date" },
       { key: "window", label: "Time" },
       { key: "room", label: "Room" },
@@ -629,7 +754,7 @@ export const pages = {
     ] satisfies Column[],
     empty: {
       title: "No exams scheduled",
-      body: "Schedule a paper, then record marks against the enrollments on it.",
+      body: "Schedule an exam.",
     },
     create: {
       button: "Schedule exam",
@@ -638,6 +763,13 @@ export const pages = {
         { name: "title", label: "Paper title", type: "text", required: true, wide: true },
         { name: "programId", label: "Programme", type: "select", required: true, optionKey: "programs" },
         { name: "termId", label: "Term", type: "select", optionKey: "terms" },
+        {
+          name: "type",
+          label: "Type",
+          type: "select",
+          required: true,
+          options: toOptions(labels.examType),
+        },
         { name: "date", label: "Date", type: "date", required: true },
         { name: "startAt", label: "Starts", type: "time", required: true },
         { name: "durationMinutes", label: "Duration (minutes)", type: "number", step: "15" },
@@ -649,7 +781,7 @@ export const pages = {
     },
     grades: {
       heading: "Marks",
-      empty: "No enrollments on this programme yet, so there is nothing to mark.",
+      empty: "No enrollments on this programme yet.",
       columns: [
         { key: "admissionNo", label: "Admission no." },
         { key: "student", label: "Student" },
@@ -677,7 +809,6 @@ export const pages = {
 
   accounts: {
     title: "Accounts",
-    description: "Fee invoices and the payments recorded against them.",
     searchLabel: "Search by invoice number or student",
     summary: {
       billed: "Billed",
@@ -697,7 +828,7 @@ export const pages = {
     ] satisfies Column[],
     empty: {
       title: "No invoices match",
-      body: "Bill a student from an approved fee structure, or import the term's bills.",
+      body: "Raise an invoice or clear the filters.",
     },
     create: {
       button: "Raise invoice",
@@ -709,7 +840,6 @@ export const pages = {
         { name: "note", label: "Note on the invoice", type: "textarea", wide: true },
       ] satisfies Field[],
       linesHeading: "Line items",
-      linesHint: "Copy the fee components for the student's programme, then edit this invoice if needed.",
       copyLines: (total: number) => `Copied ${total} fee components.`,
       created: "Invoice raised.",
       lineFields: [
@@ -735,7 +865,7 @@ export const pages = {
 
   cards: {
     title: "ID cards",
-    description: "Issue, track and replace student identification cards.",
+    description: "Card requests and printing status for this campus.",
     searchLabel: "Search by serial or admission number",
     columns: [
       { key: "serial", label: "Serial" },
@@ -747,7 +877,7 @@ export const pages = {
     ] satisfies Column[],
     empty: {
       title: "No cards recorded",
-      body: "Request a card for a student, then move it through printing to issued.",
+      body: "Request a card.",
     },
     create: {
       button: "Request card",
@@ -763,7 +893,6 @@ export const pages = {
     move: {
       title: "Move card",
       statusField: { name: "status", label: "Status", type: "select", required: true, options: toOptions(labels.cardStatus) } satisfies Field,
-      issuedAtNote: "Marking a card issued stamps today's date.",
       saved: "Card updated.",
     },
     print: {
@@ -774,7 +903,6 @@ export const pages = {
       validLabel: "Valid until",
       serialLabel: "Serial",
       campusLabel: "Campus",
-      note: "Photographs are not stored yet. The layout prints with the name, programme, serial and validity only.",
       open: "Print view",
       closed: "Hide print view",
     },
@@ -782,8 +910,7 @@ export const pages = {
 
   reports: {
     title: "Reports",
-    description: "Counts drawn from the records on this campus.",
-    scope: (campusName: string, generated: string) => `${campusName} · drawn from live records on ${generated}`,
+    generated: (date: string) => `Generated ${date}`,
     blocks: {
       admissions: {
         title: "Applications by outcome",
@@ -851,13 +978,11 @@ export const pages = {
         ] satisfies Column[],
       },
     },
-    exportNote: "Print this page from the browser to hand a copy to the finance or academic office.",
     print: "Print",
   },
 
   communication: {
     title: "Communication",
-    description: "Notices for your students and tutors.",
     scopeCampus: "This campus",
     scopeCollege: "All campuses",
     publishedOn: "Published",
@@ -865,7 +990,7 @@ export const pages = {
     pinned: "Pinned",
     empty: {
       title: "No notices yet",
-      body: "Publish an announcement and it appears in the student and tutor portals as soon as they open.",
+      body: "Write a notice.",
     },
     create: {
       button: "Write a notice",

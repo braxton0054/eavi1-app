@@ -1,6 +1,6 @@
 "use server";
 
-import { ExamStatus } from "@/generated/prisma/enums";
+import { ExamStatus, ExamType } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
@@ -16,9 +16,11 @@ import {
   requiredText,
   text,
   timeField,
+  termOnCampus,
 } from "@/lib/actions/college/_shared";
 
 const STATUSES = Object.keys(ExamStatus) as (keyof typeof ExamStatus)[];
+const TYPES = Object.keys(ExamType) as (keyof typeof ExamType)[];
 
 const copy = pages.exams;
 
@@ -51,12 +53,10 @@ export async function createExam(formData: FormData) {
     });
     if (!program) throw new FieldError(fieldErrors.notOnCampus);
 
-    const termId = text(formData, "termId");
-    if (termId) {
-      const term = await prisma.term.findUnique({ where: { id: termId }, select: { id: true } });
-      if (!term) throw new FieldError(fieldErrors.choice(fieldLabel("termId")));
-    }
+    // The paper sits inside this campus's term, so a term id from another campus is refused.
+    const termId = await termOnCampus(formData, "termId", campusId);
 
+    const type = enumField(formData, "type", TYPES, fieldLabel("type"));
     const date = requiredDate(formData, "date", fieldLabel("date"));
     const startAt = timeField(formData, "startAt", fieldLabel("startAt"));
     // The helper throws when this required time is missing; the guard only narrows the type.
@@ -84,12 +84,13 @@ export async function createExam(formData: FormData) {
         title,
         programId,
         campusId,
-        termId: termId ?? null,
+        termId,
         invigilatorId: invigilatorId ?? null,
         date,
         startAt,
         durationMinutes,
         room: text(formData, "room"),
+        type,
         status,
       },
     });

@@ -7,6 +7,7 @@ import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/pa
 import { StatusChip } from "@/components/dashboard/status-chip";
 import { formatDate } from "@/lib/format";
 
+
 const copy = pages.communication;
 
 export default async function CommunicationPage({
@@ -21,7 +22,7 @@ export default async function CommunicationPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} />
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 

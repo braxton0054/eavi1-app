@@ -62,7 +62,7 @@ export function SiteHeader() {
             asChild
             className="rounded-full px-4 hover:bg-eavi-fill-hover"
           >
-            <Link href="/register">{nav.apply}</Link>
+            <Link href="/apply">{nav.apply}</Link>
           </Button>
           <Button
             type="button"
@@ -108,7 +108,7 @@ export function SiteHeader() {
               </Link>
             </Button>
             <Button asChild className="rounded-full hover:bg-eavi-fill-hover">
-              <Link href="/register" onClick={() => setOpen(false)}>
+              <Link href="/apply" onClick={() => setOpen(false)}>
                 {nav.apply}
               </Link>
             </Button>

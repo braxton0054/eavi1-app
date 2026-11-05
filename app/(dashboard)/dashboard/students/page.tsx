@@ -10,6 +10,7 @@ import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { money } from "@/lib/format";
 import type { OptionSets } from "@/components/dashboard/record-form";
 
+
 const copy = pages.students;
 
 /** Card pipeline stages read left to right, so the chip colour follows the stage. */

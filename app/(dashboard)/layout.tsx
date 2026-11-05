@@ -3,23 +3,24 @@ import { Suspense } from "react";
 
 import { DashboardFrame } from "@/components/dashboard/dashboard-frame";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import { requireCollegeAdmin } from "@/lib/session";
 
-/**
- * Every screen here reads the session, so it cannot be prerendered into a static shell.
- * The frame streams in behind the boundary and the layout opts out of instant
- * navigation validation rather than pretending the read is static.
- */
-export const instant = false;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Portal",
   robots: { index: false, follow: false },
 };
 
+async function DashboardContent({ children }: { children: React.ReactNode }) {
+  const scope = await requireCollegeAdmin();
+  return <DashboardFrame scope={scope}>{children}</DashboardFrame>;
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardFrame>{children}</DashboardFrame>
+      <DashboardContent>{children}</DashboardContent>
     </Suspense>
   );
 }

@@ -185,9 +185,9 @@ export const admissionsSection = {
   steps: [
     {
       title: "Apply",
-      line: "Create an account, or call any campus and register over the phone.",
-      action: "Create an account",
-      href: "/register",
+      line: "Fill in the application form, or call any campus and register over the phone.",
+      action: "Apply online",
+      href: "/apply",
     },
     {
       title: "Get admitted",
@@ -195,7 +195,7 @@ export const admissionsSection = {
     },
     {
       title: "Start class",
-      line: "You begin at the campus you registered with.",
+      line: "You begin at the campus you applied to.",
     },
   ],
   requirements: {
@@ -286,7 +286,7 @@ export const faqSection = {
     {
       question: "How do I apply?",
       answer:
-        "Create an account on the register page, or call any campus and register over the phone.",
+        "Fill in the application form, or call any campus and register over the phone. Admission runs every month.",
     },
     {
       question: "Which campuses can I join?",

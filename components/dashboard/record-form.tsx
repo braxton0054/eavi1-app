@@ -90,7 +90,6 @@ export function RecordForm({
   values,
   action,
   submitLabel,
-  note,
   aside,
   hidden,
   compact = false,
@@ -101,7 +100,6 @@ export function RecordForm({
   values?: Record<string, string | undefined>;
   action: FormAction;
   submitLabel: string;
-  note?: string;
   aside?: ReactNode;
   /** Ids the form must carry but the administrator should not edit. */
   hidden?: Record<string, string>;
@@ -132,8 +130,6 @@ export function RecordForm({
         );
       })}
 
-      {note ? <p className={cn("text-xs text-eavi-muted-text", !compact && "sm:col-span-2")}>{note}</p> : null}
-
       <div className={cn("flex flex-wrap items-center gap-3", !compact && "sm:col-span-2")}>
         <SubmitButton label={submitLabel} />
         {aside}
@@ -155,7 +151,6 @@ export function DisclosureForm(props: {
   values?: Record<string, string | undefined>;
   action: FormAction;
   submitLabel: string;
-  note?: string;
   hidden?: Record<string, string>;
 }) {
   const { button, title, ...form } = props;
@@ -187,7 +182,6 @@ export function RowForm(props: {
   hidden?: Record<string, string>;
   action: FormAction;
   submitLabel: string;
-  note?: string;
   tone?: "neutral" | "danger";
 }) {
   const { button, tone = "neutral", ...form } = props;

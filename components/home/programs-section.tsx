@@ -95,7 +95,7 @@ export function ProgramsSection() {
                     </p>
                     <div className="mt-auto flex gap-2">
                       <Button asChild variant="outline" className="rounded-full">
-                        <Link href="/register">{programsSection.apply}</Link>
+                        <Link href="/apply">{programsSection.apply}</Link>
                       </Button>
                       <Button asChild variant="ghost" className="rounded-full">
                         <Link href={programsSection.learnMoreHref}>

@@ -10,6 +10,7 @@ import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { addMinutes, cleanTime, formatDate } from "@/lib/format";
 import type { OptionSets } from "@/components/dashboard/record-form";
 
+
 const copy = pages.exams;
 
 const examTone: Record<string, ChipTone> = {
@@ -45,6 +46,7 @@ export default async function ExamsPage({
     cells: {
       title: exam.title,
       program: `${exam.program.name} (${exam.program.code})`,
+      type: labels.examType[exam.type],
       date: formatDate(exam.date),
       window: `${time(exam.startAt)}–${time(addMinutes(exam.startAt, exam.durationMinutes))}`,
       room: exam.room ?? common.notSet,
@@ -59,7 +61,7 @@ export default async function ExamsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} />
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
@@ -73,7 +75,7 @@ export default async function ExamsPage({
         submitLabel={common.create}
       />
 
-      <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
+      <Panel title={copy.title}>
         <div className="p-4">
           <ListFilters basePath="/dashboard/exams" q={q} searchLabel={copy.searchLabel} />
         </div>

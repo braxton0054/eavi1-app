@@ -5,12 +5,12 @@ import { Bar, EmptyState, PageHeader, Panel } from "@/components/dashboard/panel
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { count, formatDate, money, percent } from "@/lib/format";
 
+
 const copy = pages.reports;
 
 const applicationTone: Record<string, ChipTone> = {
   SUBMITTED: "info",
   REVIEWING: "info",
-  APPROVED: "success",
   REJECTED: "danger",
   WITHDRAWN: "danger",
 };
@@ -161,12 +161,7 @@ export default async function ReportsPage() {
     <div className="space-y-6">
       <PageHeader
         title={copy.title}
-        description={copy.description}
-        meta={
-          <p className="mt-1 text-xs text-eavi-muted-text">
-            {copy.scope(reports.scope.campusName, formatDate(now))}
-          </p>
-        }
+        meta={<p className="mt-1 text-xs text-eavi-muted-text">{copy.generated(formatDate(now))}</p>}
       />
 
       <Panel title={blocks.admissions.title}>
@@ -243,8 +238,6 @@ export default async function ReportsPage() {
           <DataTable columns={blocks.cards.columns} rows={cardRows} caption={blocks.cards.title} />
         )}
       </Panel>
-
-      <p className="text-sm text-eavi-muted-text">{copy.exportNote}</p>
     </div>
   );
 }

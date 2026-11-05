@@ -31,7 +31,6 @@ enum ProgramLevel {
 enum ApplicationStatus {
   SUBMITTED
   REVIEWING
-  APPROVED
   REJECTED
   WITHDRAWN
 }
@@ -48,6 +47,23 @@ enum Gender {
   FEMALE
   OTHER
   UNDECLARED
+}
+
+/// The grade an applicant holds on the Kenya Certificate of Secondary Education scale.
+/// Named for admissions — the exam marks record is a separate model.
+enum EntryGrade {
+  A
+  A_MINUS
+  B_PLUS
+  B
+  B_MINUS
+  C_PLUS
+  C
+  C_MINUS
+  D_PLUS
+  D
+  D_MINUS
+  E
 }
 
 enum TermStatus {
@@ -72,6 +88,11 @@ enum Weekday {
   THURSDAY
   FRIDAY
   SATURDAY
+}
+
+enum ExamType {
+  CAT
+  END_TERM
 }
 
 enum ExamStatus {
@@ -115,18 +136,23 @@ model Campus {
   name           String
   place          String
   phone          String?
+  /// An office such as the Town Office handles paperwork but teaches no course, so it is
+  /// never handed an applicant. Only the campuses that teach take students.
+  takesApplicants Boolean         @default(true)
   users          User[]
   programs       Program[]        @relation("ProgramCampuses")
   students       StudentProfile[]
   tutors         TutorProfile[]
   applications   Application[]
   enrollments    Enrollment[]
-  calendarEvents CalendarEvent[]
-  timetableSlots TimetableSlot[]
-  exams          Exam[]
-  invoices       Invoice[]
-  announcements  Announcement[]
-  idCards        IdCard[]
+  calendarEvents  CalendarEvent[]
+  terms           Term[]
+  timetableSlots  TimetableSlot[]
+  exams           Exam[]
+  invoices        Invoice[]
+  announcements   Announcement[]
+  idCards         IdCard[]
+  reportingDates  ReportingDate[]
 
   @@map("campuses")
 }
@@ -206,7 +232,6 @@ model StudentProfile {
   guardianPhone       String?
   guardianEmail       String?
   address             String?
-  applications        Application[]
   enrollments         Enrollment[]
   invoices            Invoice[]
   payments            Payment[]
@@ -238,13 +263,17 @@ model TutorProfile {
   @@map("tutor_profiles")
 }
 
-/// A prospect's application. Approving one creates the student profile and enrollment.
+/// A prospect's application. It stays an application until enrolment turns it into a
+/// student, which is a separate step; the reference is the number the applicant keeps.
 model Application {
   id                    String           @id @default(uuid())
   reference             String           @unique
   fullName              String
-  email                 String
+  /// An applicant may leave this out; the office confirms one before admitting.
+  email                 String?
   phone                 String
+  gender                Gender?
+  grade                 EntryGrade?
   programId             String
   program               Program          @relation(fields: [programId], references: [id])
   campusId              Int
@@ -256,8 +285,6 @@ model Application {
   decidedById           String?
   decidedBy             User?            @relation("ApplicationDecider", fields: [decidedById], references: [id])
   decidedAt             DateTime?
-  studentId             String?
-  student               StudentProfile?  @relation(fields: [studentId], references: [id])
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
 
@@ -265,9 +292,15 @@ model Application {
   @@map("applications")
 }
 
+/// One of the three terms a campus runs in a calendar year. Campuses never share a term,
+/// so the identity of a term is (campus, year, term number).
 model Term {
   id             String          @id @default(uuid())
-  name           String          @unique
+  campusId       Int
+  campus         Campus          @relation(fields: [campusId], references: [id])
+  year           Int
+  termNo         Int
+  name           String
   startDate      DateTime
   endDate        DateTime
   status         TermStatus      @default(PLANNED)
@@ -280,6 +313,8 @@ model Term {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
+  @@unique([campusId, year, termNo])
+  @@index([campusId, startDate])
   @@map("terms")
 }
 
@@ -297,11 +332,31 @@ model Intake {
   @@map("intakes")
 }
 
+/// Admission runs every month here, so each month of a campus year carries the day its
+/// admitted students report. An application picks one; a term window is not involved.
+model ReportingDate {
+  id        String   @id @default(uuid())
+  campusId  Int
+  campus    Campus   @relation(fields: [campusId], references: [id])
+  /// Calendar year the month belongs to.
+  year      Int
+  /// 1 = January through 12 = December.
+  month     Int
+  date      DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([campusId, year, month])
+  @@index([campusId, date])
+  @@map("reporting_dates")
+}
+
 /// One dated entry on the academic calendar. campusId null means college-wide.
 model CalendarEvent {
   id          String            @id @default(uuid())
-  termId      String
-  term        Term              @relation(fields: [termId], references: [id])
+  /// Nullable so a super admin can post a college-wide entry that belongs to no campus term.
+  termId      String?
+  term        Term?             @relation(fields: [termId], references: [id])
   campusId    Int?
   campus      Campus?           @relation(fields: [campusId], references: [id])
   title       String
@@ -374,6 +429,9 @@ model Exam {
   startAt         String
   durationMinutes Int          @default(120)
   room            String?
+  /// One sitting. A term normally carries a single CAT and a single end-of-term paper,
+  /// but nothing stops it running two CATs or two end-of-term papers.
+  type            ExamType     @default(CAT)
   status          ExamStatus   @default(DRAFT)
   grades          Grade[]
   createdAt       DateTime     @default(now())

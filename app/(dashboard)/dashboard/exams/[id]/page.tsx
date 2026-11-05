@@ -66,6 +66,7 @@ export default async function ExamDetailPage({
   const programLabel = `${exam.program.name} (${exam.program.code})`;
 
   const headerValues: Record<string, ReactNode> = {
+    type: labels.examType[exam.type],
     date: formatDate(exam.date),
     window: `${time(exam.startAt)}–${time(addMinutes(exam.startAt, exam.durationMinutes))}`,
     room: exam.room ?? common.notSet,

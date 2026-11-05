@@ -14,14 +14,13 @@ const copy = pages.applications;
 
 const applicationTone: Record<string, ChipTone> = {
   SUBMITTED: "info",
-  REVIEWING: "info",
-  APPROVED: "success",
+  REVIEWING: "warning",
   REJECTED: "danger",
-  WITHDRAWN: "danger",
+  WITHDRAWN: "neutral",
 };
 
-/** The three outcomes an administrator may record, in the order they read on the form. */
-const DECIDABLE = ["APPROVED", "REJECTED", "REVIEWING"] as const;
+/** The two outcomes an administrator may record, in the order they read on the form. */
+const DECIDABLE = ["REVIEWING", "REJECTED"] as const;
 
 export default async function ApplicationDetailPage({
   params,
@@ -61,6 +60,8 @@ export default async function ApplicationDetailPage({
     fullName: application.fullName,
     email: application.email,
     phone: application.phone,
+    gender: application.gender ? labels.gender[application.gender] : null,
+    grade: application.grade ? labels.entryGrade[application.grade] : null,
     programId: `${application.program.name} (${application.program.code})`,
     previousQualification: application.previousQualification ?? common.notSet,
     notes: application.notes ?? common.notSet,
@@ -75,19 +76,16 @@ export default async function ApplicationDetailPage({
     decisionNote: application.decisionNote ?? common.notSet,
     decidedBy: application.decidedBy?.fullName ?? common.notSet,
     decidedAt: formatDate(application.decidedAt),
-    student: application.student?.admissionNo ?? common.notSet,
   };
 
-  // The credentials are only set while the applicant is still a prospect to admit.
+  // A decision is only recorded while the applicant is still waiting on the campus office.
   const openToDecide = application.status === "SUBMITTED" || application.status === "REVIEWING";
-  const temporaryPassword = pages.students.create.fields.find((field) => field.name === "password");
 
   const decisionFields: Field[] = [
     {
       ...copy.decision.statusField,
       options: DECIDABLE.map((value) => ({ value, label: labels.applicationStatus[value] })),
     },
-    ...(openToDecide && temporaryPassword ? [temporaryPassword] : []),
     copy.decision.note,
   ];
 
@@ -131,10 +129,6 @@ export default async function ApplicationDetailPage({
             <dd className="text-sm">{decisionValues.status}</dd>
           </div>
           <div>
-            <dt className="text-xs text-eavi-muted-text">{copy.detail.student}</dt>
-            <dd className="text-sm tabular-nums">{decisionValues.student}</dd>
-          </div>
-          <div>
             <dt className="text-xs text-eavi-muted-text">{copy.detail.decidedBy}</dt>
             <dd className="text-sm">{decisionValues.decidedBy}</dd>
           </div>
@@ -149,14 +143,16 @@ export default async function ApplicationDetailPage({
         </dl>
       </Panel>
 
-      <Panel title={copy.decision.button} description={openToDecide ? copy.detail.admit : undefined}>
+      <Panel
+        title={copy.decision.button}
+        description={openToDecide ? copy.decision.hold : undefined}
+      >
         <div className="p-4">
           <RecordForm
             id="application-decision"
             fields={decisionFields}
             action={decideApplication}
             submitLabel={copy.decision.button}
-            note={copy.detail.enrollNote}
             hidden={{ applicationId: application.id }}
           />
         </div>

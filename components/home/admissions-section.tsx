@@ -20,7 +20,7 @@ export function AdmissionsSection() {
         subheading={admissionsSection.subheading}
         action={
           <Button asChild size="lg" className="rounded-full hover:bg-eavi-fill-hover">
-            <Link href="/register">
+            <Link href="/apply">
               {admissionsSection.apply}
               <ArrowRightIcon data-icon="inline-end" />
             </Link>

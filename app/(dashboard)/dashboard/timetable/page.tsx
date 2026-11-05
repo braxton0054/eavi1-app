@@ -7,6 +7,7 @@ import { Notice, PageHeader, Panel } from "@/components/dashboard/panel";
 import { cleanTime } from "@/lib/format";
 import type { OptionSets } from "@/components/dashboard/record-form";
 
+
 const copy = pages.timetable;
 
 /** Slots store validated "HH:mm" strings; the fallback only narrows the formatter. */
@@ -30,7 +31,7 @@ export default async function TimetablePage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} />
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 

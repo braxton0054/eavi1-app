@@ -37,7 +37,7 @@ export function SiteFooter() {
           <Link href="/login" className={linkClass}>
             {nav.portalLogin}
           </Link>
-          <Link href="/register" className={linkClass}>
+          <Link href="/apply" className={linkClass}>
             {nav.apply}
           </Link>
         </nav>

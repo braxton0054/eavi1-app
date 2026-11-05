@@ -84,13 +84,11 @@ export function EmptyState({
 export function StatTile({
   label,
   value,
-  hint,
   icon,
   tone = "neutral",
 }: {
   label: string;
   value: string;
-  hint?: string;
   icon: DashboardIcon;
   tone?: "neutral" | "money" | "attention";
 }) {
@@ -104,7 +102,6 @@ export function StatTile({
       <p className={cn("text-2xl font-semibold tabular-nums tracking-tight", tone === "money" && "text-eavi-secondary-text", tone === "attention" && "text-eavi-warn-text")}>
         {value}
       </p>
-      {hint ? <p className="text-xs text-eavi-muted-text">{hint}</p> : null}
     </div>
   );
 }
@@ -131,7 +128,7 @@ export function SafeText({ value, className }: { value: string; className?: stri
   return <span className={className}>{value}</span>;
 }
 
-/** A one-line message the administrator acts on: a failed save, or a fact about scope. */
+/** A one-line message the administrator acts on: a failed save or a locked period. */
 export function Notice({
   tone = "warning",
   title,
@@ -139,7 +136,7 @@ export function Notice({
 }: {
   tone?: "warning" | "success" | "neutral";
   title: string;
-  body: string;
+  body?: string;
 }) {
   return (
     <div
@@ -152,7 +149,7 @@ export function Notice({
       )}
     >
       <p className="text-sm font-semibold">{title}</p>
-      <p className="mt-0.5 text-sm opacity-90">{body}</p>
+      {body ? <p className="mt-0.5 text-sm opacity-90">{body}</p> : null}
     </div>
   );
 }

@@ -1,13 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ExternalLinkIcon, LogOutIcon } from "lucide-react";
+import { LogOutIcon } from "lucide-react";
 
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
-import { StatusChip } from "@/components/dashboard/status-chip";
 import { ThemeToggle } from "@/components/home/theme-toggle";
 import { signOut } from "@/lib/actions/auth";
 import { roles, shell } from "@/lib/content/dashboard";
-import { requireCollegeAdmin } from "@/lib/session";
+import type { AdminScope } from "@/lib/session";
 import {
   Sidebar,
   SidebarContent,
@@ -22,8 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-export async function DashboardFrame({ children }: { children: React.ReactNode }) {
-  const scope = await requireCollegeAdmin();
+export function DashboardFrame({ children, scope }: { children: React.ReactNode; scope: AdminScope }) {
 
   // Collapsed menu buttons render a Radix tooltip and this registry's SidebarProvider
   // ships without the matching provider, which fails every portal navigation.
@@ -81,15 +79,7 @@ export async function DashboardFrame({ children }: { children: React.ReactNode }
             <SidebarTrigger className="-ms-2" />
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <span className="truncate text-sm font-medium">{shell.brandNote}</span>
-              <StatusChip tone="info">{`${shell.campusScope}: ${scope.campusName}`}</StatusChip>
             </div>
-            <Link
-              href="/"
-              className="hidden items-center gap-1.5 text-sm text-eavi-muted-text transition-colors hover:text-eavi-primary-text md:inline-flex"
-            >
-              <ExternalLinkIcon aria-hidden className="size-4" />
-              {shell.account.home}
-            </Link>
             <ThemeToggle />
           </header>
 
