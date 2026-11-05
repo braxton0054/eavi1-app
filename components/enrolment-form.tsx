@@ -208,21 +208,31 @@ export function EnrolmentForm({
         </section>
 
         <section className="space-y-4">
-          <h3 className="text-base font-semibold text-eavi-text">Profile photo</h3>
-          <div className="flex items-center gap-4">
-            {photoPreview && (
-              <img src={photoPreview} alt="preview" className="size-20 rounded-full object-cover ring-1 ring-eavi-border" />
-            )}
-            <input
-              name="profilePhoto"
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) setPhotoPreview(URL.createObjectURL(f));
-              }}
-              className={inputCls}
-            />
+          <h3 className="text-base font-semibold text-eavi-text">Student profile photo</h3>
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+            <div className="relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-eavi-primary-soft ring-2 ring-eavi-border">
+              {photoPreview ? (
+                <img src={photoPreview} alt="preview" className="size-full object-cover" />
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-12 text-eavi-primary-text" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                </svg>
+              )}
+            </div>
+            <div className="flex flex-1 flex-col gap-2">
+              <label className={labelCls}>Upload student photograph</label>
+              <input
+                name="profilePhoto"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setPhotoPreview(URL.createObjectURL(f));
+                }}
+                className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1.5 file:text-eavi-primary-text"
+              />
+              <p className="text-xs text-eavi-muted-text">JPG or PNG. Used as the student's profile avatar throughout the system.</p>
+            </div>
           </div>
         </section>
 
