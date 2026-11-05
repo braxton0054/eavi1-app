@@ -116,7 +116,7 @@ export async function enrolStudent(formData: FormData) {
             gender,
             dateOfBirth,
             nationalId,
-            address: text(formData, "address"),
+            address: [text(formData, "addressCounty"), text(formData, "addressSubCounty"), text(formData, "addressDetail")].filter(Boolean).join(", ") || null,
             primarySchool,
             secondarySchool,
             primarySchoolDocUrl,
@@ -150,7 +150,9 @@ export async function enrolStudent(formData: FormData) {
       const gAltPhones = all(formData, "guardianAltPhone");
       const gEmails = all(formData, "guardianEmail");
       const gOccs = all(formData, "guardianOccupation");
-      const gAddrs = all(formData, "guardianAddress");
+      const gCounties = all(formData, "guardianCounty");
+      const gSubs = all(formData, "guardianSubCounty");
+      const gDetails = all(formData, "guardianDetail");
       for (let i = 0; i < gNames.length; i++) {
         if (!gNames[i]) continue;
         await tx.parentGuardian.create({
@@ -162,7 +164,7 @@ export async function enrolStudent(formData: FormData) {
             altPhone: gAltPhones[i] || null,
             email: gEmails[i] || null,
             occupation: gOccs[i] || null,
-            address: gAddrs[i] || null,
+            address: [gCounties[i], gSubs[i], gDetails[i]].filter(Boolean).join(", ") || null,
           },
         });
       }
@@ -172,7 +174,9 @@ export async function enrolStudent(formData: FormData) {
       const eRels = all(formData, "emergencyRelationship");
       const ePhones = all(formData, "emergencyPhone");
       const eAltPhones = all(formData, "emergencyAltPhone");
-      const eAddrs = all(formData, "emergencyAddress");
+      const eCounties = all(formData, "emergencyCounty");
+      const eSubs = all(formData, "emergencySubCounty");
+      const eDetails = all(formData, "emergencyDetail");
       for (let i = 0; i < eNames.length; i++) {
         if (!eNames[i] || !ePhones[i]) continue;
         await tx.emergencyContact.create({
@@ -182,7 +186,7 @@ export async function enrolStudent(formData: FormData) {
             relationship: eRels[i] || "Emergency",
             phone: ePhones[i],
             altPhone: eAltPhones[i] || null,
-            address: eAddrs[i] || null,
+            address: [eCounties[i], eSubs[i], eDetails[i]].filter(Boolean).join(", ") || null,
           },
         });
       }

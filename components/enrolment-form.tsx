@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { enrolStudent } from "@/lib/actions/college/enrolment";
+import { KENYA_COUNTIES } from "@/lib/data/kenya-locations";
 
 type Option = { value: string; label: string };
 
@@ -13,6 +14,36 @@ const emptyEmergency: Emergency = { fullName: "", relationship: "Emergency", pho
 
 const inputCls = "h-11 w-full rounded-lg border border-input bg-eavi-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 const labelCls = "text-sm font-medium text-eavi-text";
+
+function LocationPicker({ prefix, label = "Residential address" }: { prefix: string; label?: string }) {
+  const [county, setCounty] = useState("");
+  const countyObj = KENYA_COUNTIES.find((c) => c.name === county);
+  return (
+    <div className="sm:col-span-2 space-y-2">
+      <span className={labelCls}>{label}</span>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <select
+          name={`${prefix}County`}
+          value={county}
+          onChange={(e) => setCounty(e.target.value)}
+          className={inputCls}
+        >
+          <option value="">Select county</option>
+          {KENYA_COUNTIES.map((c) => (
+            <option key={c.name} value={c.name}>{c.name}</option>
+          ))}
+        </select>
+        <select name={`${prefix}SubCounty`} className={inputCls} disabled={!countyObj}>
+          <option value="">Select sub-county</option>
+          {countyObj?.subCounties.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <input name={`${prefix}Detail`} placeholder="Town / street / estate" className={inputCls} />
+      </div>
+    </div>
+  );
+}
 
 export function EnrolmentForm({
   application,
@@ -99,10 +130,7 @@ export function EnrolmentForm({
               <label className={labelCls}>National ID / birth cert no.</label>
               <input name="nationalId" className={inputCls} />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>Address</label>
-              <input name="address" className={inputCls} />
-            </div>
+            <LocationPicker prefix="address" />
           </div>
         </section>
 
@@ -270,10 +298,7 @@ export function EnrolmentForm({
                   <label className={labelCls}>Occupation (optional)</label>
                   <input name="guardianOccupation" className={inputCls} />
                 </div>
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label className={labelCls}>Residential address</label>
-                  <textarea name="guardianAddress" rows={2} className="w-full rounded-lg border border-input bg-eavi-card px-3 py-2 text-sm" />
-                </div>
+                <LocationPicker prefix="guardian" label="Residential address" />
               </div>
             </div>
           ))}
@@ -315,10 +340,7 @@ export function EnrolmentForm({
                   <label className={labelCls}>Alternative phone</label>
                   <input name="emergencyAltPhone" className={inputCls} />
                 </div>
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label className={labelCls}>Residential address (optional)</label>
-                  <textarea name="emergencyAddress" rows={2} className="w-full rounded-lg border border-input bg-eavi-card px-3 py-2 text-sm" />
-                </div>
+                <LocationPicker prefix="emergency" label="Residential address (optional)" />
               </div>
             </div>
           ))}
