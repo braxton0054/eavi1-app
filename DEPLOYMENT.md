@@ -9,6 +9,38 @@
 | `deploy.example.env` | Template for that `.env`. Copy it, fill it in, never commit it. |
 | `.github/workflows/ci.yml` | On every push/PR: `npm ci`, `prisma validate`, eslint, `tsc --noEmit`, `next build`, then builds both images. |
 | `.github/workflows/release.yml` | On push to `main`: publishes `ghcr.io/braxton0054/eavi1-app` (`latest`, `sha-…`) plus the `:migrate-<sha>` image. |
+| `.github/workflows/deploy.yml` | On a **green** CI run for `main`: deploys to the VPS. See below. |
+
+## Automatic deploy
+
+`deploy.yml` runs on the box's own self-hosted runner (`/opt/actions-runner`, service
+`actions.runner.braxton0054-eavi1-app.*`), so no inbound SSH or webhook is needed. It
+triggers only when CI concludes successfully for `main`, then:
+
+1. resolves the commit CI validated — `github.event.workflow_run.head_sha`, not `main`,
+   so a concurrent push cannot deploy something untested;
+2. resets `/root/eavi1-app` to that commit, keeping the untracked `.env`;
+3. runs `docker compose up -d --build` — the build finishes before any container is
+   recreated, so a failed build leaves the previous release serving;
+4. gates on `https://$PUBLIC_HOST/api/health` and prints the running commit.
+
+So shipping is: **push to `main` → CI → deploy.** Nothing to run by hand.
+
+The image is built on the box rather than pulled from GHCR on purpose: the package is
+private, so pulling would need a token with `read:packages`.
+
+`PUBLIC_HOST` and `DEPLOY_PATH` live in the workflow's `env:`. To deploy a specific commit
+without waiting for a push, run the workflow manually (`workflow_dispatch`) and pass `sha`.
+
+### Runner notes
+
+- Runs as root (`RUNNER_ALLOW_RUNASROOT=1`), because it needs the Docker socket. Anything
+  that can run on that runner is effectively root on this host — keep the repo private and
+  do not let untrusted branches reach this workflow.
+- The runner has no stored git credentials. The deploy job passes a `contents: read`
+  job token to `git` through an inline credential helper, so no token is written into
+  the deployment's `.git/config`.
+
 
 ## First deploy on a server
 
