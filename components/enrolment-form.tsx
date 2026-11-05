@@ -17,7 +17,9 @@ const labelCls = "text-sm font-medium text-eavi-text";
 
 function LocationPicker({ prefix, label = "Residential address" }: { prefix: string; label?: string }) {
   const [county, setCounty] = useState("");
+  const [subCounty, setSubCounty] = useState("");
   const countyObj = KENYA_COUNTIES.find((c) => c.name === county);
+
   return (
     <div className="sm:col-span-2 space-y-2">
       <span className={labelCls}>{label}</span>
@@ -25,22 +27,34 @@ function LocationPicker({ prefix, label = "Residential address" }: { prefix: str
         <select
           name={`${prefix}County`}
           value={county}
-          onChange={(e) => setCounty(e.target.value)}
+          onChange={(e) => {
+            setCounty(e.target.value);
+            setSubCounty("");
+          }}
           className={inputCls}
         >
-          <option value="">Select county</option>
+          <option value="">Select county (47)</option>
           {KENYA_COUNTIES.map((c) => (
             <option key={c.name} value={c.name}>{c.name}</option>
           ))}
         </select>
-        <select name={`${prefix}SubCounty`} className={inputCls} disabled={!countyObj}>
-          <option value="">Select sub-county</option>
+        <select
+          name={`${prefix}SubCounty`}
+          value={subCounty}
+          onChange={(e) => setSubCounty(e.target.value)}
+          className={inputCls}
+          disabled={!countyObj}
+        >
+          <option value="">{countyObj ? `Select sub-county (${countyObj.subCounties.length})` : "Select county first"}</option>
           {countyObj?.subCounties.map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
-        <input name={`${prefix}Detail`} placeholder="Town / street / estate" className={inputCls} />
+        <input name={`${prefix}Detail`} placeholder="Town / estate / street" className={inputCls} />
       </div>
+      <p className="text-xs text-eavi-muted-text">
+        Choose the county, then only its sub-counties will appear. Add the specific town or estate in the last box.
+      </p>
     </div>
   );
 }
