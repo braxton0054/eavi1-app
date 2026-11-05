@@ -28,7 +28,7 @@ ARG DATABASE_URL=postgresql://build-only:build-only@127.0.0.1:5432/build-only
 ENV DATABASE_URL=$DATABASE_URL
 # `NEXT_PUBLIC_*` is inlined into the client bundle at build time, so the public
 # origin has to be present here — a runtime env var would arrive too late.
-ARG NEXT_PUBLIC_SITE_URL
+ARG NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules

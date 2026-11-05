@@ -38,7 +38,7 @@ export const site = {
   description:
     "Quality and affordable education across three campuses in Eldoret, Kenya. Apply online, then use the portal for results, class cards and campus notices.",
   /** Set NEXT_PUBLIC_SITE_URL to the deployed domain; used for metadata and JSON-LD. */
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  url: process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000",
   whatsapp: {
     tel: mainCampus.tel,
     href: `https://wa.me/${waNumber(mainCampus.tel)}`,

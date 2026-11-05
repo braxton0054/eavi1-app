@@ -45,6 +45,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # NEXT_PUBLIC_* is inlined at build time, so the published image has to
+          # carry the real origin or its metadata/sitemap point at localhost.
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
