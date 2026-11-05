@@ -52,7 +52,11 @@ jobs:
       - run: npm run lint
       - run: npx tsc --noEmit
 
-      - name: Production build
+      # The image build has no database to reach, so neither may the production build.
+      # Port 1 is never listening: this fails loudly if any route touches Prisma at build.
+      - name: Production build without a database
+        env:
+          DATABASE_URL: postgresql://none:none@127.0.0.1:1/none
         run: npm run build
 
   image:

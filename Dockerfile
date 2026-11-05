@@ -21,6 +21,11 @@ RUN npm ci --no-audit --no-fund
 
 FROM deps AS build
 ENV NEXT_TELEMETRY_DISABLED=1
+# `prisma generate` loads prisma.config.ts, and that config resolves DATABASE_URL on
+# import — so the variable has to exist even though the build never opens a connection.
+# A build argument, never an image environment variable: the runner stage does not copy it.
+ARG DATABASE_URL=postgresql://build-only:build-only@127.0.0.1:5432/build-only
+ENV DATABASE_URL=$DATABASE_URL
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

@@ -6,7 +6,6 @@ generated
 coverage
 Dockerfile
 docker-compose.yml
-docker/
 *.md
 .env
 .env.*
