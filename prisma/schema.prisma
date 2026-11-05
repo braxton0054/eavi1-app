@@ -174,8 +174,9 @@ model User {
   phone        String?
   passwordHash String
   role         Role           @default(STUDENT)
-  status       Status         @default(ACTIVE)
-  campus       Campus?        @relation(fields: [campusId], references: [id])
+  status             Status         @default(ACTIVE)
+  mustChangePassword Boolean        @default(false)
+  campus             Campus?        @relation(fields: [campusId], references: [id])
   campusId     Int?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
@@ -261,6 +262,20 @@ model StudentProfile {
   guardianPhone       String?
   guardianEmail       String?
   address             String?
+  applicationId       String?        @unique
+  application         Application?   @relation(fields: [applicationId], references: [id])
+  primarySchool       String?
+  secondarySchool     String?
+  primarySchoolDocUrl String?
+  secondarySchoolDocUrl String?
+  birthCertificateUrl String?
+  medicalInfo         String?
+  hasNoMedicalConditions Boolean     @default(false)
+  profilePhotoUrl     String?
+  admissionCategory   String?
+  previousInstitution String?
+  parentGuardians     ParentGuardian[]
+  emergencyContacts   EmergencyContact[]
   enrollments         Enrollment[]
   invoices            Invoice[]
   payments            Payment[]
@@ -315,6 +330,7 @@ model Application {
   decidedBy             User?            @relation("ApplicationDecider", fields: [decidedById], references: [id])
   decidedAt             DateTime?
   createdAt             DateTime         @default(now())
+  studentProfile        StudentProfile?
   updatedAt             DateTime         @updatedAt
 
   @@index([campusId, status])
@@ -398,6 +414,39 @@ model CalendarEvent {
   @@index([startsAt])
   @@index([campusId])
   @@map("calendar_events")
+}
+
+
+model ParentGuardian {
+  id            String         @id @default(uuid())
+  studentId     String
+  student       StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fullName      String
+  relationship  String
+  phone         String?
+  altPhone      String?
+  email         String?
+  address       String?
+  occupation    String?
+  createdAt     DateTime       @default(now())
+
+  @@index([studentId])
+  @@map("parent_guardians")
+}
+
+model EmergencyContact {
+  id            String         @id @default(uuid())
+  studentId     String
+  student       StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fullName      String
+  relationship  String
+  phone         String
+  altPhone      String?
+  address       String?
+  createdAt     DateTime       @default(now())
+
+  @@index([studentId])
+  @@map("emergency_contacts")
 }
 
 model Enrollment {
