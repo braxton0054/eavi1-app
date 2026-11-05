@@ -1,0 +1,90 @@
+name: Deploy
+
+# Runs only after CI has passed on main, so a red build never reaches the box.
+# The deployment lives at /root/eavi1-app and keeps its own .env; this workflow
+# moves that working copy to the exact commit CI validated, rebuilds the images
+# on the box and restarts the stack.
+#
+# Builds happen here rather than pulling the published GHCR image on purpose:
+# the package is private, so pulling would need a token with read:packages.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to deploy (defaults to origin/main)
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DEPLOY_PATH: /root/eavi1-app
+  PUBLIC_HOST: eavi.college.eavi.shop
+
+jobs:
+  deploy:
+    name: Build and restart on the VPS
+    runs-on: [self-hosted, eavi-vps]
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Resolve target commit
+        id: target
+        run: |
+          if [ -n "${{ github.event.inputs.sha }}" ]; then
+            echo "sha=${{ github.event.inputs.sha }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=$(git -C "$DEPLOY_PATH" rev-parse origin/main)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sync the deployment to that commit
+        run: |
+          set -eu
+          cd "$DEPLOY_PATH"
+          # The tracked tree is reset; .env is untracked and survives.
+          git fetch --prune origin main
+          git reset --hard "${{ steps.target.outputs.sha }}"
+          echo "deploying $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
+
+      - name: Build and restart
+        run: |
+          set -eu
+          cd "$DEPLOY_PATH"
+          # --build completes before any container is recreated, so a failed
+          # build leaves the previous release serving traffic.
+          docker compose up -d --build
+
+      - name: Wait for health
+        run: |
+          set -eu
+          cd "$DEPLOY_PATH"
+          for i in $(seq 1 40); do
+            if curl -fsS --max-time 5 "https://$PUBLIC_HOST/api/health" >/dev/null 2>&1; then
+              echo "healthy after ${i} attempts"
+              curl -fsS --max-time 5 "https://$PUBLIC_HOST/api/health"
+              echo
+              docker compose ps
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::health check never came back on https://$PUBLIC_HOST"
+          docker compose ps
+          docker compose logs --tail=80 app || true
+          exit 1
+
+      - name: Report the running revision
+        run: |
+          cd "$DEPLOY_PATH"
+          echo "commit: $(git rev-parse HEAD)"
+          docker compose ps --format '{{.Service}} {{.Status}}'
