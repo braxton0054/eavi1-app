@@ -1,12 +1,10 @@
 import { createEnrollment, setEnrollmentStatus } from "@/lib/actions/college/enrollments";
 import {
-  getApplications,
   getEnrollments,
   getIntakeOptions,
   getProgramOptions,
   getStudentOptions,
 } from "@/lib/dal/college";
-import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
@@ -36,19 +34,12 @@ export default async function EnrollmentsPage({
   const { q, status, page, invalid } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  const [list, studentOptions, programOptions, intakeOptions, apps] = await Promise.all([
+  const [list, studentOptions, programOptions, intakeOptions] = await Promise.all([
     getEnrollments({ q, status, page: Number(page) || 1 }),
     getStudentOptions(scope.campusId),
     getProgramOptions(scope.campusId),
     getIntakeOptions(),
-    getApplications({ page: 1 }),
   ]);
-
-  const enrolledIds = new Set(
-    (await prisma.studentProfile.findMany({ where: { applicationId: { not: null } }, select: { applicationId: true } }))
-      .map((r) => r.applicationId as string),
-  );
-  const availableApps = apps.rows.filter((a) => !enrolledIds.has(a.id));
 
   const options: OptionSets = { students: studentOptions, programs: programOptions, intakes: intakeOptions };
 
@@ -90,30 +81,14 @@ export default async function EnrollmentsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={copy.title} />
-
-      {availableApps.length > 0 && (
-        <Panel title="Enrol a student from an application">
-          <ul className="divide-y divide-eavi-border">
-            {availableApps.map((app) => (
-              <li key={app.id} className="flex items-center justify-between gap-4 p-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{app.fullName}</p>
-                  <p className="text-xs text-eavi-muted-text">
-                    {app.reference} · {app.program.name} ({app.program.code})
-                  </p>
-                </div>
-                <a
-                  href={`/dashboard/students/enrol?application=${app.id}`}
-                  className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
-                >
-                  Enrol
-                </a>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-      )}
+      <PageHeader
+        title={copy.title}
+        action={
+          <a href="/dashboard/applications" className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill">
+            Enrol from application
+          </a>
+        }
+      />
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
