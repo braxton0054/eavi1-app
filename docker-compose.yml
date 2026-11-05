@@ -37,6 +37,9 @@ services:
     build:
       context: .
       target: runner
+      args:
+        # The public origin, baked into metadata, JSON-LD, sitemap and robots.
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
     image: ${APP_IMAGE:-eavi-portal:latest}
     restart: unless-stopped
     environment:
