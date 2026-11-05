@@ -86,29 +86,6 @@ export default async function EnrollmentsPage({
     <div className="space-y-6">
       <PageHeader title={copy.title} />
 
-      {availableApps.length > 0 && (
-        <Panel title="Enrol a student from an application">
-          <ul className="divide-y divide-eavi-border">
-            {availableApps.map((app) => (
-              <li key={app.id} className="flex items-center justify-between gap-4 p-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{app.fullName}</p>
-                  <p className="text-xs text-eavi-muted-text">
-                    {app.reference} · {app.program.name} ({app.program.code})
-                  </p>
-                </div>
-                <a
-                  href={`/dashboard/students/enrol?application=${app.id}`}
-                  className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
-                >
-                  Enrol
-                </a>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-      )}
-
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
       <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
@@ -140,6 +117,29 @@ export default async function EnrollmentsPage({
           </>
         )}
       </Panel>
+
+      {availableApps.length > 0 && (
+        <Panel title="Enrol a student from an application">
+          <ul className="divide-y divide-eavi-border">
+            {availableApps.map((app) => (
+              <li key={app.id} className="flex items-center justify-between gap-4 p-4">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{app.fullName}</p>
+                  <p className="text-xs text-eavi-muted-text">
+                    {app.reference} · {app.program.name} ({app.program.code})
+                  </p>
+                </div>
+                <a
+                  href={`/dashboard/students/enrol?application=${app.id}`}
+                  className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
+                >
+                  Enrol
+                </a>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
     </div>
   );
 }
