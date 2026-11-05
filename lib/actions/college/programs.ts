@@ -1,27 +1,25 @@
 "use server";
 
-import { ProgramLevel } from "@/generated/prisma/enums";
+import { EntryGrade, FeeFrequency, ProgramLevel } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
-  checked,
   enumField,
   onSave,
   requiredNumber,
   requiredText,
   text,
-  termOnCampus,
   unique,
 } from "@/lib/actions/college/_shared";
 
 const LEVELS = Object.keys(ProgramLevel) as (keyof typeof ProgramLevel)[];
+const GRADES = Object.keys(EntryGrade) as (keyof typeof EntryGrade)[];
+const FREQUENCIES = Object.keys(FeeFrequency) as (keyof typeof FeeFrequency)[];
 
 const fieldLabel = (name: string) =>
-  pages.programs.create.fields.find((field) => field.name === name)?.label ??
-  pages.programs.feeItems.create.fields.find((field) => field.name === name)?.label ??
-  name;
+  pages.programs.create.fields.find((field) => field.name === name)?.label ?? name;
 
 /** The programme list, the overview counters and the enrolment screen all read this. */
 const AFFECTED = ["/dashboard/programs", "/dashboard", "/dashboard/enrollments"];
@@ -32,9 +30,16 @@ export async function createProgram(formData: FormData) {
   return onSave("/dashboard/programs", AFFECTED, async () => {
     const code = requiredText(formData, "code", fieldLabel("code"));
     const name = requiredText(formData, "name", fieldLabel("name"));
+    const departmentId = requiredText(formData, "departmentId", fieldLabel("departmentId"));
     const level = enumField(formData, "level", LEVELS, fieldLabel("level"));
+    const minKcseGrade = enumField(formData, "minKcseGrade", GRADES, fieldLabel("minKcseGrade"));
+    const feeFrequency = enumField(formData, "feeFrequency", FREQUENCIES, fieldLabel("feeFrequency"));
     const durationMonths = requiredNumber(formData, "durationMonths", fieldLabel("durationMonths"));
     if (durationMonths < 1) throw new FieldError(fieldErrors.number(fieldLabel("durationMonths")));
+
+    // The id arrives from a dropdown, so prove it still names a real department.
+    const department = await prisma.department.findUnique({ where: { id: departmentId } });
+    if (!department) throw new FieldError(fieldErrors.choice(fieldLabel("departmentId")));
 
     // A super admin is not pinned to one campus, so what they add is college-wide.
     const campuses =
@@ -47,7 +52,10 @@ export async function createProgram(formData: FormData) {
         data: {
           code: code.toUpperCase(),
           name,
+          department: { connect: { id: department.id } },
           level,
+          minKcseGrade,
+          feeFrequency,
           durationMonths: Math.round(durationMonths),
           description: text(formData, "description"),
           campuses: { connect: campuses },
@@ -57,35 +65,16 @@ export async function createProgram(formData: FormData) {
   });
 }
 
-export async function createFeeItem(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+/** The department form's only field is also called `name`, so it needs its own lookup. */
+const departmentFieldLabel = (name: string) =>
+  pages.programs.departments.create.fields.find((field) => field.name === name)?.label ?? name;
+
+export async function createDepartment(formData: FormData) {
+  await requireCollegeAdmin();
 
   return onSave("/dashboard/programs", ["/dashboard/programs"], async () => {
-    const programId = requiredText(formData, "programId", fieldLabel("programId"));
-    const itemLabel = requiredText(formData, "label", fieldLabel("label"));
-    const amount = requiredNumber(formData, "amount", fieldLabel("amount"));
-    if (amount < 0) throw new FieldError(fieldErrors.number(fieldLabel("amount")));
+    const name = requiredText(formData, "name", departmentFieldLabel("name"));
 
-    const visible = await prisma.program.findFirst({
-      where: {
-        id: programId,
-        ...(scope.campusId === null ? {} : { campuses: { some: { id: scope.campusId } } }),
-      },
-      select: { id: true },
-    });
-    if (!visible) throw new FieldError(fieldErrors.notOnCampus);
-
-    // A fee is tied to this campus's term, or to no term at all when left blank.
-    const termId = await termOnCampus(formData, "termId", scope.campusId);
-
-    await prisma.feeItem.create({
-      data: {
-        programId,
-        termId,
-        label: itemLabel,
-        amount,
-        isOptional: checked(formData, "isOptional"),
-      },
-    });
+    await unique(departmentFieldLabel("name"), () => prisma.department.create({ data: { name } }));
   });
 }

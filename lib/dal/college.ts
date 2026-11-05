@@ -390,31 +390,31 @@ async function programsFor(campusId: number | null, q?: string) {
     orderBy: { name: "asc" },
     include: {
       campuses: { select: { id: true, name: true } },
-      feeItems: { select: { amount: true, isOptional: true } },
+      department: { select: { id: true, name: true } },
       enrollments: { where: { status: "ACTIVE" }, select: { id: true } },
     },
   });
 
   return programs.map((program) => ({
     ...program,
-    feeTotal: program.feeItems
-      .filter((item) => !item.isOptional)
-      .reduce((sum, item) => sum + money(item.amount), 0),
     enrolledCount: program.enrollments.length,
   }));
 }
 
-/** Fee components sit next to the programme list so the two cannot drift apart. */
-export async function getFeeItems() {
-  const scope = await requireCollegeAdmin();
-  return prisma.feeItem.findMany({
-    where: scope.campusId === null ? {} : { program: { campuses: { some: { id: scope.campusId } } } },
-    orderBy: [{ program: { name: "asc" } }, { label: "asc" }],
-    include: {
-      program: { select: { name: true, code: true } },
-      term: { select: { name: true } },
-    },
+/** Departments are college-wide, like terms: one list every campus shares. */
+export async function getDepartments() {
+  await requireCollegeAdmin();
+  return prisma.department.findMany({
+    orderBy: { name: "asc" },
+    include: { programs: { select: { id: true } } },
   });
+}
+
+export async function getDepartmentOptions() {
+  await requireCollegeAdmin();
+  const rows = await prisma.department.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
+
+  return rows.map((row) => ({ value: row.id, label: row.name }));
 }
 
 /* -------------------------------------------------------------------- tutors */

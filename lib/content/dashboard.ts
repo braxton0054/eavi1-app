@@ -51,8 +51,8 @@ export type Field = {
     | "intakes"
     | "enrollments"
     | "invoices"
-    | "feeItems"
     | "campuses"
+    | "departments"
     | "years";
 };
 
@@ -207,6 +207,12 @@ export const labels = {
     HIGHER_DIPLOMA: "Higher diploma",
     DEGREE: "Degree",
     SHORT_COURSE: "Short course",
+  },
+  feeFrequency: {
+    SEMESTER: "Per semester",
+    TERM: "Per term",
+    MODULE: "Per module",
+    MONTH: "Monthly",
   },
   applicationStatus: {
     SUBMITTED: "Submitted",
@@ -524,10 +530,12 @@ export const pages = {
     columns: [
       { key: "code", label: "Code" },
       { key: "name", label: "Programme" },
-      { key: "level", label: "Level" },
+      { key: "department", label: "Department" },
+      { key: "level", label: "Programme type" },
       { key: "duration", label: "Duration" },
+      { key: "minKcseGrade", label: "Min KCSE" },
+      { key: "feeFrequency", label: "Fee payment type" },
       { key: "students", label: "Enrolled", align: "end" },
-      { key: "feeTotal", label: "Fees per term", align: "end" },
     ] satisfies Column[],
     empty: {
       title: "No programmes yet",
@@ -537,38 +545,34 @@ export const pages = {
       button: "Add programme",
       title: "New programme",
       fields: [
-        { name: "code", label: "Code", type: "text", required: true, placeholder: "DIT-101" },
-        { name: "name", label: "Name", type: "text", required: true, wide: true },
-        { name: "level", label: "Level", type: "select", required: true, options: toOptions(labels.programLevel) },
+        { name: "departmentId", label: "Department", type: "select", required: true, optionKey: "departments" },
+        { name: "name", label: "Programme name", type: "text", required: true, wide: true },
+        { name: "code", label: "Code", type: "text", required: true },
+        { name: "level", label: "Programme type", type: "select", required: true, options: toOptions(labels.programLevel) },
         { name: "durationMonths", label: "Duration (months)", type: "number", required: true, step: "1" },
+        { name: "minKcseGrade", label: "Minimum KCSE grade", type: "select", required: true, options: toOptions(labels.entryGrade) },
+        { name: "feeFrequency", label: "Fee payment type", type: "select", required: true, options: toOptions(labels.feeFrequency) },
         { name: "description", label: "Description", type: "textarea", wide: true },
       ] satisfies Field[],
       created: "Programme saved.",
     },
-    duration: (months: number) => `${months} months`,
-    feeItems: {
-      heading: "Fee components",
-      description: "Standard charges per programme.",
+    departments: {
+      heading: "Departments",
+      description: "Add a department once, then pick it on every programme in it.",
       columns: [
-        { key: "program", label: "Programme" },
-        { key: "label", label: "Item" },
-        { key: "amount", label: "Amount", align: "end" },
-        { key: "term", label: "Term" },
-        { key: "optional", label: "Optional" },
+        { key: "name", label: "Department" },
+        { key: "programs", label: "Programmes", align: "end" },
       ] satisfies Column[],
-      empty: "No fee components for this programme.",
+      empty: "No departments yet. Add one before creating a programme.",
       create: {
-        button: "Add fee component",
-        title: "New fee component",
+        button: "Add department",
+        title: "New department",
         fields: [
-          { name: "programId", label: "Programme", type: "select", required: true, optionKey: "programs" },
-          { name: "termId", label: "Term (blank = any)", type: "select", optionKey: "terms" },
-          { name: "label", label: "What it pays for", type: "text", required: true, placeholder: "Tuition, lab, exam fee" },
-          { name: "amount", label: "Amount (KES)", type: "number", required: true, step: "0.01" },
-          { name: "isOptional", label: "Optional item", type: "checkbox" },
+          { name: "name", label: "Department name", type: "text", required: true, wide: true },
         ] satisfies Field[],
       },
     },
+    duration: (months: number) => `${months} months`,
   },
 
   tutors: {
@@ -926,7 +930,7 @@ export const pages = {
         empty: "No active enrollments to report on.",
         columns: [
           { key: "program", label: "Programme" },
-          { key: "level", label: "Level" },
+          { key: "level", label: "Programme type" },
           { key: "count", label: "Students", align: "end" },
         ] satisfies Column[],
       },

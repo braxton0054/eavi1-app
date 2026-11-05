@@ -8,9 +8,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// The `?next=` destination has to be read before the form renders, so this route
-// blocks instead of streaming. Without it the post-login redirect is refused.
-
 export default async function LoginPage({
   searchParams,
 }: {

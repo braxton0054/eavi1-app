@@ -116,6 +116,15 @@ enum PaymentMethod {
   CHEQUE
 }
 
+/// How often a programme's fees fall due. Describes the cadence of the fee
+/// components on the programme, not the rail a payment arrives by.
+enum FeeFrequency {
+  SEMESTER
+  TERM
+  MODULE
+  MONTH
+}
+
 enum CardStatus {
   PENDING
   PRINTING
@@ -194,13 +203,31 @@ model Session {
   @@map("sessions")
 }
 
+/// A teaching department. Created once and then reused by every programme that
+/// belongs to it, so the catalogue groups by spelling rather than by typing.
+model Department {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  programs  Program[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("departments")
+}
+
 /// A programme on the college catalogue, offered at one or more campuses.
 model Program {
   id             String        @id @default(uuid())
   code           String        @unique
   name           String
+  departmentId   String
+  department     Department    @relation(fields: [departmentId], references: [id])
   level          ProgramLevel
   durationMonths Int
+  /// Lowest KCSE aggregate the college admits against; the same scale the
+  /// application form records an applicant's grade on.
+  minKcseGrade   EntryGrade
+  feeFrequency   FeeFrequency
   description    String?
   campuses       Campus[]      @relation("ProgramCampuses")
   tutors         TutorProfile[] @relation("ProgramTutors")
