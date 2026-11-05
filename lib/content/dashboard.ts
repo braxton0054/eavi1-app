@@ -535,6 +535,14 @@ export const pages = {
       saved: "Curriculum uploaded.",
       none: "No curriculum uploaded yet.",
     },
+    feeStructure: {
+      heading: "Fee structure upload",
+      program: "Programme",
+      file: "Fee structure file (PDF)",
+      button: "Upload fee structure",
+      saved: "Fee structure uploaded.",
+      none: "No fee structure uploaded yet.",
+    },
     columns: [
       { key: "code", label: "Code" },
       { key: "name", label: "Programme" },
@@ -545,6 +553,7 @@ export const pages = {
       { key: "feeFrequency", label: "Fee payment type" },
       { key: "students", label: "Enrolled", align: "end" },
       { key: "curriculum", label: "Curriculum" },
+      { key: "feeStructure", label: "Fee structure" },
     ] satisfies Column[],
     empty: {
       title: "No programmes yet",

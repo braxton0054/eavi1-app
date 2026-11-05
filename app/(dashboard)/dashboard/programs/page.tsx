@@ -1,4 +1,4 @@
-import { createDepartment, createProgram, uploadCurriculum } from "@/lib/actions/college/programs";
+import { createDepartment, createProgram, uploadCurriculum, uploadFeeStructure } from "@/lib/actions/college/programs";
 import { getDepartmentOptions, getDepartments, getProgramOptions, getPrograms } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
@@ -45,6 +45,13 @@ export default async function ProgramsPage({
         </a>
       ) : (
         <span className="text-eavi-muted-text">{copy.curriculum.none}</span>
+      ),
+      feeStructure: program.feeStructureUrl ? (
+        <a href={program.feeStructureUrl} target="_blank" rel="noreferrer" className="text-eavi-primary-text underline">
+          View
+        </a>
+      ) : (
+        <span className="text-eavi-muted-text">{copy.feeStructure.none}</span>
       ),
     },
   }));
@@ -142,6 +149,50 @@ export default async function ProgramsPage({
               className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
             >
               {copy.curriculum.button}
+            </button>
+          </div>
+        </form>
+      </Panel>
+
+      <Panel title={copy.feeStructure.heading}>
+        <form action={uploadFeeStructure} className="grid gap-4 p-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium" htmlFor="feestructure-program">
+              {copy.feeStructure.program}
+            </label>
+            <select
+              id="feestructure-program"
+              name="programId"
+              required
+              className="h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm"
+            >
+              <option value="">{common.none}</option>
+              {programOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium" htmlFor="feestructure-file">
+              {copy.feeStructure.file}
+            </label>
+            <input
+              id="feestructure-file"
+              name="feeStructure"
+              type="file"
+              accept="application/pdf"
+              required
+              className="h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1 file:text-eavi-primary-text"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <button
+              type="submit"
+              className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
+            >
+              {copy.feeStructure.button}
             </button>
           </div>
         </form>

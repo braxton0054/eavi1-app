@@ -98,6 +98,34 @@ export async function uploadCurriculum(formData: FormData) {
   });
 }
 
+export async function uploadFeeStructure(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+
+  return onSave("/dashboard/programs", ["/dashboard/programs"], async () => {
+    const programId = String(formData.get("programId") ?? "");
+    const file = formData.get("feeStructure") as File | null;
+
+    if (!programId || !file || file.size === 0) {
+      throw new FieldError("Missing programme or file.");
+    }
+
+    const program = await prisma.program.findFirst({
+      where: { id: programId, campuses: scope.campusId ? { some: { id: scope.campusId } } : undefined },
+      select: { id: true, code: true },
+    });
+    if (!program) throw new FieldError("Programme not available on your account.");
+
+    if (!storageConfigured()) throw new FieldError("File storage is not configured.");
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const key = `fee-structures/${program.id}/${Date.now()}-${safeName}`;
+    const url = await uploadFile(key, buffer, file.type || "application/pdf");
+
+    await prisma.program.update({ where: { id: program.id }, data: { feeStructureUrl: url } });
+  });
+}
+
 export async function createDepartment(formData: FormData) {
   await requireCollegeAdmin();
 

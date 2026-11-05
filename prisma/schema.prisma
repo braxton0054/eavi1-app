@@ -230,6 +230,7 @@ model Program {
   feeFrequency   FeeFrequency
   description    String?
   curriculumUrl  String?
+  feeStructureUrl String?
   campuses       Campus[]      @relation("ProgramCampuses")
   tutors         TutorProfile[] @relation("ProgramTutors")
   enrollments    Enrollment[]
