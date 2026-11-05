@@ -5,7 +5,7 @@ import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { storageConfigured, uploadFile } from "@/lib/storage";
-import { fieldErrors, pages } from "@/lib/content/dashboard";
+import { fieldErrors } from "@/lib/content/dashboard";
 import {
   FieldError,
   dateField,
@@ -21,15 +21,18 @@ import {
 } from "@/lib/actions/college/_shared";
 
 const GENDERS = Object.keys(Gender) as (keyof typeof Gender)[];
-const RELATIONSHIPS = ["Father", "Mother", "Guardian", "Other"];
 
-async function maybeUpload(file: FormDataEntryValue | null, folder: string, programOrStudentId: string) {
+async function maybeUpload(file: FormDataEntryValue | null, folder: string, keySeed: string) {
   if (!file || !(file instanceof File) || file.size === 0) return null;
   if (!storageConfigured()) return null;
   const buffer = Buffer.from(await file.arrayBuffer());
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const key = `${folder}/${programOrStudentId}/${Date.now()}-${safeName}`;
+  const key = `${folder}/${keySeed}/${Date.now()}-${safeName}`;
   return uploadFile(key, buffer, file.type || "application/octet-stream");
+}
+
+function all(formData: FormData, name: string): string[] {
+  return formData.getAll(name).map((v) => String(v ?? "").trim());
 }
 
 export async function enrolStudent(formData: FormData) {
@@ -40,19 +43,17 @@ export async function enrolStudent(formData: FormData) {
     if (!applicationId) throw new FieldError("Application is required.");
 
     const application = await prisma.application.findFirst({
-      where: { id: applicationId, ... (scope.campusId ? { campusId: scope.campusId } : {}) },
+      where: { id: applicationId, ...(scope.campusId ? { campusId: scope.campusId } : {}) },
       include: { program: { select: { id: true } } },
     });
     if (!application) throw new FieldError("Application not found.");
 
-    // Prevent duplicate enrolment from the same application.
     const existing = await prisma.studentProfile.findUnique({ where: { applicationId } });
     if (existing) throw new FieldError("This application has already been enrolled.");
 
     const campusId = scope.campusId ?? application.campusId;
     if (campusId === null) throw new FieldError(fieldErrors.notOnCampus);
 
-    // Personal details (editable from application)
     const fullName = requiredText(formData, "fullName", "Full name");
     const emailRaw = String(formData.get("email") ?? "").trim();
     const email = emailRaw ? emailRaw.toLowerCase() : null;
@@ -70,7 +71,6 @@ export async function enrolStudent(formData: FormData) {
     const intakeId = text(formData, "intakeId");
     const admissionNoInput = text(formData, "admissionNo");
     const genderRaw = text(formData, "gender");
-    const GENDERS = Object.keys(Gender) as (keyof typeof Gender)[];
     const gender = genderRaw === null ? null : enumField(formData, "gender", GENDERS, "Gender");
     const dateOfBirth = dateField(formData, "dateOfBirth");
     const nationalId = text(formData, "nationalId");
@@ -85,7 +85,6 @@ export async function enrolStudent(formData: FormData) {
     const issuedAdmissionNo = admissionNoInput ?? (await nextAdmissionNo());
     const passwordHash = await hashPassword(password);
 
-    // Uploads
     const profilePhotoUrl = await maybeUpload(formData.get("profilePhoto"), "profile-photos", applicationId);
     const birthCertificateUrl = await maybeUpload(formData.get("birthCertificate"), "birth-certificates", applicationId);
     const primarySchoolDocUrl = await maybeUpload(formData.get("primarySchoolDoc"), "school-docs", applicationId);
@@ -144,38 +143,48 @@ export async function enrolStudent(formData: FormData) {
         },
       });
 
-      // Parent/guardian (single for now; extend to multiple later)
-      const gName = text(formData, "guardianFullName");
-      if (gName) {
+      // Parent/guardians (multiple)
+      const gNames = all(formData, "guardianFullName");
+      const gRels = all(formData, "guardianRelationship");
+      const gPhones = all(formData, "guardianPhone");
+      const gAltPhones = all(formData, "guardianAltPhone");
+      const gEmails = all(formData, "guardianEmail");
+      const gOccs = all(formData, "guardianOccupation");
+      const gAddrs = all(formData, "guardianAddress");
+      for (let i = 0; i < gNames.length; i++) {
+        if (!gNames[i]) continue;
         await tx.parentGuardian.create({
           data: {
             studentId: profile.id,
-            fullName: gName,
-            relationship: text(formData, "guardianRelationship") ?? "Guardian",
-            phone: phoneField(formData, "guardianPhone", "Guardian phone"),
-            altPhone: phoneField(formData, "guardianAltPhone", "Guardian alt phone"),
-            email: emailField(formData, "guardianEmail", "Guardian email", true),
-            address: text(formData, "guardianAddress"),
-            occupation: text(formData, "guardianOccupation"),
+            fullName: gNames[i],
+            relationship: gRels[i] || "Guardian",
+            phone: gPhones[i] || null,
+            altPhone: gAltPhones[i] || null,
+            email: gEmails[i] || null,
+            occupation: gOccs[i] || null,
+            address: gAddrs[i] || null,
           },
         });
       }
 
-      const eName = text(formData, "emergencyFullName");
-      if (eName) {
-        const ePhone = phoneField(formData, "emergencyPhone", "Emergency phone");
-        if (ePhone) {
-          await tx.emergencyContact.create({
-            data: {
-              studentId: profile.id,
-              fullName: eName,
-              relationship: text(formData, "emergencyRelationship") ?? "Emergency",
-              phone: ePhone,
-              altPhone: phoneField(formData, "emergencyAltPhone", "Emergency alt phone"),
-              address: text(formData, "emergencyAddress"),
-            },
-          });
-        }
+      // Emergency contacts (multiple)
+      const eNames = all(formData, "emergencyFullName");
+      const eRels = all(formData, "emergencyRelationship");
+      const ePhones = all(formData, "emergencyPhone");
+      const eAltPhones = all(formData, "emergencyAltPhone");
+      const eAddrs = all(formData, "emergencyAddress");
+      for (let i = 0; i < eNames.length; i++) {
+        if (!eNames[i] || !ePhones[i]) continue;
+        await tx.emergencyContact.create({
+          data: {
+            studentId: profile.id,
+            fullName: eNames[i],
+            relationship: eRels[i] || "Emergency",
+            phone: ePhones[i],
+            altPhone: eAltPhones[i] || null,
+            address: eAddrs[i] || null,
+          },
+        });
       }
     });
   });
