@@ -1,5 +1,5 @@
-import { createDepartment, createProgram } from "@/lib/actions/college/programs";
-import { getDepartmentOptions, getDepartments, getPrograms } from "@/lib/dal/college";
+import { createDepartment, createProgram, uploadCurriculum } from "@/lib/actions/college/programs";
+import { getDepartmentOptions, getDepartments, getProgramOptions, getPrograms } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
@@ -19,13 +19,14 @@ export default async function ProgramsPage({
   const { invalid } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  const [rows, departments, departmentOptions] = await Promise.all([
+  const [rows, departments, departmentOptions, programOptions] = await Promise.all([
     getPrograms({}),
     getDepartments(),
     getDepartmentOptions(),
+    getProgramOptions(scope.campusId),
   ]);
 
-  const options: OptionSets = { departments: departmentOptions };
+  const options: OptionSets = { departments: departmentOptions, programs: programOptions };
 
   const programRows: Row[] = rows.map((program) => ({
     id: program.id,
@@ -38,6 +39,13 @@ export default async function ProgramsPage({
       minKcseGrade: labels.entryGrade[program.minKcseGrade],
       feeFrequency: labels.feeFrequency[program.feeFrequency],
       students: String(program.enrolledCount),
+      curriculum: program.curriculumUrl ? (
+        <a href={program.curriculumUrl} target="_blank" rel="noreferrer" className="text-eavi-primary-text underline">
+          View
+        </a>
+      ) : (
+        <span className="text-eavi-muted-text">{copy.curriculum.none}</span>
+      ),
     },
   }));
 
@@ -93,6 +101,50 @@ export default async function ProgramsPage({
         ) : (
           <DataTable columns={copy.columns} rows={programRows} caption={copy.title} />
         )}
+      </Panel>
+
+      <Panel title={copy.curriculum.heading}>
+        <form action={uploadCurriculum} className="grid gap-4 p-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium" htmlFor="curriculum-program">
+              {copy.curriculum.program}
+            </label>
+            <select
+              id="curriculum-program"
+              name="programId"
+              required
+              className="h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm"
+            >
+              <option value="">{common.none}</option>
+              {programOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium" htmlFor="curriculum-file">
+              {copy.curriculum.file}
+            </label>
+            <input
+              id="curriculum-file"
+              name="curriculum"
+              type="file"
+              accept="application/pdf"
+              required
+              className="h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1 file:text-eavi-primary-text"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <button
+              type="submit"
+              className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
+            >
+              {copy.curriculum.button}
+            </button>
+          </div>
+        </form>
       </Panel>
     </div>
   );

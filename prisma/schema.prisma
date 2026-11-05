@@ -229,6 +229,7 @@ model Program {
   minKcseGrade   EntryGrade
   feeFrequency   FeeFrequency
   description    String?
+  curriculumUrl  String?
   campuses       Campus[]      @relation("ProgramCampuses")
   tutors         TutorProfile[] @relation("ProgramTutors")
   enrollments    Enrollment[]

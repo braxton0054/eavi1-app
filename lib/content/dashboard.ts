@@ -527,6 +527,14 @@ export const pages = {
   programs: {
     title: "Programmes",
     description: "Courses on offer at this campus.",
+    curriculum: {
+      heading: "Curriculum upload",
+      program: "Programme",
+      file: "Curriculum file (PDF)",
+      button: "Upload curriculum",
+      saved: "Curriculum uploaded.",
+      none: "No curriculum uploaded yet.",
+    },
     columns: [
       { key: "code", label: "Code" },
       { key: "name", label: "Programme" },
@@ -536,6 +544,7 @@ export const pages = {
       { key: "minKcseGrade", label: "Min KCSE" },
       { key: "feeFrequency", label: "Fee payment type" },
       { key: "students", label: "Enrolled", align: "end" },
+      { key: "curriculum", label: "Curriculum" },
     ] satisfies Column[],
     empty: {
       title: "No programmes yet",

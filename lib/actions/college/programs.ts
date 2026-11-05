@@ -3,6 +3,7 @@
 import { EntryGrade, FeeFrequency, ProgramLevel } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
+import { storageConfigured, uploadFile } from "@/lib/storage";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -68,6 +69,34 @@ export async function createProgram(formData: FormData) {
 /** The department form's only field is also called `name`, so it needs its own lookup. */
 const departmentFieldLabel = (name: string) =>
   pages.programs.departments.create.fields.find((field) => field.name === name)?.label ?? name;
+
+export async function uploadCurriculum(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+
+  return onSave("/dashboard/programs", ["/dashboard/programs"], async () => {
+    const programId = String(formData.get("programId") ?? "");
+    const file = formData.get("curriculum") as File | null;
+
+    if (!programId || !file || file.size === 0) {
+      throw new FieldError("Missing programme or file.");
+    }
+
+    const program = await prisma.program.findFirst({
+      where: { id: programId, campuses: scope.campusId ? { some: { id: scope.campusId } } : undefined },
+      select: { id: true, code: true },
+    });
+    if (!program) throw new FieldError("Programme not available on your account.");
+
+    if (!storageConfigured()) throw new FieldError("File storage is not configured.");
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const key = `curricula/${program.id}/${Date.now()}-${safeName}`;
+    const url = await uploadFile(key, buffer, file.type || "application/octet-stream");
+
+    await prisma.program.update({ where: { id: program.id }, data: { curriculumUrl: url } });
+  });
+}
 
 export async function createDepartment(formData: FormData) {
   await requireCollegeAdmin();
