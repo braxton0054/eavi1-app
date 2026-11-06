@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { enrolStudent } from "@/lib/actions/college/enrolment";
+import { genderChoices } from "@/lib/content/apply";
 import { KENYA_COUNTIES } from "@/lib/data/kenya-locations";
 
 type Option = { value: string; label: string };
@@ -202,10 +203,11 @@ export function EnrolmentForm({
           <Field label="Gender">
             <select name="gender" defaultValue={selectedApp?.gender ?? ""} className={inputCls}>
               <option value="">—</option>
-              <option value="MALE">Male</option>
-              <option value="FEMALE">Female</option>
-              <option value="OTHER">Other</option>
-              <option value="UNDECLARED">Prefer not to say</option>
+              {genderChoices.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {choice.label}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="Date of birth">

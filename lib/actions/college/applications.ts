@@ -1,8 +1,9 @@
 "use server";
 
-import { ApplicationStatus, EntryGrade, Gender } from "@/generated/prisma/enums";
+import { ApplicationStatus, EntryGrade } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
+import { genderValues } from "@/lib/content/apply";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -25,7 +26,6 @@ const DECISIONS = ["REJECTED", "REVIEWING"] as const satisfies readonly (
   | keyof typeof ApplicationStatus
 )[];
 
-const GENDERS = Object.keys(Gender) as (keyof typeof Gender)[];
 const GRADES = Object.keys(EntryGrade) as (keyof typeof EntryGrade)[];
 
 const applicationCopy = pages.applications;
@@ -53,7 +53,7 @@ export async function createApplication(formData: FormData) {
     if (!phone) throw new FieldError(fieldErrors.required(fieldLabel("phone")));
     // A walk-in rarely has an address on hand, and the office confirms one when they call.
     const email = emailField(formData, "email", fieldLabel("email"), true);
-    const gender = enumField(formData, "gender", GENDERS, fieldLabel("gender"));
+    const gender = enumField(formData, "gender", genderValues, fieldLabel("gender"));
     const grade = enumField(formData, "grade", GRADES, fieldLabel("grade"));
 
     const programId = requiredText(formData, "programId", fieldLabel("programId"));

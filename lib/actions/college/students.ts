@@ -1,9 +1,10 @@
 "use server";
 
-import { EnrollmentStatus, Gender, Role, Status } from "@/generated/prisma/enums";
+import { EnrollmentStatus, Role, Status } from "@/generated/prisma/enums";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
+import { genderValues } from "@/lib/content/apply";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -18,8 +19,6 @@ import {
   text,
   unique,
 } from "@/lib/actions/college/_shared";
-
-const GENDERS = Object.keys(Gender) as (keyof typeof Gender)[];
 
 const fieldLabel = (name: string) =>
   pages.students.create.fields.find((field) => field.name === name)?.label ?? name;
@@ -61,7 +60,7 @@ export async function createStudent(formData: FormData) {
 
     const admissionNo = text(formData, "admissionNo");
     const genderRaw = text(formData, "gender");
-    const gender = genderRaw === null ? null : enumField(formData, "gender", GENDERS, fieldLabel("gender"));
+    const gender = genderRaw === null ? null : enumField(formData, "gender", genderValues, fieldLabel("gender"));
     const dateOfBirth = dateField(formData, "dateOfBirth");
     const nationalId = text(formData, "nationalId");
     const guardianName = text(formData, "guardianName");

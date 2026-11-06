@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { ApplicationStatus, EntryGrade, Gender } from "@/generated/prisma/enums";
 import { nextApplicationReference } from "@/lib/actions/college/_shared";
-import { applyPage } from "@/lib/content/apply";
+import { applyPage, genderValues } from "@/lib/content/apply";
 import { assignCampus } from "@/lib/dal/public";
 import { prisma } from "@/lib/prisma";
 import { isEmail, normalizeKenyanPhone } from "@/lib/validation";
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   const email = rawEmail ? rawEmail.toLowerCase() : null;
 
   const gender = str(answers.gender);
-  if (!(Object.keys(Gender) as string[]).includes(gender)) {
+  if (!(genderValues as string[]).includes(gender)) {
     fieldErrors.gender = applyPage.fields.gender.empty;
   }
 

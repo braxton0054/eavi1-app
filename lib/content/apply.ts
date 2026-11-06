@@ -6,13 +6,17 @@
 
 export type Choice = { value: string; label: string };
 
-/** The two lists an applicant picks from, in the order they read on the form. */
-export const genderChoices = [
+/**
+ * The genders an applicant states, in the order they read on the form. No form in the
+ * system offers a third — a record that stored one earlier still reads back in the portal.
+ */
+export const genderChoices: { value: "MALE" | "FEMALE"; label: string }[] = [
   { value: "MALE", label: "Male" },
   { value: "FEMALE", label: "Female" },
-  { value: "OTHER", label: "Other" },
-  { value: "UNDECLARED", label: "Prefer not to say" },
-] satisfies Choice[];
+];
+
+/** The gender values a form may submit. */
+export const genderValues = genderChoices.map((choice) => choice.value);
 
 export const gradeChoices = [
   { value: "A", label: "A" },

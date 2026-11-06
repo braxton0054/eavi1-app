@@ -1,10 +1,11 @@
 "use server";
 
-import { EnrollmentStatus, Gender, Role, Status } from "@/generated/prisma/enums";
+import { EnrollmentStatus, Role, Status } from "@/generated/prisma/enums";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { storageConfigured, uploadFile } from "@/lib/storage";
+import { genderValues } from "@/lib/content/apply";
 import { fieldErrors } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -18,8 +19,6 @@ import {
   text,
   unique,
 } from "@/lib/actions/college/_shared";
-
-const GENDERS = Object.keys(Gender) as (keyof typeof Gender)[];
 
 async function maybeUpload(file: FormDataEntryValue | null, folder: string, keySeed: string) {
   if (!file || !(file instanceof File) || file.size === 0) return null;
@@ -70,7 +69,7 @@ export async function enrolStudent(formData: FormData) {
     const intakeId = text(formData, "intakeId");
     const admissionNoInput = text(formData, "admissionNo");
     const genderRaw = text(formData, "gender");
-    const gender = genderRaw === null ? null : enumField(formData, "gender", GENDERS, "Gender");
+    const gender = genderRaw === null ? null : enumField(formData, "gender", genderValues, "Gender");
     const dateOfBirth = dateField(formData, "dateOfBirth");
     const nationalId = text(formData, "nationalId");
 

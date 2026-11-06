@@ -4,6 +4,8 @@
  * figures and dates all come from the database.
  */
 
+import { genderChoices } from "@/lib/content/apply";
+
 export type DashboardIcon =
   | "overview"
   | "applications"
@@ -387,7 +389,7 @@ export const pages = {
           label: "Gender",
           type: "select",
           required: true,
-          options: toOptions(labels.gender),
+          options: genderChoices,
         },
         {
           name: "grade",
@@ -468,7 +470,7 @@ export const pages = {
         { name: "intakeId", label: "Intake", type: "select", optionKey: "intakes" },
         { name: "admissionNo", label: "Admission number", type: "text", hint: "Leave blank to issue one automatically." },
         { name: "password", label: "Temporary password", type: "text", required: true, hint: "Minimum 10 characters." },
-        { name: "gender", label: "Gender", type: "select", options: toOptions(labels.gender) },
+        { name: "gender", label: "Gender", type: "select", options: genderChoices },
         { name: "dateOfBirth", label: "Date of birth", type: "date" },
         { name: "nationalId", label: "ID or birth certificate no.", type: "text" },
         { name: "guardianName", label: "Guardian name", type: "text" },
