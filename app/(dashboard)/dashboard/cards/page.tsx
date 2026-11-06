@@ -89,7 +89,7 @@ export default async function CardsPage({
                   {face.map((line) => (
                     <div key={line.label} className="flex items-baseline justify-between gap-3">
                       <dt className="shrink-0 text-xs text-eavi-muted-text">{line.label}</dt>
-                      <dd className="min-w-0 truncate text-xs">{line.value}</dd>
+                      <dd className="min-w-0 text-xs text-right sm:truncate">{line.value}</dd>
                     </div>
                   ))}
                 </dl>

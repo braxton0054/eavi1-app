@@ -415,7 +415,6 @@ export const pages = {
     /** Admission runs monthly, so each campus month carries the day its students report. */
     dateSetting: {
       heading: "Application date setting",
-      description: "Set monthly reporting dates for admitted students.",
       year: {
         select: "Year",
         show: "Show",

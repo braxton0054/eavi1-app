@@ -36,9 +36,9 @@ function BarList({ bars }: { bars: { id: string; caption: string; value: string;
   return (
     <div className="space-y-2 border-t border-eavi-border p-5">
       {bars.map((bar) => (
-        <div key={bar.id} className="flex items-center gap-3">
-          <span className="w-36 shrink-0 truncate text-xs text-eavi-muted-text">{bar.caption}</span>
-          <span className="w-16 shrink-0 text-right text-xs tabular-nums">{bar.value}</span>
+        <div key={bar.id} className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
+          <span className="text-xs leading-tight text-eavi-muted-text md:w-36 md:shrink-0 md:truncate">{bar.caption}</span>
+          <span className="text-xs tabular-nums md:w-16 md:shrink-0 md:text-right">{bar.value}</span>
           <div className="min-w-0 flex-1">
             <Bar ratio={bar.ratio} label={`${bar.caption}: ${bar.value}`} />
           </div>

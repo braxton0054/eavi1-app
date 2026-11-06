@@ -45,6 +45,7 @@ export default function ApplyPage() {
         eyebrow={applyPage.eyebrow}
         heading={applyPage.introHeading}
         subheading={applyPage.introSubheading}
+        onBackground
       />
 
       <div className="mt-10 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">

@@ -52,7 +52,7 @@ export default async function CommunicationPage({
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium">{notice.title}</p>
-                      <p className="mt-1 line-clamp-2 text-sm text-eavi-muted-text">{notice.body}</p>
+                      <p className="mt-1 text-sm text-eavi-muted-text sm:line-clamp-2">{notice.body}</p>
                     </div>
                     {notice.pinned ? <StatusChip tone="info">{copy.pinned}</StatusChip> : null}
                     <StatusChip tone="neutral">{labels.audience[notice.audience]}</StatusChip>

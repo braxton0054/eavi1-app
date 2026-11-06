@@ -5,6 +5,7 @@ import { getStudent } from "@/lib/dal/college";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { EmptyState, PageHeader, Panel } from "@/components/dashboard/panel";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { formatDate, money } from "@/lib/format";
 import type { Column } from "@/lib/content/dashboard";
@@ -61,7 +62,11 @@ export default async function StudentProfilePage({
             title={common.notFoundTitle}
             body={common.notFoundBody}
             icon="students"
-            action={<Link href="/dashboard/students">{common.back}</Link>}
+            action={
+              <ShimmerButton asChild>
+                <Link href="/dashboard/students">{common.back}</Link>
+              </ShimmerButton>
+            }
           />
         </Panel>
       </div>
@@ -160,7 +165,7 @@ export default async function StudentProfilePage({
           {copy.create.fields.map((field) => (
             <div key={field.name} className={field.wide ? "sm:col-span-2" : undefined}>
               <dt className="text-xs text-eavi-muted-text">{field.label}</dt>
-              <dd className="text-sm">{profileValues[field.name] ?? common.notSet}</dd>
+              <dd className="min-w-0 text-sm break-words">{profileValues[field.name] ?? common.notSet}</dd>
             </div>
           ))}
         </dl>

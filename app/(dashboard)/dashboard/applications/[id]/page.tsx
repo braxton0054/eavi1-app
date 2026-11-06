@@ -5,6 +5,7 @@ import { decideApplication } from "@/lib/actions/college/applications";
 import { getApplication } from "@/lib/dal/college";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { EmptyState, PageHeader, Panel } from "@/components/dashboard/panel";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { RecordForm } from "@/components/dashboard/record-form";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { formatDate } from "@/lib/format";
@@ -48,7 +49,11 @@ export default async function ApplicationDetailPage({
             title={common.notFoundTitle}
             body={common.notFoundBody}
             icon="applications"
-            action={<Link href="/dashboard/applications">{common.back}</Link>}
+            action={
+              <ShimmerButton asChild>
+                <Link href="/dashboard/applications">{common.back}</Link>
+              </ShimmerButton>
+            }
           />
         </Panel>
       </div>
@@ -116,7 +121,7 @@ export default async function ApplicationDetailPage({
           {copy.create.fields.map((field) => (
             <div key={field.name} className={field.wide ? "sm:col-span-2" : undefined}>
               <dt className="text-xs text-eavi-muted-text">{field.label}</dt>
-              <dd className="text-sm">{fieldValues[field.name] ?? common.notSet}</dd>
+              <dd className="min-w-0 text-sm break-words">{fieldValues[field.name] ?? common.notSet}</dd>
             </div>
           ))}
         </dl>
@@ -126,19 +131,19 @@ export default async function ApplicationDetailPage({
         <dl className="grid gap-x-6 gap-y-3 p-4 sm:grid-cols-2">
           <div>
             <dt className="text-xs text-eavi-muted-text">{common.status}</dt>
-            <dd className="text-sm">{decisionValues.status}</dd>
+            <dd className="min-w-0 text-sm break-words">{decisionValues.status}</dd>
           </div>
           <div>
             <dt className="text-xs text-eavi-muted-text">{copy.detail.decidedBy}</dt>
-            <dd className="text-sm">{decisionValues.decidedBy}</dd>
+            <dd className="min-w-0 text-sm break-words">{decisionValues.decidedBy}</dd>
           </div>
           <div>
             <dt className="text-xs text-eavi-muted-text">{copy.detail.decidedAt}</dt>
-            <dd className="text-sm">{decisionValues.decidedAt}</dd>
+            <dd className="min-w-0 text-sm break-words">{decisionValues.decidedAt}</dd>
           </div>
           <div className="sm:col-span-2">
             <dt className="text-xs text-eavi-muted-text">{copy.decision.note.label}</dt>
-            <dd className="text-sm">{decisionValues.decisionNote}</dd>
+            <dd className="min-w-0 text-sm break-words">{decisionValues.decisionNote}</dd>
           </div>
         </dl>
       </Panel>

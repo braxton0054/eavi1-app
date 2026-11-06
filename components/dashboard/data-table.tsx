@@ -85,26 +85,36 @@ export function DataTable({
           return (
             <li key={row.id} className="rounded-xl border border-eavi-border bg-background p-4">
               <dl className="space-y-1.5">
-                {columns.map((column, index) => (
-                  <div key={column.key} className="flex items-baseline justify-between gap-3">
-                    <dt className="shrink-0 text-xs text-eavi-muted-text">{column.label}</dt>
-                    <dd
-                      className={cn(
-                        "min-w-0 text-right text-sm",
-                        index === 0 && "font-medium",
-                        column.align === "end" && "tabular-nums",
-                      )}
+                {columns.map((column, index) => {
+                  const isFirst = index === 0;
+                  const linked = isFirst && href;
+                  return (
+                    <div
+                      key={column.key}
+                      className={cn("flex justify-between gap-3", isFirst ? "items-center" : "items-baseline")}
                     >
-                      {column.key === columns[0].key && href ? (
-                        <Link href={href} className="text-eavi-primary-text underline-offset-4 hover:underline">
-                          {row.cells[column.key]}
-                        </Link>
-                      ) : (
-                        row.cells[column.key]
-                      )}
-                    </dd>
-                  </div>
-                ))}
+                      <dt className="shrink-0 text-xs text-eavi-muted-text">{column.label}</dt>
+                      <dd
+                        className={cn(
+                          "min-w-0 flex-1 text-right text-sm break-words",
+                          isFirst && "font-medium",
+                          column.align === "end" && "tabular-nums",
+                        )}
+                      >
+                        {linked ? (
+                          <Link
+                            href={href}
+                            className="inline-flex min-h-11 w-full items-center justify-end text-eavi-primary-text underline-offset-4 hover:underline"
+                          >
+                            {row.cells[column.key]}
+                          </Link>
+                        ) : (
+                          row.cells[column.key]
+                        )}
+                      </dd>
+                    </div>
+                  );
+                })}
               </dl>
             </li>
           );

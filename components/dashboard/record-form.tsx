@@ -14,7 +14,7 @@ export type OptionSets = Partial<Record<NonNullable<Field["optionKey"]>, Choice[
 export type FormAction = (formData: FormData) => Promise<void>;
 
 const control =
-  "flex h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 aria-invalid:border-destructive md:text-sm dark:bg-input/30";
+  "flex h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 aria-invalid:border-destructive md:text-sm";
 
 function Control({
   field,

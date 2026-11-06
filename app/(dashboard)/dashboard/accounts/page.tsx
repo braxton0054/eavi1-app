@@ -98,7 +98,7 @@ export default async function AccountsPage({
                 <ul className="space-y-1">
                   {invoice.lines.map((line) => (
                     <li key={line.id} className="flex items-baseline justify-between gap-3">
-                      <span className="min-w-0 truncate">{line.label}</span>
+                      <span className="min-w-0 leading-tight sm:truncate">{line.label}</span>
                       <span className="shrink-0 tabular-nums">{money(line.amount)}</span>
                     </li>
                   ))}

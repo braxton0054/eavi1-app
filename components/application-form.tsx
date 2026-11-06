@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import {
   Card,
   CardContent,
@@ -114,7 +114,7 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
         <CardContent className="flex flex-col gap-6 px-6 pb-6">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-border bg-eavi-plate px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 {applyPage.applied.reference}
               </p>
               <p className="text-lg leading-8 font-semibold tracking-wide tabular-nums">
@@ -122,7 +122,7 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
               </p>
             </div>
             <div className="rounded-xl border border-border bg-eavi-plate px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 {applyPage.applied.campus}
               </p>
               <p className="text-lg leading-8 font-semibold">{applied.campusName}</p>
@@ -139,9 +139,7 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              className="rounded-full"
+            <ShimmerButton
               onClick={() => {
                 setValues(EMPTY);
                 setErrors({});
@@ -149,10 +147,10 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
               }}
             >
               {applyPage.applied.again}
-            </Button>
-            <Button asChild variant="ghost" className="rounded-full">
+            </ShimmerButton>
+            <ShimmerButton asChild>
               <Link href="/">{applyPage.applied.home}</Link>
-            </Button>
+            </ShimmerButton>
           </div>
         </CardContent>
       </Card>
@@ -296,10 +294,10 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
             </p>
           )}
 
-          <Button type="submit" className="mt-1 w-full rounded-full" disabled={busy}>
+          <ShimmerButton type="submit" className="mt-1 w-full" disabled={busy}>
             {busy && <Spinner data-icon="inline-start" />}
             {busy ? applyPage.submitting : applyPage.submit}
-          </Button>
+          </ShimmerButton>
         </form>
       </CardContent>
     </Card>

@@ -4,16 +4,18 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { BorderBeam } from "@/components/magicui/border-beam";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -149,22 +151,13 @@ export function RegisterForm() {
   }
 
   return (
-    <Card className="w-full max-w-sm gap-0 py-0">
-      <CardHeader className="gap-2 px-6 pt-7 pb-4">
-        <CardTitle className="text-2xl">Create an account</CardTitle>
-        <CardDescription className="text-sm leading-6 text-muted-foreground">
-          Already registered?{" "}
-          <Link
-            href="/login"
-            className="font-medium text-primary underline-offset-4 hover:underline"
-          >
-            Sign in
-          </Link>
-          .
-        </CardDescription>
+    <Card className="relative w-full max-w-[350px] overflow-hidden">
+      <CardHeader>
+        <CardTitle>Register</CardTitle>
+        <CardDescription>Enter your details to create your account.</CardDescription>
       </CardHeader>
 
-      <CardContent className="px-6 pb-6">
+      <CardContent>
         {result ? (
           <Alert>
             <AlertTitle>
@@ -173,157 +166,194 @@ export function RegisterForm() {
             <AlertDescription>{result.message}</AlertDescription>
           </Alert>
         ) : (
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-            <Field>
-              <FieldLabel htmlFor="reg-role">I am registering as</FieldLabel>
-              <Select
-                value={role}
-                onValueChange={(next) => {
-                  setRole(next);
-                  setErrors((current) => ({ ...current, campusId: undefined }));
-                }}
-              >
-                <SelectTrigger id="reg-role" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLES.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldError id="reg-role-error">{errors.role}</FieldError>
-            </Field>
-
-            {needsCampus && (
-              <Field>
-                <FieldLabel htmlFor="reg-campus">Campus</FieldLabel>
+          <form id="register-form" onSubmit={handleSubmit} noValidate>
+            <div className="grid w-full items-center gap-4">
+              <div className="flex flex-col space-y-1.5">
+                <Label htmlFor="reg-role">I am registering as</Label>
                 <Select
-                  value={campusId === null ? undefined : String(campusId)}
-                  onValueChange={(next) => setCampusId(Number(next))}
+                  value={role}
+                  onValueChange={(next) => {
+                    setRole(next);
+                    setErrors((current) => ({ ...current, campusId: undefined }));
+                  }}
                 >
-                  <SelectTrigger id="reg-campus" className="w-full">
-                    <SelectValue placeholder="Choose a campus" />
+                  <SelectTrigger id="reg-role" className="w-full">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {campuses.length === 0 ? (
-                      <SelectItem value="__unavailable" disabled>
-                        Campus list unavailable
+                    {ROLES.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
-                    ) : (
-                      campuses.map((campus) => (
-                        <SelectItem key={campus.id} value={String(campus.id)}>
-                          {campus.name}
-                        </SelectItem>
-                      ))
-                    )}
+                    ))}
                   </SelectContent>
                 </Select>
-                <FieldError id="reg-campus-error">{errors.campusId}</FieldError>
-              </Field>
-            )}
+                {errors.role && (
+                  <p className="text-sm font-medium text-destructive">{errors.role}</p>
+                )}
+              </div>
 
-            {!needsCampus && (
-              <FieldDescription>
-                Superadmins are not tied to one campus, and every admin request waits
-                for the current superadmin to approve it.
-              </FieldDescription>
-            )}
+              {needsCampus && (
+                <div className="flex flex-col space-y-1.5">
+                  <Label htmlFor="reg-campus">Campus</Label>
+                  <Select
+                    value={campusId === null ? undefined : String(campusId)}
+                    onValueChange={(next) => setCampusId(Number(next))}
+                  >
+                    <SelectTrigger id="reg-campus" className="w-full">
+                      <SelectValue placeholder="Choose a campus" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {campuses.length === 0 ? (
+                        <SelectItem value="__unavailable" disabled>
+                          Campus list unavailable
+                        </SelectItem>
+                      ) : (
+                        campuses.map((campus) => (
+                          <SelectItem key={campus.id} value={String(campus.id)}>
+                            {campus.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {errors.campusId && (
+                    <p id="reg-campus-error" className="text-sm font-medium text-destructive">
+                      {errors.campusId}
+                    </p>
+                  )}
+                </div>
+              )}
 
-            <Field>
-              <FieldLabel htmlFor="name">Full name</FieldLabel>
-              <Input
-                id="name"
-                name="fullName"
-                autoComplete="name"
-                placeholder="Amos Kemboi"
-                value={values.fullName}
-                onChange={update("fullName")}
-                aria-invalid={errors.fullName ? true : undefined}
-                aria-describedby={errors.fullName ? "name-error" : undefined}
-              />
-              <FieldError id="name-error">{errors.fullName}</FieldError>
-            </Field>
+              <div className="flex flex-col space-y-1.5">
+                <Label htmlFor="name">Full name</Label>
+                <Input
+                  id="name"
+                  name="fullName"
+                  autoComplete="name"
+                  placeholder="Amos Kemboi"
+                  value={values.fullName}
+                  onChange={update("fullName")}
+                  aria-invalid={errors.fullName ? true : undefined}
+                  aria-describedby={errors.fullName ? "name-error" : undefined}
+                />
+                {errors.fullName && (
+                  <p id="name-error" className="text-sm font-medium text-destructive">
+                    {errors.fullName}
+                  </p>
+                )}
+              </div>
 
-            <Field>
-              <FieldLabel htmlFor="reg-email">Email address</FieldLabel>
-              <Input
-                id="reg-email"
-                name="email"
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={values.email}
-                onChange={update("email")}
-                aria-invalid={errors.email ? true : undefined}
-                aria-describedby={errors.email ? "reg-email-error" : undefined}
-              />
-              <FieldError id="reg-email-error">{errors.email}</FieldError>
-            </Field>
+              <div className="flex flex-col space-y-1.5">
+                <Label htmlFor="reg-email">Email</Label>
+                <Input
+                  id="reg-email"
+                  name="email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="Enter your email"
+                  value={values.email}
+                  onChange={update("email")}
+                  aria-invalid={errors.email ? true : undefined}
+                  aria-describedby={errors.email ? "reg-email-error" : undefined}
+                />
+                {errors.email && (
+                  <p id="reg-email-error" className="text-sm font-medium text-destructive">
+                    {errors.email}
+                  </p>
+                )}
+              </div>
 
-            <Field>
-              <FieldLabel htmlFor="phone">Phone</FieldLabel>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="0712 345 678"
-                value={values.phone}
-                onChange={update("phone")}
-                aria-invalid={errors.phone ? true : undefined}
-                aria-describedby={errors.phone ? "phone-error" : undefined}
-              />
-              <FieldError id="phone-error">{errors.phone}</FieldError>
-            </Field>
+              <div className="flex flex-col space-y-1.5">
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="0712 345 678"
+                  value={values.phone}
+                  onChange={update("phone")}
+                  aria-invalid={errors.phone ? true : undefined}
+                  aria-describedby={errors.phone ? "phone-error" : undefined}
+                />
+                {errors.phone && (
+                  <p id="phone-error" className="text-sm font-medium text-destructive">
+                    {errors.phone}
+                  </p>
+                )}
+              </div>
 
-            <Field>
-              <FieldLabel htmlFor="reg-password">Password</FieldLabel>
-              <Input
-                id="reg-password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                value={values.password}
-                onChange={update("password")}
-                aria-invalid={errors.password ? true : undefined}
-                aria-describedby={errors.password ? "reg-password-error" : undefined}
-              />
-              <FieldError id="reg-password-error">{errors.password}</FieldError>
-            </Field>
+              <div className="flex flex-col space-y-1.5">
+                <Label htmlFor="reg-password">Password</Label>
+                <Input
+                  id="reg-password"
+                  name="password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Enter your password"
+                  value={values.password}
+                  onChange={update("password")}
+                  aria-invalid={errors.password ? true : undefined}
+                  aria-describedby={errors.password ? "reg-password-error" : undefined}
+                />
+                {errors.password && (
+                  <p id="reg-password-error" className="text-sm font-medium text-destructive">
+                    {errors.password}
+                  </p>
+                )}
+              </div>
 
-            <Field>
-              <FieldLabel htmlFor="confirm">Confirm password</FieldLabel>
-              <Input
-                id="confirm"
-                name="confirm"
-                type="password"
-                autoComplete="new-password"
-                value={values.confirm}
-                onChange={update("confirm")}
-                aria-invalid={errors.confirm ? true : undefined}
-                aria-describedby={errors.confirm ? "confirm-error" : undefined}
-              />
-              <FieldError id="confirm-error">{errors.confirm}</FieldError>
-            </Field>
+              <div className="flex flex-col space-y-1.5">
+                <Label htmlFor="confirm">Confirm password</Label>
+                <Input
+                  id="confirm"
+                  name="confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Repeat your password"
+                  value={values.confirm}
+                  onChange={update("confirm")}
+                  aria-invalid={errors.confirm ? true : undefined}
+                  aria-describedby={errors.confirm ? "confirm-error" : undefined}
+                />
+                {errors.confirm && (
+                  <p id="confirm-error" className="text-sm font-medium text-destructive">
+                    {errors.confirm}
+                  </p>
+                )}
+              </div>
+            </div>
 
             {failure && (
-              <p role="alert" className="text-sm font-medium text-destructive">
+              <p role="alert" className="mt-4 text-sm font-medium text-destructive">
                 {failure}
               </p>
             )}
-
-            <Button type="submit" className="mt-1 w-full" disabled={busy}>
-              {busy && <Spinner data-icon="inline-start" />}
-              {busy ? "Creating account" : "Create account"}
-            </Button>
           </form>
         )}
       </CardContent>
+
+      {!result && (
+        <CardFooter className="flex justify-between">
+          <ShimmerButton asChild>
+            <Link href="/login">Login</Link>
+          </ShimmerButton>
+          <ShimmerButton type="submit" form="register-form" disabled={busy}>
+            {busy && <Spinner data-icon="inline-start" />}
+            {busy ? "Creating account" : "Register"}
+          </ShimmerButton>
+        </CardFooter>
+      )}
+
+      <BorderBeam
+        duration={4}
+        size={300}
+        reverse
+        className="from-transparent via-green-500 to-transparent"
+      />
     </Card>
   );
 }

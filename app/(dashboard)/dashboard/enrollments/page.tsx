@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { setEnrollmentStatus } from "@/lib/actions/college/enrollments";
 import { getApplications, getEnrollments } from "@/lib/dal/college";
 import { prisma } from "@/lib/prisma";
@@ -80,12 +82,12 @@ export default async function EnrollmentsPage({
         title={copy.title}
         description="Search once at the top — it filters both the pending applications and the enrolled students."
         action={
-          <a
+          <Link
             href="/dashboard/students/enrol"
             className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
           >
             New enrolment
-          </a>
+          </Link>
         }
       />
 
@@ -113,12 +115,12 @@ export default async function EnrollmentsPage({
             <span className="rounded-full bg-eavi-primary-soft px-3 py-1 text-xs font-medium text-eavi-primary-text">
               {availableApps.length} pending
             </span>
-            <a
+            <Link
               href="/dashboard/applications"
               className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-3 text-xs font-medium text-eavi-primary-text hover:bg-eavi-muted"
             >
               All applications →
-            </a>
+            </Link>
           </span>
         }
       >
@@ -127,19 +129,19 @@ export default async function EnrollmentsPage({
         ) : (
           <ul className="divide-y divide-eavi-border">
             {availableApps.map((app) => (
-              <li key={app.id} className="flex items-center justify-between gap-4 p-4">
+              <li key={app.id} className="flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{app.fullName}</p>
-                  <p className="truncate text-xs text-eavi-muted-text">
+                  <p className="text-sm leading-tight font-medium sm:truncate">{app.fullName}</p>
+                  <p className="text-xs leading-tight text-eavi-muted-text sm:truncate">
                     {app.reference} · {app.program.name} ({app.program.code})
                   </p>
                 </div>
-                <a
+                <Link
                   href={`/dashboard/students/enrol?application=${app.id}`}
-                  className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
+                  className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill sm:w-auto sm:justify-start"
                 >
                   Start enrolment
-                </a>
+                </Link>
               </li>
             ))}
           </ul>

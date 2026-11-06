@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { common } from "@/lib/content/dashboard";
 
 export default function DashboardError({
@@ -18,12 +18,12 @@ export default function DashboardError({
 
   return (
     <div className="mx-auto flex max-w-lg flex-col items-start gap-4 py-16">
-      <h1 className="text-xl font-semibold">{common.errorTitle}</h1>
-      <p className="text-sm text-eavi-muted-text">{common.loadError}</p>
+      <h1 className="text-xl font-semibold text-eavi-on-bg">{common.errorTitle}</h1>
+      <p className="text-sm text-eavi-on-bg">{common.loadError}</p>
       {error.digest ? (
-        <p className="text-xs text-eavi-muted-text">Ref: {error.digest}</p>
+        <p className="text-xs text-eavi-on-bg">Ref: {error.digest}</p>
       ) : null}
-      <Button onClick={reset}>{common.retry}</Button>
+      <ShimmerButton onClick={reset}>{common.retry}</ShimmerButton>
     </div>
   );
 }

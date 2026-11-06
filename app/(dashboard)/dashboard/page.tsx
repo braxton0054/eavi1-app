@@ -50,7 +50,7 @@ export default async function OverviewPage() {
               {events.map((event) => (
                 <li key={event.id} className="flex items-start justify-between gap-4 px-5 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{event.title}</p>
+                    <p className="text-sm leading-tight font-medium sm:truncate">{event.title}</p>
                     <p className="text-xs text-eavi-muted-text">
                       {event.campus?.name ?? pages.calendar.events.collegeWide}
                     </p>
@@ -73,7 +73,7 @@ export default async function OverviewPage() {
               {exams.map((exam) => (
                 <li key={exam.id} className="flex items-start justify-between gap-4 px-5 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{exam.title}</p>
+                    <p className="text-sm leading-tight font-medium sm:truncate">{exam.title}</p>
                     <p className="text-xs text-eavi-muted-text">
                       {exam.program.code} · {exam.room ?? common.notSet}
                     </p>
@@ -96,7 +96,7 @@ export default async function OverviewPage() {
               {deadlines.map((intake) => (
                 <li key={intake.id} className="flex items-start justify-between gap-4 px-5 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{intake.name}</p>
+                    <p className="text-sm leading-tight font-medium sm:truncate">{intake.name}</p>
                     <p className="text-xs text-eavi-muted-text">{intake.semester.name}</p>
                   </div>
                   <span className="shrink-0 text-sm tabular-nums">
@@ -120,7 +120,7 @@ export default async function OverviewPage() {
               {recentStudents.map((student) => (
                 <li key={student.id} className="flex items-start justify-between gap-4 px-5 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{student.user.fullName}</p>
+                    <p className="text-sm leading-tight font-medium sm:truncate">{student.user.fullName}</p>
                     <p className="text-xs text-eavi-muted-text">
                       {student.admissionNo} · {student.enrollments[0]?.program.name ?? common.none}
                     </p>
@@ -143,7 +143,7 @@ export default async function OverviewPage() {
             <ul className="divide-y divide-eavi-border">
               {announcements.map((notice) => (
                 <li key={notice.id} className="flex items-start justify-between gap-4 px-5 py-3">
-                  <p className="min-w-0 truncate text-sm font-medium">{notice.title}</p>
+                  <p className="min-w-0 text-sm leading-tight font-medium sm:truncate">{notice.title}</p>
                   <div className="flex shrink-0 items-center gap-2">
                     <StatusChip tone="neutral">{labels.audience[notice.audience]}</StatusChip>
                     <span className="text-xs tabular-nums text-eavi-muted-text">

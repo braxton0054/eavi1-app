@@ -24,7 +24,7 @@ const emptyGuardian: Guardian = { fullName: "", relationship: "Guardian", phone:
 const emptyEmergency: Emergency = { fullName: "", relationship: "Emergency", phone: "", altPhone: "" };
 
 const inputCls =
-  "h-11 w-full rounded-lg border border-input bg-eavi-card px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50";
+  "h-11 w-full rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50";
 const labelCls = "text-sm font-medium text-eavi-text";
 
 function Section({ step, title, hint, children }: { step?: string; title: string; hint?: string; children: ReactNode }) {
@@ -128,14 +128,14 @@ export function EnrolmentForm({
       <input type="hidden" name="applicationId" value={selectedApp?.id ?? ""} />
 
       {/* Stepper */}
-      <ol className="flex items-center gap-2 rounded-2xl border border-eavi-border bg-eavi-card p-3 shadow-eavi-card" aria-label="Enrolment progress">
+      <ol className="flex items-start gap-2 rounded-2xl border border-eavi-border bg-eavi-card p-3 shadow-eavi-card" aria-label="Enrolment progress">
         {STEPS.map((s, i) => (
-          <li key={s.n} className="flex flex-1 items-center gap-2 last:flex-none">
+          <li key={s.n} className="flex min-w-0 flex-1 items-center gap-2">
             <button
               type="button"
               onClick={() => setStep(s.n)}
               className={
-                "flex flex-1 items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors " +
+                "flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors " +
                 (step === s.n ? "bg-eavi-primary-soft" : "hover:bg-eavi-muted")
               }
               aria-current={step === s.n ? "step" : undefined}
@@ -152,11 +152,11 @@ export function EnrolmentForm({
               >
                 {step > s.n ? "✓" : s.n}
               </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-eavi-text">
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm leading-tight font-semibold text-eavi-text sm:truncate">
                   {i + 1}. {s.label}
                 </span>
-                <span className="block truncate text-xs text-eavi-muted-text">{s.hint}</span>
+                <span className="hidden text-xs leading-tight text-eavi-muted-text sm:block sm:truncate">{s.hint}</span>
               </span>
             </button>
             {i < STEPS.length - 1 && <span className="hidden h-px w-6 bg-eavi-border sm:block" aria-hidden />}
@@ -238,7 +238,7 @@ export function EnrolmentForm({
                   const f = e.target.files?.[0];
                   if (f) setPhotoPreview(URL.createObjectURL(f));
                 }}
-                className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1.5 file:text-eavi-primary-text"
+                className="block w-full min-h-11 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1.5 file:text-eavi-primary-text"
               />
               <p className="text-xs text-eavi-muted-text">JPG or PNG.</p>
             </div>
@@ -269,11 +269,11 @@ export function EnrolmentForm({
               name="medicalInfo"
               rows={3}
               placeholder="Allergies, conditions, medication…"
-              className="w-full rounded-lg border border-input bg-eavi-card px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="w-full rounded-lg border border-input bg-eavi-card eavi-carved px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
           </Field>
-          <label className="flex items-center gap-2 text-sm text-eavi-text sm:col-span-2">
-            <input type="checkbox" name="hasNoMedicalConditions" value="yes" className="size-4 accent-eavi-fill" />
+          <label className="flex min-h-11 items-center gap-2 text-sm text-eavi-text sm:col-span-2">
+            <input type="checkbox" name="hasNoMedicalConditions" value="yes" className="size-5 accent-eavi-fill" />
             No known medical conditions
           </label>
         </Section>
@@ -335,7 +335,7 @@ export function EnrolmentForm({
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-eavi-text">Guardian {idx + 1}</h3>
                   {guardians.length > 1 && (
-                    <button type="button" onClick={() => setGuardians((gs) => gs.filter((_, i) => i !== idx))} className="text-xs font-medium text-eavi-destructive">
+                    <button type="button" onClick={() => setGuardians((gs) => gs.filter((_, i) => i !== idx))} className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-eavi-destructive">
                       Remove
                     </button>
                   )}
@@ -381,7 +381,7 @@ export function EnrolmentForm({
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-eavi-text">Emergency contact {idx + 1}</h3>
                   {emergencies.length > 1 && (
-                    <button type="button" onClick={() => setEmergencies((es) => es.filter((_, i) => i !== idx))} className="text-xs font-medium text-eavi-destructive">
+                    <button type="button" onClick={() => setEmergencies((es) => es.filter((_, i) => i !== idx))} className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-eavi-destructive">
                       Remove
                     </button>
                   )}

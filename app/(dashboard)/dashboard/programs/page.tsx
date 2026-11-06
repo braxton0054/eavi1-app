@@ -40,14 +40,14 @@ export default async function ProgramsPage({
       feeFrequency: labels.feeFrequency[program.feeFrequency],
       students: String(program.enrolledCount),
       curriculum: program.curriculumUrl ? (
-        <a href={program.curriculumUrl} target="_blank" rel="noreferrer" className="text-eavi-primary-text underline">
+        <a href={program.curriculumUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-end px-2 text-sm font-medium text-eavi-primary-text underline underline-offset-4">
           View
         </a>
       ) : (
         <span className="text-eavi-muted-text">{copy.curriculum.none}</span>
       ),
       feeStructure: program.feeStructureUrl ? (
-        <a href={program.feeStructureUrl} target="_blank" rel="noreferrer" className="text-eavi-primary-text underline">
+        <a href={program.feeStructureUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-end px-2 text-sm font-medium text-eavi-primary-text underline underline-offset-4">
           View
         </a>
       ) : (
@@ -120,7 +120,7 @@ export default async function ProgramsPage({
               id="curriculum-program"
               name="programId"
               required
-              className="h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm"
+              className="h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm"
             >
               <option value="">{common.none}</option>
               {programOptions.map((option) => (
@@ -140,7 +140,7 @@ export default async function ProgramsPage({
               type="file"
               accept="application/pdf"
               required
-              className="h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1 file:text-eavi-primary-text"
+              className="h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1 file:text-eavi-primary-text"
             />
           </div>
           <div className="sm:col-span-2">
@@ -164,7 +164,7 @@ export default async function ProgramsPage({
               id="feestructure-program"
               name="programId"
               required
-              className="h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm"
+              className="h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm"
             >
               <option value="">{common.none}</option>
               {programOptions.map((option) => (
@@ -184,7 +184,7 @@ export default async function ProgramsPage({
               type="file"
               accept="application/pdf"
               required
-              className="h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1 file:text-eavi-primary-text"
+              className="h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1 file:text-eavi-primary-text"
             />
           </div>
           <div className="sm:col-span-2">

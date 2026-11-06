@@ -4,17 +4,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import { Button } from "@/components/ui/button";
+import { BorderBeam } from "@/components/magicui/border-beam";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { isEmail } from "@/lib/validation";
 
@@ -35,8 +36,6 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(true);
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
@@ -64,7 +63,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password, remember }),
+        body: JSON.stringify({ email, password, remember: true }),
       });
       const data = await response.json().catch(() => ({}));
 
@@ -85,90 +84,81 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   }
 
   return (
-    <Card className="w-full max-w-sm gap-0 py-0">
-      <CardHeader className="gap-2 px-6 pt-7 pb-4">
-        <CardTitle className="text-2xl">Sign in</CardTitle>
-        <CardDescription className="text-sm leading-6 text-muted-foreground">
-          No account yet?{" "}
-          <Link
-            href="/register"
-            className="font-medium text-primary underline-offset-4 hover:underline"
-          >
-            Register
-          </Link>
-          .
-        </CardDescription>
+    <Card className="relative w-full max-w-[350px] overflow-hidden">
+      <CardHeader>
+        <CardTitle>Login</CardTitle>
+        <CardDescription>Enter your credentials to access your account.</CardDescription>
       </CardHeader>
 
-      <CardContent className="px-6 pb-6">
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-            <Field>
-              <FieldLabel htmlFor="email">Email address</FieldLabel>
+      <CardContent>
+        <form id="login-form" onSubmit={handleSubmit} noValidate>
+          <div className="grid w-full items-center gap-4">
+            <div className="flex flex-col space-y-1.5">
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
                 inputMode="email"
                 autoComplete="username"
-                placeholder="you@eavi.ac.ke"
+                placeholder="Enter your email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 aria-invalid={errors.email ? true : undefined}
                 aria-describedby={errors.email ? "email-error" : undefined}
               />
-              <FieldError id="email-error">{errors.email}</FieldError>
-            </Field>
+              {errors.email && (
+                <p id="email-error" className="text-sm font-medium text-destructive">
+                  {errors.email}
+                </p>
+              )}
+            </div>
 
-            <Field>
-              <div className="flex items-center justify-between gap-2">
-                <FieldLabel htmlFor="password">Password</FieldLabel>
-                <Button
-                  type="button"
-                  variant="link"
-                  size="xs"
-                  className="h-6 px-0"
-                  onClick={() => setShowPassword((visible) => !visible)}
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </Button>
-              </div>
+            <div className="flex flex-col space-y-1.5">
+              <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 name="password"
-                type={showPassword ? "text" : "password"}
+                type="password"
                 autoComplete="current-password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 aria-invalid={errors.password ? true : undefined}
                 aria-describedby={errors.password ? "password-error" : undefined}
               />
-              <FieldError id="password-error">{errors.password}</FieldError>
-            </Field>
+              {errors.password && (
+                <p id="password-error" className="text-sm font-medium text-destructive">
+                  {errors.password}
+                </p>
+              )}
+            </div>
+          </div>
 
-            <Field orientation="horizontal">
-              <Checkbox
-                id="remember"
-                name="remember"
-                checked={remember}
-                onCheckedChange={(checked) => setRemember(checked === true)}
-              />
-              <FieldLabel htmlFor="remember" className="text-sm font-normal">
-                Keep me signed in on this device
-              </FieldLabel>
-            </Field>
-
-            {failure && (
-              <p role="alert" className="text-sm font-medium text-destructive">
-                {failure}
-              </p>
-            )}
-
-            <Button type="submit" className="mt-1 w-full" disabled={busy}>
-              {busy && <Spinner data-icon="inline-start" />}
-              {busy ? "Signing in" : "Sign in"}
-            </Button>
-          </form>
+          {failure && (
+            <p role="alert" className="mt-4 text-sm font-medium text-destructive">
+              {failure}
+            </p>
+          )}
+        </form>
       </CardContent>
+
+      <CardFooter className="flex justify-between">
+        <ShimmerButton asChild>
+          <Link href="/register">Register</Link>
+        </ShimmerButton>
+        <ShimmerButton type="submit" form="login-form" disabled={busy}>
+          {busy && <Spinner data-icon="inline-start" />}
+          {busy ? "Signing in" : "Login"}
+        </ShimmerButton>
+      </CardFooter>
+
+      <BorderBeam
+        duration={4}
+        size={300}
+        reverse
+        className="from-transparent via-green-500 to-transparent"
+      />
     </Card>
   );
 }

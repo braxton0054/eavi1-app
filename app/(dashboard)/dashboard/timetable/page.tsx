@@ -63,7 +63,7 @@ export default async function TimetablePage({
                         {time(slot.startAt)}–{time(slot.endAt)}
                       </p>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm">
+                        <p className="text-sm leading-tight sm:truncate">
                           {slot.program.code} · {slot.program.name}
                         </p>
                         <p className="text-xs text-eavi-muted-text">

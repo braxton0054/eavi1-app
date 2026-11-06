@@ -1,6 +1,6 @@
 import { SearchIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { common, pagination } from "@/lib/content/dashboard";
@@ -50,7 +50,7 @@ export function ListFilters({
             id={statusId}
             name="status"
             defaultValue={status ?? ""}
-            className="h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+            className="h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <option value="">{common.allStatuses}</option>
             {statuses.map((choice) => (
@@ -64,7 +64,9 @@ export function ListFilters({
 
       <input type="hidden" name="page" value="1" />
 
-      <Button type="submit">{common.search}</Button>
+      <ShimmerButton type="submit" className="shrink-0">
+        {common.search}
+      </ShimmerButton>
       {q || status ? (
         <a
           href={basePath}

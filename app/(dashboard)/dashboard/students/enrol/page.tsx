@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { EnrolmentForm } from "@/components/enrolment-form";
 import { EmptyState, PageHeader, Panel } from "@/components/dashboard/panel";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import Link from "next/link";
 
 export default async function EnrolStudentPage({
@@ -85,7 +86,7 @@ export default async function EnrolStudentPage({
 
       {!selectedApplication && availableApps.length === 0 && (
         <Panel>
-          <EmptyState title="No pending applications" body="All applications have been enrolled, or none have been submitted yet." icon="students" action={<Link href="/dashboard/applications">Go to applications</Link>} />
+          <EmptyState title="No pending applications" body="All applications have been enrolled, or none have been submitted yet." icon="students" action={<ShimmerButton asChild><Link href="/dashboard/applications">Go to applications</Link></ShimmerButton>} />
         </Panel>
       )}
     </div>

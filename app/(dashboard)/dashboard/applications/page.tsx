@@ -8,7 +8,7 @@ import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
 import { ListFilters, Paginator, ResultCount, StepLink } from "@/components/dashboard/list-tools";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { Label } from "@/components/ui/label";
 import { formatDate, toDateInput } from "@/lib/format";
 import type { OptionSets } from "@/components/dashboard/record-form";
@@ -101,7 +101,7 @@ export default async function ApplicationsPage({
   });
 
   const choiceClass =
-    "h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+    "h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
   return (
     <div className="space-y-6">
@@ -149,7 +149,7 @@ export default async function ApplicationsPage({
         )}
       </Panel>
 
-      <Panel title={dates.heading} description={dates.description}>
+      <Panel title={dates.heading}>
         <div className="space-y-4 p-4">
           {collegeAdmin ? (
             <nav className="flex flex-wrap items-center gap-2" aria-label={dates.campus.select}>
@@ -197,7 +197,9 @@ export default async function ApplicationsPage({
                     </option>
                   ))}
                 </select>
-                <Button type="submit">{dates.year.show}</Button>
+                <ShimmerButton type="submit" className="shrink-0">
+                  {dates.year.show}
+                </ShimmerButton>
               </form>
 
               <StepLink

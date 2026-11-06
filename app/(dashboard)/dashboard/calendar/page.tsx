@@ -7,7 +7,7 @@ import {
 } from "@/lib/actions/college/calendar";
 import { getCalendar } from "@/lib/dal/college";
 import { common, labels, pages } from "@/lib/content/dashboard";
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { Label } from "@/components/ui/label";
 import { DisclosureForm, RowForm, type OptionSets } from "@/components/dashboard/record-form";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
@@ -92,7 +92,7 @@ export default async function CalendarPage({
   };
 
   const choiceClass =
-    "h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+    "h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
   // A campus admin is pinned to their own campus, so the campus select is not offered.
   const semesterFields = copy.semesters.create.fields.filter(
@@ -151,7 +151,9 @@ export default async function CalendarPage({
                 </option>
               ))}
             </select>
-            <Button type="submit">{copy.year.show}</Button>
+            <ShimmerButton type="submit" className="shrink-0">
+              {copy.year.show}
+            </ShimmerButton>
           </form>
 
           <StepLink
@@ -273,7 +275,7 @@ export default async function CalendarPage({
                                     key={exam.id}
                                     className="flex items-center justify-between gap-3 py-2"
                                   >
-                                    <span className="min-w-0 truncate font-medium">{exam.title}</span>
+                                    <span className="min-w-0 leading-tight font-medium sm:truncate">{exam.title}</span>
                                     <span className="shrink-0 text-xs text-eavi-muted-text">
                                       {formatDate(exam.date)} {exam.startAt}
                                     </span>
@@ -295,7 +297,7 @@ export default async function CalendarPage({
                       <ul className="mt-1 divide-y divide-eavi-border text-sm">
                         {slot.cards.map((card) => (
                           <li key={card.id} className="flex items-center justify-between gap-3 py-2">
-                            <span className="min-w-0 truncate">
+                            <span className="min-w-0 leading-tight sm:truncate">
                               {card.student.user.fullName}
                               <span className="text-xs text-eavi-muted-text"> · {card.serial}</span>
                             </span>
@@ -317,7 +319,7 @@ export default async function CalendarPage({
                         {semester.calendarEvents.map((event) => (
                           <li key={event.id} className="flex items-center justify-between gap-3 py-2">
                             <span className="min-w-0">
-                              <span className="block truncate font-medium">{event.title}</span>
+                              <span className="block leading-tight font-medium sm:truncate">{event.title}</span>
                               <span className="text-xs text-eavi-muted-text">
                                 {formatDate(event.startsAt)}
                                 {event.endsAt ? `–${formatDate(event.endsAt)}` : ""}
@@ -371,7 +373,7 @@ export default async function CalendarPage({
                 {view.collegeEvents.map((event) => (
                   <li key={event.id} className="flex items-center justify-between gap-3 py-2">
                     <span className="min-w-0">
-                      <span className="block truncate font-medium">{event.title}</span>
+                      <span className="block leading-tight font-medium sm:truncate">{event.title}</span>
                       <span className="text-xs text-eavi-muted-text">
                         {formatDate(event.startsAt)} · {copy.events.collegeWide}
                       </span>

@@ -20,8 +20,8 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
-        <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{title}</h1>
-        {description ? <p className="mt-1 text-sm text-eavi-muted-text">{description}</p> : null}
+        <h1 className="text-2xl font-semibold tracking-tight text-balance text-eavi-on-bg sm:text-3xl">{title}</h1>
+        {description ? <p className="mt-1 text-sm text-eavi-on-bg">{description}</p> : null}
         {meta}
       </div>
       {action ? <div className="flex flex-wrap items-center gap-2">{action}</div> : null}
@@ -44,12 +44,12 @@ export function Panel({
   return (
     <Card className={cn("gap-0 py-0 shadow-eavi-card ring-0", props.className)}>
       {(title || aside) && (
-        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-eavi-border py-4">
+        <CardHeader className="flex flex-col items-start gap-3 border-b border-eavi-border py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
-            {title ? <CardTitle className="truncate text-base">{title}</CardTitle> : null}
+            {title ? <CardTitle className="text-base sm:truncate">{title}</CardTitle> : null}
             {description ? <CardDescription className="mt-0.5">{description}</CardDescription> : null}
           </div>
-          {aside}
+          <div className="flex flex-wrap items-center gap-2">{aside}</div>
         </CardHeader>
       )}
       <CardContent className="p-0">{children}</CardContent>

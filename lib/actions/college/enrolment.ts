@@ -9,7 +9,6 @@ import { fieldErrors } from "@/lib/content/dashboard";
 import {
   FieldError,
   dateField,
-  emailField,
   enumField,
   nextAdmissionNo,
   onSave,

@@ -7,6 +7,7 @@ import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { RecordForm, RowForm } from "@/components/dashboard/record-form";
 import { EmptyState, PageHeader, Panel } from "@/components/dashboard/panel";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { addMinutes, cleanTime, formatDate, percent } from "@/lib/format";
 import type { Column } from "@/lib/content/dashboard";
@@ -49,7 +50,11 @@ export default async function ExamDetailPage({
             title={common.notFoundTitle}
             body={common.notFoundBody}
             icon="exams"
-            action={<Link href="/dashboard/exams">{common.back}</Link>}
+            action={
+              <ShimmerButton asChild>
+                <Link href="/dashboard/exams">{common.back}</Link>
+              </ShimmerButton>
+            }
           />
         </Panel>
       </div>
@@ -141,7 +146,7 @@ export default async function ExamDetailPage({
             .map((column) => (
               <div key={column.key}>
                 <dt className="text-xs text-eavi-muted-text">{column.label}</dt>
-                <dd className="text-sm">{headerValues[column.key] ?? common.notSet}</dd>
+                <dd className="min-w-0 text-sm break-words">{headerValues[column.key] ?? common.notSet}</dd>
               </div>
             ))}
         </dl>
