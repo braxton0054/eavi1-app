@@ -2,7 +2,8 @@ import { getApplication, getApplications, getIntakeOptions, getProgramOptions } 
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { EnrolmentForm } from "@/components/enrolment-form";
-import { EmptyState, PageHeader, Panel } from "@/components/dashboard/panel";
+import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
+import { shell } from "@/lib/content/dashboard";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import Link from "next/link";
 
@@ -78,13 +79,17 @@ export default async function EnrolStudentPage({
         }
       />
 
-      <Panel>
-        <div className="p-4 sm:p-6">
-          <EnrolmentForm application={selectedApplication} applications={availableApps} programs={programOptions} intakes={intakeOptions} />
-        </div>
-      </Panel>
+      {scope.campusId === null ? (
+        <Notice tone="neutral" title="New enrolment" body={shell.chooseCampus} />
+      ) : (
+        <Panel>
+          <div className="p-4 sm:p-6">
+            <EnrolmentForm application={selectedApplication} applications={availableApps} programs={programOptions} intakes={intakeOptions} />
+          </div>
+        </Panel>
+      )}
 
-      {!selectedApplication && availableApps.length === 0 && (
+      {scope.campusId !== null && !selectedApplication && availableApps.length === 0 && (
         <Panel>
           <EmptyState title="No pending applications" body="All applications have been enrolled, or none have been submitted yet." icon="students" action={<ShimmerButton asChild><Link href="/dashboard/applications">Go to applications</Link></ShimmerButton>} />
         </Panel>

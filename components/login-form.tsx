@@ -29,6 +29,7 @@ function landingFor(role: string, nextPath: string | undefined) {
   const safe =
     nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : null;
   if (safe) return safe;
+  if (role === "TUTOR") return "/tutor";
   return role === "SUPERADMIN" || role === "CAMPUS_ADMIN" ? "/dashboard" : "/unavailable";
 }
 

@@ -1,7 +1,7 @@
 import { createSlot, deleteSlot } from "@/lib/actions/college/timetable";
 import { getProgramOptions, getTimetable, getTutorOptions, timetableDays } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
-import { common, labels, pages } from "@/lib/content/dashboard";
+import { common, labels, pages, shell } from "@/lib/content/dashboard";
 import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
 import { Notice, PageHeader, Panel } from "@/components/dashboard/panel";
 import { cleanTime } from "@/lib/format";
@@ -35,15 +35,19 @@ export default async function TimetablePage({
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
-      <DisclosureForm
-        id="new-slot"
-        button={copy.create.button}
-        title={copy.create.title}
-        fields={copy.create.fields}
-        options={options}
-        action={createSlot}
-        submitLabel={common.create}
-      />
+      {scope.campusId !== null ? (
+        <DisclosureForm
+          id="new-slot"
+          button={copy.create.button}
+          title={copy.create.title}
+          fields={copy.create.fields}
+          options={options}
+          action={createSlot}
+          submitLabel={common.create}
+        />
+      ) : (
+        <Notice tone="neutral" title={copy.create.button} body={shell.chooseCampus} />
+      )}
 
       {/* One column on phones, two from lg up: a week reads top-to-bottom at 375px. */}
       <div className="grid gap-4 lg:grid-cols-2">

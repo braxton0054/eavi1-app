@@ -11,7 +11,7 @@ import {
   getSemesterOptions,
 } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
-import { common, labels, pages } from "@/lib/content/dashboard";
+import { common, labels, pages, shell } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { DisclosureForm, RowForm, type OptionSets } from "@/components/dashboard/record-form";
 import { ListFilters, Paginator, ResultCount } from "@/components/dashboard/list-tools";
@@ -164,15 +164,19 @@ export default async function AccountsPage({
         ))}
       </section>
 
-      <DisclosureForm
-        id="new-invoice"
-        button={copy.create.button}
-        title={copy.create.title}
-        fields={copy.create.fields}
-        options={options}
-        action={createInvoice}
-        submitLabel={common.create}
-      />
+      {scope.campusId !== null ? (
+        <DisclosureForm
+          id="new-invoice"
+          button={copy.create.button}
+          title={copy.create.title}
+          fields={copy.create.fields}
+          options={options}
+          action={createInvoice}
+          submitLabel={common.create}
+        />
+      ) : (
+        <Notice tone="neutral" title={copy.create.button} body={shell.chooseCampus} />
+      )}
 
       <DisclosureForm
         id="new-payment"

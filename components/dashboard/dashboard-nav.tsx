@@ -12,14 +12,18 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { navGroups } from "@/lib/content/dashboard";
+import type { NavGroup } from "@/lib/content/dashboard";
 
-export function DashboardNav() {
+/**
+ * The section list of whichever portal is open. Each group animates in after the one above
+ * it, so the menu reads top to bottom instead of appearing all at once.
+ */
+export function DashboardNav({ groups, home }: { groups: NavGroup[]; home: string }) {
   const pathname = usePathname();
   const reduceMotion = useReducedMotion();
   let position = 0;
 
-  return navGroups.map((group) => (
+  return groups.map((group) => (
     <SidebarGroup key={group.id}>
       <motion.div
         initial={reduceMotion ? false : { opacity: 0 }}
@@ -32,8 +36,8 @@ export function DashboardNav() {
         {group.items.map((item) => {
           const Icon = icons[item.icon];
           const active =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
+            item.href === home
+              ? pathname === home
               : pathname === item.href || pathname.startsWith(`${item.href}/`);
           const index = position++;
 

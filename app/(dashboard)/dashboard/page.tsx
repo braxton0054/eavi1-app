@@ -2,6 +2,8 @@ import { Bar, EmptyState, PageHeader, Panel, StatTile } from "@/components/dashb
 import { StatusChip } from "@/components/dashboard/status-chip";
 import { formatDate, money } from "@/lib/format";
 import { getOverview } from "@/lib/dal/college";
+import { CollegeOverview } from "@/components/dashboard/college-overview";
+import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
 
 
@@ -12,6 +14,9 @@ const toneFor = {
 } as const;
 
 export default async function OverviewPage() {
+  const scope = await requireCollegeAdmin();
+  if (scope.role === "SUPERADMIN" && scope.campusId === null) return <CollegeOverview />;
+
   const { stats, deadlines, events, exams, recentStudents, announcements } = await getOverview();
   const kpis = pages.overview.kpis;
   const values: Record<(typeof kpis)[number]["key"], string> = {

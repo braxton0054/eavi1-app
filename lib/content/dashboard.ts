@@ -74,6 +74,9 @@ export type Column = {
   interactive?: boolean;
 };
 
+export type NavItem = { href: string; label: string; icon: DashboardIcon };
+export type NavGroup = { id: string; label: string; items: NavItem[] };
+
 export const shell = {
   brandName: "EAVI Portal",
   brandNote: "College administration",
@@ -82,6 +85,8 @@ export const shell = {
   openMenu: "Open section menu",
   closeMenu: "Close section menu",
   allCampuses: "All campuses",
+  chooseCampus: "Choose a campus from the College overview to add records here.",
+  tutorNote: "Tutor portal",
   account: {
     label: "Account",
     role: "Role",
@@ -102,11 +107,7 @@ export const roles = {
   STUDENT: "Student",
 } as const;
 
-export const navGroups: {
-  id: string;
-  label: string;
-  items: { href: string; label: string; icon: DashboardIcon }[];
-}[] = [
+export const navGroups: NavGroup[] = [
   {
     id: "administration",
     label: "Administration",
@@ -152,6 +153,60 @@ export const navGroups: {
     ],
   },
 ];
+
+/** A super admin keeps the same working sections as a campus office, with college-wide screens first. */
+export const superNavGroups: NavGroup[] = [
+  {
+    id: "administration",
+    label: "Administration",
+    items: [
+      { href: "/dashboard/scope?campus=all", label: "College overview", icon: "overview" },
+      { href: "/dashboard/campuses", label: "Campuses", icon: "programs" },
+      { href: "/dashboard/staff", label: "Staff approvals", icon: "tutors" },
+      { href: "/dashboard/profile", label: shell.account.profile, icon: "profile" },
+    ],
+  },
+  ...navGroups.slice(1),
+];
+
+/**
+ * The tutor's own menu. It reaches only their classes, their invigilations and the marks
+ * they owe — never the college-wide screens a campus office works in.
+ */
+export const tutorNavGroups: NavGroup[] = [
+  {
+    id: "teaching",
+    label: "Teaching",
+    items: [
+      { href: "/tutor", label: "Today", icon: "overview" },
+      { href: "/tutor/timetable", label: "Week timetable", icon: "timetable" },
+    ],
+  },
+  {
+    id: "assessment",
+    label: "Assessment",
+    items: [
+      { href: "/tutor/exams", label: "My invigilations", icon: "exams" },
+      { href: "/tutor/marks", label: "Marks to enter", icon: "reports" },
+    ],
+  },
+];
+
+/** The four links the bottom bar of any portal screen carries. */
+export const mobileNav: Record<"admin" | "tutor", NavItem[]> = {
+  admin: [
+    { href: "/dashboard", label: "Overview", icon: "overview" },
+    { href: "/dashboard/applications", label: "Applications", icon: "applications" },
+    { href: "/dashboard/students", label: "Students", icon: "students" },
+    { href: "/dashboard/enrollments", label: "Enrollments", icon: "enrollments" },
+  ],
+  tutor: [
+    { href: "/tutor", label: "Today", icon: "overview" },
+    { href: "/tutor/timetable", label: "Timetable", icon: "timetable" },
+    { href: "/tutor/exams", label: "Exams", icon: "exams" },
+    { href: "/tutor/marks", label: "Marks", icon: "reports" },
+  ],
+};
 
 export const common = {
   search: "Search",
@@ -388,6 +443,42 @@ export const pages = {
       announcements: "Latest notices",
       announcementsEmpty: "No notices published from this campus.",
     },
+  },
+
+  /** The super admin's own screen: the whole college at once, campus by campus. */
+  college: {
+    title: "The college at a glance",
+    description: "Every campus counted the same way.",
+    campusesOne: "campus",
+    campusesMany: "campuses",
+    figures: {
+      students: "Students",
+      applicationsOpen: "Applications to review",
+      activeEnrollments: "Active enrolments",
+      tutors: "Tutors",
+      billed: "Billed",
+      collected: "Collected",
+      outstanding: "Outstanding",
+    },
+    blocks: {
+      campuses: "Campuses",
+      campusesEmpty: "No campus is registered yet.",
+      applications: "Applications received",
+      applicationsNote: "Counted by the month the applicant sent it in.",
+      programmes: "Where the enrolled students are",
+      programmesEmpty: "No one is enrolled yet.",
+      recent: "Latest applications",
+      recentEmpty: "Nothing has come in through the public form.",
+      collection: "What has been collected",
+    },
+    columns: [
+      { key: "campus", label: "Campus" },
+      { key: "students", label: "Students", align: "end" },
+      { key: "applicationsOpen", label: "To review", align: "end" },
+      { key: "activeEnrollments", label: "Enrolled", align: "end" },
+      { key: "tutors", label: "Tutors", align: "end" },
+      { key: "collected", label: "Collected of billed", align: "end" },
+    ] as const,
   },
 
   applications: {
@@ -1175,6 +1266,67 @@ export const pages = {
     remove: { button: "Withdraw", done: "Notice withdrawn." },
   },
 
+  campuses: {
+    title: "Campuses",
+    heading: "Campus register",
+    description: "Every campus the college runs. Edits apply to every portal screen at once.",
+    yes: "Yes",
+    no: "No",
+    columns: [
+      { key: "code", label: "Code" },
+      { key: "name", label: "Campus" },
+      { key: "place", label: "Address" },
+      { key: "phone", label: "Phone" },
+      { key: "applicants", label: "Takes applicants" },
+      { key: "students", label: "Students", align: "end" },
+      { key: "tutors", label: "Tutors", align: "end" },
+      { key: "actions", label: "Edit", interactive: true },
+    ] satisfies Column[],
+    empty: { title: "No campuses yet", body: "Add the first campus." },
+    create: {
+      button: "Add campus",
+      title: "New campus",
+      fields: [
+        { name: "code", label: "Campus code", type: "text", required: true, placeholder: "MAIN" },
+        { name: "name", label: "Name", type: "text", required: true },
+        { name: "place", label: "Address", type: "text", required: true, wide: true },
+        { name: "phone", label: "Phone", type: "tel" },
+        { name: "takesApplicants", label: "Takes applicants", type: "checkbox" },
+      ] satisfies Field[],
+      created: "Campus saved.",
+    },
+    edit: {
+      button: "Edit",
+      fields: [
+        { name: "name", label: "Name", type: "text", required: true },
+        { name: "place", label: "Address", type: "text", required: true, wide: true },
+        { name: "phone", label: "Phone", type: "tel" },
+        { name: "takesApplicants", label: "Takes applicants", type: "checkbox" },
+      ] satisfies Field[],
+    },
+  },
+
+  staff: {
+    title: "Staff approvals",
+    heading: "Staff accounts",
+    description: "Tutors and college admins who registered themselves wait here until you approve them.",
+    ownAccount: "You cannot change your own account here.",
+    noRecord: "Teaching record missing",
+    approve: "Approve",
+    disable: "Disable",
+    enable: "Enable",
+    yes: "Yes",
+    columns: [
+      { key: "name", label: "Name" },
+      { key: "role", label: "Role" },
+      { key: "campus", label: "Campus" },
+      { key: "record", label: "Teaching record" },
+      { key: "status", label: "Account" },
+      { key: "actions", label: "Action", interactive: true },
+    ] satisfies Column[],
+    empty: { title: "No staff accounts", body: "Staff who register appear here." },
+  },
+
   profile: {
     title: "Profile and settings",
     description: "Your own picture, the address you sign in with and your password.",
@@ -1221,6 +1373,89 @@ export const pages = {
 function toOptions(map: Record<string, string>) {
   return Object.entries(map).map(([value, label]) => ({ value, label }));
 }
+
+/** Every string the tutor portal shows. */
+export const tutorPortal = {
+  home: {
+    title: "Today",
+    greeting: "Hello,",
+    description: "Your classes today and the papers you invigilate.",
+    classes: "Classes today",
+    noClasses: "No classes timetabled for today.",
+    sunday: "Sunday: no classes are timetabled.",
+    papers: "Invigilating ahead",
+    noPapers: "No papers ahead of you.",
+    open: "Papers open for marks",
+    room: "Room not set",
+  },
+  timetable: {
+    title: "Week timetable",
+    description: "Your recurring classes, day by day.",
+    emptyDay: "No classes",
+  },
+  exams: {
+    title: "My invigilations",
+    description: "Papers where you are the invigilator.",
+    empty: { title: "No papers yet", body: "You are not assigned to invigilate any paper." },
+    columns: [
+      { key: "title", label: "Paper" },
+      { key: "program", label: "Programme" },
+      { key: "date", label: "Date" },
+      { key: "window", label: "Time" },
+      { key: "room", label: "Room" },
+      { key: "status", label: "Status" },
+    ] satisfies Column[],
+  },
+  marks: {
+    title: "Marks to enter",
+    description: "Open a paper to record marks for its students. Only papers you invigilate appear here.",
+    entered: (marked: number, total: number) => `${marked} of ${total} marked`,
+    empty: { title: "No papers to mark", body: "Papers you invigilate will appear here." },
+    columns: [
+      { key: "title", label: "Paper" },
+      { key: "program", label: "Programme" },
+      { key: "date", label: "Date" },
+      { key: "marked", label: "Marked" },
+      { key: "status", label: "Status" },
+    ] satisfies Column[],
+  },
+  entry: {
+    back: "Back to marks",
+    publish: "Publish all marks on this paper",
+    published: "Marks published.",
+    saved: "Mark saved.",
+    empty: "No active students on this programme yet.",
+    yes: "Yes",
+    no: "No",
+    defaultMaxScore: "100",
+    columns: [
+      { key: "admissionNo", label: "Admission no." },
+      { key: "student", label: "Student" },
+      { key: "score", label: "Score", align: "end" },
+      { key: "maxScore", label: "Out of", align: "end" },
+      { key: "pct", label: "%", align: "end" },
+      { key: "published", label: "Published" },
+      { key: "actions", label: "Mark", interactive: true },
+    ] satisfies Column[],
+    fields: [
+      { name: "score", label: "Score", type: "number", required: true, step: "0.5" },
+      { name: "maxScore", label: "Out of", type: "number", required: true, step: "1" },
+      { name: "remark", label: "Remark", type: "text" },
+      { name: "published", label: "Publish to student", type: "checkbox" },
+    ] satisfies Field[],
+  },
+  profile: {
+    title: "My profile",
+    description: "Your teaching record. The college office changes it.",
+    staffNo: "Staff number",
+    department: "Department",
+    campus: "Campus",
+    email: "Sign-in email",
+    programmes: "Programmes taught",
+    noProgrammes: "None assigned yet",
+    weeklyHours: "Weekly hours",
+  },
+} as const;
 
 export const pagination = {
   window: 20,

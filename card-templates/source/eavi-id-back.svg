@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1712" height="1080" viewBox="0 0 856 540" font-family="Arial, Helvetica, sans-serif">
+  <!-- EAVI Student ID - BACK | CR80 85.6x54mm | placeholders: {{...}} -->
+  <!-- Keep logo.png in the same folder as this file -->
+  <!-- COLORS: .brand = main color #FB3099 | .ink = text #1F2937 | .accent = thin stripes. Change hex values in the style block below -->
+  <style>
+    .ink{fill:#1F2937}
+    .brand{fill:#FB3099}
+    .accent{fill:#1F2937}
+    .ink-stroke{stroke:#1F2937}
+    .label{font-size:12px;fill:#6B7280;letter-spacing:1.5px;font-weight:bold}
+    .head{font-size:14px;fill:#FB3099;font-weight:bold;letter-spacing:2px}
+    .body{font-size:17px;fill:#1F2937}
+    .white{fill:#FFFFFF}
+  </style>
+  <defs>
+    <clipPath id="card"><rect width="856" height="540" rx="28"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#card)">
+    <rect width="856" height="540" fill="#FFFFFF"/>
+
+    <!-- header -->
+    <image xlink:href="logo.png" x="26" y="3" width="55" height="52" preserveAspectRatio="xMidYMid meet"/>
+    <text x="96" y="30" font-size="22" font-weight="bold" class="ink" letter-spacing="1">EAST AFRICA VISION INSTITUTE</text>
+    <text x="96" y="49" font-size="14" font-style="italic" font-weight="bold" class="brand">Nurturing quality and affordable education</text>
+    <rect y="58" width="856" height="5" class="brand"/>
+    <rect y="63" width="856" height="3" class="accent"/>
+
+    <!-- terms -->
+    <text x="40" y="100" class="head">TERMS OF USE</text>
+    <text x="40" y="126" class="body">This card is the property of East Africa Vision Institute.</text>
+    <text x="40" y="150" class="body">It is non-transferable and must be carried while on campus.</text>
+    <text x="40" y="174" class="body">If found, please return it to any EAVI campus.</text>
+
+    <!-- campuses -->
+    <text x="40" y="212" class="head">CAMPUSES - ELDORET</text>
+    <text x="40" y="238" class="body" font-size="15"><tspan font-weight="bold">Admissions:</tspan> Skymart Bldg, 1st Floor, Room F45</text>
+    <text x="40" y="260" class="body" font-size="15"><tspan font-weight="bold">Main:</tspan> City Plaza, next to Bandaptai Hotel  |  0726 044 022</text>
+    <text x="40" y="282" class="body" font-size="15"><tspan font-weight="bold">West:</tspan> Mailinne, next to Kapyemit Dispensary  |  0748 022 044</text>
+
+    <!-- accreditation -->
+    <text x="40" y="314" class="label">ACCREDITED BY MINISTRY OF EDUCATION &amp; TVETA</text>
+    <text x="40" y="334" font-size="13" fill="#1F2937">Reg. No. MOHEST/PC/1409/011   |   KNEC Centre No. 26578004</text>
+
+    <!-- QR placeholder -->
+    <rect x="690" y="90" width="126" height="126" fill="#FFFFFF" class="ink-stroke" stroke-width="3" stroke-dasharray="8 6"/>
+    <text x="753" y="158" text-anchor="middle" font-size="18" font-weight="bold" class="ink">QR</text>
+    <text x="753" y="236" text-anchor="middle" class="label">SCAN TO VERIFY</text>
+    <text x="753" y="252" text-anchor="middle" font-size="10" fill="#6B7280">{{qr_data}}</text>
+
+    <!-- barcode placeholder -->
+    <rect x="40" y="362" width="380" height="66" fill="#FFFFFF" class="ink-stroke" stroke-width="2" stroke-dasharray="8 6"/>
+    <text x="230" y="401" text-anchor="middle" font-size="15" fill="#6B7280">BARCODE (Code 128)</text>
+    <text x="230" y="450" text-anchor="middle" font-size="17" font-weight="bold" class="ink" letter-spacing="3">{{reg_no}}</text>
+
+    <!-- emergency contact -->
+    <text x="470" y="376" class="label">EMERGENCY CONTACT</text>
+    <text x="470" y="404" font-size="21" font-weight="bold" class="ink">{{emergency_name}}</text>
+    <text x="470" y="428" font-size="19" fill="#1F2937">{{emergency_phone}}</text>
+
+    <!-- footer -->
+    <rect y="480" width="856" height="60" class="brand"/>
+    <rect y="480" width="856" height="4" class="accent"/>
+    <text x="40" y="516" font-size="15" class="white">ISSUED: <tspan font-weight="bold">{{issue_date}}</tspan></text>
+    <text x="428" y="516" text-anchor="middle" font-size="13" class="white" letter-spacing="1">registrar@eavi.ac.ke</text>
+    <text x="620" y="516" font-size="15" class="white">EXPIRES: <tspan font-weight="bold">{{expiry_date}}</tspan></text>
+  </g>
+</svg>

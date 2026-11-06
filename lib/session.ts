@@ -1,4 +1,5 @@
 import { SESSION_COOKIE, resolveSession } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { shell } from "@/lib/content/dashboard";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -9,6 +10,9 @@ import { cache } from "react";
  * (campusId null); a campus admin is locked to their own.
  */
 const ADMIN_ROLES = ["CAMPUS_ADMIN", "SUPERADMIN"] as const;
+
+/** The campus a super admin has chosen to work in; absent or "all" means college-wide. */
+export const SCOPE_COOKIE = "eavi_scope";
 
 export type AdminScope = {
   userId: string;
@@ -60,6 +64,22 @@ export async function requireCollegeAdmin(): Promise<AdminScope> {
     redirect("/unavailable?reason=unassigned");
   }
 
+  if (user.role === "SUPERADMIN") {
+    const chosen = (await cookies()).get(SCOPE_COOKIE)?.value;
+    const campus = chosen && /^\d+$/.test(chosen)
+      ? await prisma.campus.findUnique({ where: { id: Number(chosen) }, select: { id: true, name: true } })
+      : null;
+    return {
+      userId: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      role: "SUPERADMIN",
+      photoUrl: user.photoUrl ?? null,
+      campusId: campus?.id ?? null,
+      campusName: campus?.name ?? shell.allCampuses,
+    };
+  }
+
   return {
     userId: user.id,
     fullName: user.fullName,
@@ -74,4 +94,69 @@ export async function requireCollegeAdmin(): Promise<AdminScope> {
 /** `where` fragment that keeps every query inside the admin's own campus. */
 export function campusWhere(campusId: number | null) {
   return campusId === null ? {} : { campusId };
+}
+
+/**
+ * Reads the session and proves the caller is a super admin. College-wide registers such as
+ * campuses and accounts are managed from here; campus staff never reach this screen.
+ */
+export async function requireSuperAdmin(): Promise<AdminScope> {
+  const user = await signedInUser();
+  if (!user) redirect("/login?next=%2Fdashboard");
+  if (user.role !== "SUPERADMIN") redirect("/unavailable");
+
+  return {
+    userId: user.id,
+    fullName: user.fullName,
+    email: user.email,
+    role: "SUPERADMIN",
+    photoUrl: user.photoUrl ?? null,
+    campusId: user.campusId,
+    campusName: user.campus?.name ?? shell.allCampuses,
+  };
+}
+
+export type TutorScope = {
+  userId: string;
+  fullName: string;
+  email: string;
+  role: "TUTOR";
+  photoUrl: string | null;
+  /** The teaching record every timetable, exam and mark row hangs off. */
+  tutorId: string;
+  staffNo: string;
+  department: string | null;
+  campusId: number;
+  campusName: string;
+};
+
+/**
+ * Reads the session, proves the caller is a tutor and hands back their teaching record.
+ * A tutor without one could only be shown an empty screen, so that account is refused.
+ */
+export async function requireTutor(): Promise<TutorScope> {
+  const user = await signedInUser();
+  if (!user) redirect("/login?next=%2Ftutor");
+
+  if (user.role !== "TUTOR") redirect("/unavailable");
+
+  // Self-registration creates a user with no teaching record; nothing here could be scoped.
+  const profile = await prisma.tutorProfile.findUnique({
+    where: { userId: user.id },
+    include: { campus: { select: { name: true } } },
+  });
+  if (!profile) redirect("/unavailable?reason=unassigned");
+
+  return {
+    userId: user.id,
+    fullName: user.fullName,
+    email: user.email,
+    role: "TUTOR",
+    photoUrl: user.photoUrl ?? null,
+    tutorId: profile.id,
+    staffNo: profile.staffNo,
+    department: profile.department,
+    campusId: profile.campusId,
+    campusName: profile.campus.name,
+  };
 }

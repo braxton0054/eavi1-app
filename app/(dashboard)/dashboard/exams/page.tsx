@@ -1,7 +1,7 @@
 import { createExam } from "@/lib/actions/college/exams";
 import { getExams, getProgramOptions, getSemesterOptions, getTutorOptions } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
-import { common, labels, pages } from "@/lib/content/dashboard";
+import { common, labels, pages, shell } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { DisclosureForm } from "@/components/dashboard/record-form";
 import { ListFilters } from "@/components/dashboard/list-tools";
@@ -65,15 +65,19 @@ export default async function ExamsPage({
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
-      <DisclosureForm
-        id="new-exam"
-        button={copy.create.button}
-        title={copy.create.title}
-        fields={copy.create.fields}
-        options={options}
-        action={createExam}
-        submitLabel={common.create}
-      />
+      {scope.campusId !== null ? (
+        <DisclosureForm
+          id="new-exam"
+          button={copy.create.button}
+          title={copy.create.title}
+          fields={copy.create.fields}
+          options={options}
+          action={createExam}
+          submitLabel={common.create}
+        />
+      ) : (
+        <Notice tone="neutral" title={copy.create.button} body={shell.chooseCampus} />
+      )}
 
       <Panel title={copy.title}>
         <div className="p-4">

@@ -8,13 +8,7 @@ import { motion } from "motion/react";
 import { icons } from "@/components/dashboard/icons";
 import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-
-const primary = [
-  { href: "/dashboard", label: "Overview", icon: "overview" },
-  { href: "/dashboard/applications", label: "Applications", icon: "applications" },
-  { href: "/dashboard/students", label: "Students", icon: "students" },
-  { href: "/dashboard/enrollments", label: "Enrollments", icon: "enrollments" },
-] as const;
+import type { NavItem } from "@/lib/content/dashboard";
 
 function ActiveEdge() {
   return (
@@ -26,13 +20,16 @@ function ActiveEdge() {
   );
 }
 
-export function DashboardMobileBar() {
+/**
+ * The four screens of the open portal, plus the menu button that reaches the rest. Below
+ * `md` the sidebar is off-canvas, so this is the only navigation on screen.
+ */
+export function DashboardMobileBar({ items, home }: { items: NavItem[]; home: string }) {
   const pathname = usePathname();
   const { open, setOpen } = useSidebar();
 
-  const isActive = (href: string) =>
-    href === "/dashboard" ? pathname === href : pathname.startsWith(href);
-  const menuSelected = primary.every((item) => !isActive(item.href));
+  const isActive = (href: string) => (href === home ? pathname === home : pathname.startsWith(href));
+  const menuSelected = items.every((item) => !isActive(item.href));
 
   return (
     <nav
@@ -40,7 +37,7 @@ export function DashboardMobileBar() {
       className="fixed inset-x-0 bottom-0 z-40 border-t border-eavi-border bg-eavi-card pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <ul className="mx-auto flex max-w-2xl items-stretch">
-        {primary.map((item) => {
+        {items.map((item) => {
           const Icon = icons[item.icon];
           const active = isActive(item.href);
           return (

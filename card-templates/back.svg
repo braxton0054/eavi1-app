@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="85.6mm" height="54mm" viewBox="0 0 856 540" font-family="'Liberation Sans', Arial, Helvetica, sans-serif">
+  <!-- EAVI Student ID - BACK | CR80 85.6 x 54mm | 10 units = 1mm -->
+  <!--
+    The qr and barcode groups are replaced wholesale at render time. Their contents
+    here are a fallback so the template still reads correctly when nothing has been
+    generated. Campus addresses below are artwork, not data: a second campus prints
+    from its own template row rather than sharing this one.
+  -->
+  <style>
+    .ink{fill:#1F2937}
+    .brand{fill:#800080}
+    .accent{fill:#5c005c}
+    .ink-stroke{stroke:#1F2937}
+    .brand-stroke{stroke:#800080}
+    .label{font-size:12px;fill:#6B7280;letter-spacing:1.5px;font-weight:bold}
+    .head{font-size:14px;fill:#800080;font-weight:bold;letter-spacing:2px}
+    .body{font-size:17px;fill:#1F2937}
+    .white{fill:#FFFFFF}
+  </style>
+  <defs>
+    <clipPath id="bk-card"><rect width="856" height="540" rx="28"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#bk-card)">
+    <rect width="856" height="540" fill="#FFFFFF"/>
+
+    <!-- header -->
+    <image xlink:href="{{logo_url}}" href="{{logo_url}}" x="26" y="3" width="55" height="52" preserveAspectRatio="xMidYMid meet"/>
+    <text x="96" y="30" font-size="22" font-weight="bold" class="ink" letter-spacing="1">EAST AFRICA VISION INSTITUTE</text>
+    <text x="96" y="49" font-size="14" font-style="italic" font-weight="bold" class="brand">Nurturing quality and affordable education</text>
+    <rect y="58" width="856" height="5" class="brand"/>
+    <rect y="63" width="856" height="3" class="accent"/>
+
+    <!-- terms -->
+    <text x="40" y="100" class="head">TERMS OF USE</text>
+    <text x="40" y="126" class="body">This card is the property of East Africa Vision Institute.</text>
+    <text x="40" y="150" class="body">It is non-transferable and must be carried while on campus.</text>
+    <text x="40" y="174" class="body">If found, please return it to any EAVI campus.</text>
+
+    <!-- campuses -->
+    <text x="40" y="212" class="head">CAMPUSES - ELDORET</text>
+    <text x="40" y="238" class="body" font-size="15"><tspan font-weight="bold">Admissions:</tspan> Skymart Bldg, 1st Floor, Room F45</text>
+    <text x="40" y="260" class="body" font-size="15"><tspan font-weight="bold">Main:</tspan> City Plaza, next to Bandaptai Hotel  |  0726 044 022</text>
+    <text x="40" y="282" class="body" font-size="15"><tspan font-weight="bold">West:</tspan> Mailinne, next to Kapyemit Dispensary  |  0748 022 044</text>
+
+    <!-- accreditation -->
+    <text x="40" y="314" class="label">ACCREDITED BY MINISTRY OF EDUCATION &amp; TVETA</text>
+    <text x="40" y="334" font-size="13" fill="#1F2937">Reg. No. MOHEST/PC/1409/011   |   KNEC Centre No. 26578004</text>
+
+    <!-- verification QR: 180 units is 18mm, which holds a version 4 code at 0.55mm modules -->
+    <g data-slot="qr" transform="translate(640,86)">
+      <rect width="180" height="180" fill="#FFFFFF" class="ink-stroke" stroke-width="3" stroke-dasharray="8 6"/>
+      <text x="90" y="98" text-anchor="middle" font-size="18" font-weight="bold" class="ink">QR</text>
+    </g>
+    <text x="730" y="288" text-anchor="middle" class="label">SCAN TO VERIFY</text>
+    <text data-slot="verify_token" data-max-width="180" x="730" y="304" text-anchor="middle" font-size="11" fill="#6B7280">{{verify_token}}</text>
+
+    <!-- barcode: Code 128 of the reg no, quiet zone included in the generated group -->
+    <g data-slot="barcode" transform="translate(48,368)">
+      <rect width="364" height="54" fill="#FFFFFF" class="ink-stroke" stroke-width="2" stroke-dasharray="8 6"/>
+      <text x="182" y="31" text-anchor="middle" font-size="15" fill="#6B7280">BARCODE (Code 128)</text>
+    </g>
+    <text data-slot="reg_no" data-max-width="370" x="230" y="450" text-anchor="middle" font-size="17" font-weight="bold" class="ink" letter-spacing="3">{{reg_no}}</text>
+
+    <!-- emergency contact -->
+    <text x="470" y="376" class="label">EMERGENCY CONTACT</text>
+    <text data-slot="emergency_name" data-max-width="350" x="470" y="404" font-size="21" font-weight="bold" class="ink">{{emergency_name}}</text>
+    <text data-slot="emergency_phone" data-max-width="350" x="470" y="428" font-size="19" fill="#1F2937">{{emergency_phone}}</text>
+
+    <!-- footer -->
+    <rect y="480" width="856" height="60" class="brand"/>
+    <rect y="480" width="856" height="4" class="accent"/>
+    <text x="40" y="516" font-size="15" class="white">ISSUED: <tspan data-slot="issue_date" data-max-width="227" font-weight="bold">{{issue_date}}</tspan></text>
+    <text data-slot="contact_email" data-max-width="190" x="428" y="516" text-anchor="middle" font-size="13" class="white" letter-spacing="1">{{contact_email}}</text>
+    <text x="620" y="516" font-size="15" class="white">EXPIRES: <tspan data-slot="expiry_date" data-max-width="129" font-weight="bold">{{expiry_date}}</tspan></text>
+  </g>
+</svg>

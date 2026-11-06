@@ -6,8 +6,7 @@ import { DashboardMobileBar } from "@/components/dashboard/dashboard-mobile-bar"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { signOut } from "@/lib/actions/auth";
-import { roles, shell } from "@/lib/content/dashboard";
-import type { AdminScope } from "@/lib/session";
+import { roles, shell, type NavGroup, type NavItem } from "@/lib/content/dashboard";
 import {
   Sidebar,
   SidebarContent,
@@ -22,8 +21,37 @@ import {
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-export function DashboardFrame({ children, scope }: { children: React.ReactNode; scope: AdminScope }) {
+/** The account details the frame shows, shared by the two portals that use it. */
+export type FrameScope = {
+  fullName: string;
+  email: string;
+  role: keyof typeof roles;
+  photoUrl: string | null;
+  campusName: string;
+};
 
+/**
+ * The chrome around every signed-in screen: the section menu, the account in the header and
+ * the bottom bar on a phone. Which portal is open decides only where the links go and what
+ * the header calls the place.
+ */
+export function DashboardFrame({
+  children,
+  scope,
+  home,
+  note,
+  profileHref,
+  nav,
+  mobile,
+}: {
+  children: React.ReactNode;
+  scope: FrameScope;
+  home: string;
+  note: string;
+  profileHref: string;
+  nav: NavGroup[];
+  mobile: NavItem[];
+}) {
   // Collapsed menu buttons render a Radix tooltip and this registry's SidebarProvider
   // ships without the matching provider, which fails every portal navigation.
   return (
@@ -31,7 +59,7 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
       <TooltipProvider delayDuration={0}>
         <Sidebar collapsible="offcanvas" className="border-eavi-border">
           <SidebarHeader className="border-b border-eavi-border">
-            <Link href="/dashboard" className="flex items-center gap-3 rounded-lg px-1 py-1">
+            <Link href={home} className="flex items-center gap-3 rounded-lg px-1 py-1">
               <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-eavi-plate ring-1 ring-eavi-border">
                 <Image src="/logo.png" alt="" width={44} height={44} className="size-11" />
               </span>
@@ -45,7 +73,7 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
           </SidebarHeader>
 
           <SidebarContent aria-label={shell.navLabel}>
-            <DashboardNav />
+            <DashboardNav groups={nav} home={home} />
           </SidebarContent>
 
           <SidebarFooter className="border-t border-eavi-border">
@@ -68,11 +96,11 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
           <header className="eavi-glass sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-eavi-border px-4 text-eavi-on-bg sm:px-6">
             <SidebarTrigger className="-ms-2" />
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <span className="text-sm leading-tight font-medium sm:truncate">{shell.brandNote}</span>
+              <span className="text-sm leading-tight font-medium sm:truncate">{note}</span>
             </div>
 
             <Link
-              href="/dashboard/profile"
+              href={profileHref}
               className="flex min-w-0 items-center gap-2 rounded-full py-1 ps-1 pe-3 outline-offset-2 hover:bg-eavi-plate focus-visible:ring-2 focus-visible:ring-ring"
             >
               <AccountBadge photoUrl={scope.photoUrl} />
@@ -97,7 +125,7 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
             {children}
           </main>
 
-          <DashboardMobileBar />
+          <DashboardMobileBar items={mobile} home={home} />
         </SidebarInset>
       </TooltipProvider>
     </SidebarProvider>
@@ -105,9 +133,9 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
 }
 
 /**
- * The administrator's own picture, kept next to the sign-out control so the account is
- * reachable from any screen. The object host comes from the environment at runtime, so the
- * stored file is shown as-is instead of through the image optimiser.
+ * The account's own picture, kept next to the sign-out control so it is reachable from any
+ * screen. The object host comes from the environment at runtime, so the stored file is
+ * shown as-is instead of through the image optimiser.
  */
 function AccountBadge({ photoUrl }: { photoUrl: string | null }) {
   return (

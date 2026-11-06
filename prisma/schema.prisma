@@ -144,6 +144,7 @@ model Campus {
   invoices        Invoice[]
   announcements   Announcement[]
   idCards         IdCard[]
+  cardTemplates   CardTemplate[]
   reportingDates  ReportingDate[]
 
   @@map("campuses")
@@ -650,20 +651,52 @@ model Announcement {
 }
 
 model IdCard {
-  id        String     @id @default(uuid())
-  serial    String     @unique
-  studentId String
-  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  campusId  Int
-  campus    Campus     @relation(fields: [campusId], references: [id])
-  programId String?
-  program   Program?   @relation(fields: [programId], references: [id])
-  status    CardStatus @default(PENDING)
-  issuedAt  DateTime?
-  expiresAt DateTime?
-  remarks   String?
-  createdAt DateTime   @default(now())
+  id          String       @id @default(uuid())
+  serial      String       @unique
+  /// The unguessable half of the verification link the card's QR encodes. The serial is
+  /// issued in sequence, so it can never be the thing a stranger is given.
+  verifyToken String       @unique
+  studentId   String
+  student     StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  campusId    Int
+  campus      Campus       @relation(fields: [campusId], references: [id])
+  programId   String?
+  program     Program?     @relation(fields: [programId], references: [id])
+  templateId  String?
+  template    CardTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  status      CardStatus   @default(PENDING)
+  issuedAt    DateTime?
+  expiresAt   DateTime?
+  remarks     String?
+  createdAt   DateTime     @default(now())
 
   @@index([campusId, status])
   @@map("id_cards")
+}
+
+/// A printable card design, held as text rather than as a file: the artwork is versioned
+/// data, not code, so a campus can change its card without a deploy. It is only ever
+/// rendered inside this app, which is why it does not live in public object storage.
+model CardTemplate {
+  id           String   @id @default(uuid())
+  name         String
+  /// Null means the template is the college-wide fallback.
+  campusId     Int?
+  campus       Campus?  @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  frontSvg     String
+  backSvg      String
+  logoUrl      String   @default("/card-logo.png")
+  signatureUrl String   @default("/card-signature.png")
+  version      Int      @default(1)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  idCards      IdCard[]
+
+  /// Deliberately not a unique index: a college-wide template has campusId null, and
+  /// Postgres counts nulls as distinct, so a unique constraint would not stop two
+  /// competing defaults from being inserted. Which template applies is resolved on read.
+  @@index([campusId, name, version])
+  @@index([campusId, isActive])
+  @@map("card_templates")
 }

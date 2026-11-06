@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1712" height="1080" viewBox="0 0 856 540" font-family="Arial, Helvetica, sans-serif">
+  <!-- EAVI Student ID - FRONT | CR80 85.6x54mm | placeholders: {{...}} -->
+  <!-- Keep logo.png in the same folder as this file -->
+  <!-- COLORS: .brand = main color #FB3099 | .ink = text #1F2937 | .accent = thin stripes. Change hex values in the style block below -->
+  <style>
+    .ink{fill:#1F2937}
+    .brand{fill:#FB3099}
+    .accent{fill:#1F2937}
+    .ink-stroke{stroke:#1F2937}
+    .brand-stroke{stroke:#FB3099}
+    .accent-stroke{stroke:#1F2937}
+    .label{font-size:13px;fill:#6B7280;letter-spacing:1.5px;font-weight:bold}
+    .value{font-size:24px;fill:#1F2937;font-weight:bold}
+    .white{fill:#FFFFFF}
+  </style>
+  <defs>
+    <clipPath id="card"><rect width="856" height="540" rx="28"/></clipPath>
+    <clipPath id="photoClip"><rect x="40" y="140" width="200" height="250" rx="12"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#card)">
+    <rect width="856" height="540" fill="#FFFFFF"/>
+
+    <!-- watermark ring -->
+    <circle cx="740" cy="400" r="190" fill="none" class="brand-stroke" stroke-width="40" opacity="0.05"/>
+
+    <!-- header: diagonal accent on the right -->
+    <polygon points="676,0 692,0 652,112 636,112" class="accent"/>
+    <polygon points="692,0 856,0 856,112 652,112" class="brand"/>
+    <rect y="112" width="856" height="6" class="brand"/>
+    <rect y="118" width="856" height="3" class="accent"/>
+
+    <!-- logo -->
+    <image xlink:href="logo.png" x="24" y="8" width="100" height="94" preserveAspectRatio="xMidYMid meet"/>
+
+    <text x="140" y="52" font-size="26" font-weight="bold" class="ink">EAST AFRICA VISION INSTITUTE</text>
+    <text x="140" y="82" font-size="16" font-weight="bold" class="brand" letter-spacing="2">EAVI COLLEGE  |  ELDORET, KENYA</text>
+    <text x="828" y="64" text-anchor="end" font-size="20" font-weight="bold" class="white" letter-spacing="3">STUDENT</text>
+    <text x="828" y="90" text-anchor="end" font-size="14" class="white" letter-spacing="4">ID CARD</text>
+
+    <!-- photo -->
+    <rect x="40" y="140" width="200" height="250" rx="12" fill="#E5E7EB"/>
+    <circle cx="140" cy="236" r="46" fill="#CBD5E1"/>
+    <path d="M58 390 C58 318 222 318 222 390 Z" fill="#CBD5E1"/>
+    <image href="{{photo_url}}" x="40" y="140" width="200" height="250" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"/>
+    <rect x="40" y="140" width="200" height="250" rx="12" fill="none" class="brand-stroke" stroke-width="5"/>
+
+    <!-- reg no -->
+    <text x="40" y="418" class="label">REG NO.</text>
+    <text x="40" y="446" class="value">{{reg_no}}</text>
+
+    <!-- fields -->
+    <text x="275" y="152" class="label">FULL NAME</text>
+    <text x="275" y="190" font-size="30" font-weight="bold" class="ink">{{full_name}}</text>
+    <rect x="275" y="202" width="70" height="4" class="brand"/>
+
+    <text x="275" y="244" class="label">COURSE</text>
+    <text x="275" y="272" class="value">{{course}}</text>
+
+    <text x="275" y="312" class="label">CAMPUS</text>
+    <text x="275" y="340" class="value">{{campus}}</text>
+
+    <text x="275" y="380" class="label">INTAKE</text>
+    <text x="275" y="408" class="value">{{intake}}</text>
+    <text x="560" y="380" class="label">VALID UNTIL</text>
+    <text x="560" y="408" class="value">{{expiry_date}}</text>
+
+    <!-- signatures -->
+    <line x1="275" y1="466" x2="530" y2="466" class="ink-stroke" stroke-width="1.5"/>
+    <text x="275" y="484" class="label" font-size="11">HOLDER'S SIGNATURE</text>
+    <line x1="580" y1="466" x2="816" y2="466" class="ink-stroke" stroke-width="1.5"/>
+    <text x="580" y="484" class="label" font-size="11">REGISTRAR</text>
+
+    <!-- footer -->
+    <rect y="500" width="856" height="40" class="brand"/>
+    <rect y="500" width="856" height="4" class="accent"/>
+    <text x="428" y="527" text-anchor="middle" font-size="14" class="white" letter-spacing="2">eastafricavisioninstitute.ac.ke</text>
+  </g>
+</svg>

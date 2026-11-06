@@ -150,6 +150,127 @@ async function overviewFor(campusId: number | null) {
   };
 }
 
+/* ------------------------------------------------------- college-wide (super admin) */
+
+/** The month labels the super-admin trend is drawn over, oldest first. */
+function monthBuckets(count = 6) {
+  const now = new Date();
+  return Array.from({ length: count }, (_, index) => {
+    const start = new Date(now.getFullYear(), now.getMonth() - (count - 1 - index), 1);
+    return { label: start.toLocaleDateString("en-KE", { month: "short" }), start };
+  });
+}
+
+/**
+ * The college seen at once: every campus measured the same way, the same figures added up,
+ * and where the applicants and enrolments actually sit. Nothing here takes a campus filter
+ * — this screen is college-wide by definition, and only a super admin is shown it.
+ */
+export async function getCollegeOverview() {
+  const scope = await requireCollegeAdmin();
+  const buckets = monthBuckets();
+
+  const campuses = await prisma.campus.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, place: true },
+  });
+
+  const [studentCounts, applicationCounts, enrollmentCounts, tutorCounts, feeRows, arrivals, programmeCounts, recentApplications] =
+    await Promise.all([
+      prisma.studentProfile.groupBy({ by: ["campusId"], _count: { _all: true } }),
+      prisma.application.groupBy({
+        by: ["campusId"],
+        where: { status: { in: ["SUBMITTED", "REVIEWING"] } },
+        _count: { _all: true },
+      }),
+      prisma.enrollment.groupBy({ by: ["campusId"], where: { status: "ACTIVE" }, _count: { _all: true } }),
+      prisma.tutorProfile.groupBy({ by: ["campusId"], _count: { _all: true } }),
+      Promise.all(
+        campuses.map(async (campus) => {
+          const [lines, paid] = await Promise.all([
+            prisma.invoiceLine.aggregate({ _sum: { amount: true }, where: { invoice: { campusId: campus.id } } }),
+            prisma.payment.aggregate({ _sum: { amount: true }, where: { invoice: { campusId: campus.id } } }),
+          ]);
+          return { billed: money(lines._sum.amount), collected: money(paid._sum.amount) };
+        }),
+      ),
+      prisma.application.findMany({
+        where: { createdAt: { gte: buckets[0].start } },
+        select: { createdAt: true },
+      }),
+      prisma.enrollment.groupBy({
+        by: ["programId"],
+        where: { status: "ACTIVE" },
+        _count: { _all: true },
+        orderBy: { _count: { programId: "desc" } },
+        take: 6,
+      }),
+      prisma.application.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          reference: true,
+          fullName: true,
+          status: true,
+          createdAt: true,
+          program: { select: { name: true, code: true } },
+          campus: { select: { name: true } },
+        },
+      }),
+    ]);
+
+  const of = (rows: { campusId: number; _count: { _all: number } }[], campusId: number) =>
+    rows.find((row) => row.campusId === campusId)?._count._all ?? 0;
+
+  const byCampus = campuses.map((campus, index) => {
+    const fees = feeRows[index];
+    return {
+      id: campus.id,
+      name: campus.name,
+      place: campus.place,
+      students: of(studentCounts, campus.id),
+      applicationsOpen: of(applicationCounts, campus.id),
+      activeEnrollments: of(enrollmentCounts, campus.id),
+      tutors: of(tutorCounts, campus.id),
+      billed: fees.billed,
+      collected: fees.collected,
+      outstanding: fees.billed - fees.collected,
+    };
+  });
+
+  const totals = byCampus.reduce(
+    (sum, campus) => ({
+      students: sum.students + campus.students,
+      applicationsOpen: sum.applicationsOpen + campus.applicationsOpen,
+      activeEnrollments: sum.activeEnrollments + campus.activeEnrollments,
+      tutors: sum.tutors + campus.tutors,
+      billed: sum.billed + campus.billed,
+      collected: sum.collected + campus.collected,
+    }),
+    { students: 0, applicationsOpen: 0, activeEnrollments: 0, tutors: 0, billed: 0, collected: 0 },
+  );
+
+  const nextStart = (index: number) => buckets[index + 1]?.start ?? new Date(8_640_000_000_000_000);
+  const applicationsByMonth = buckets.map((bucket, index) => ({
+    label: bucket.label,
+    value: arrivals.filter((row) => row.createdAt >= bucket.start && row.createdAt < nextStart(index)).length,
+  }));
+
+  const programmes = await prisma.program.findMany({
+    where: { id: { in: programmeCounts.map((row) => row.programId) } },
+    select: { id: true, name: true, code: true },
+  });
+
+  const enrollmentsByProgramme = programmeCounts.flatMap((row) => {
+    const programme = programmes.find((item) => item.id === row.programId);
+    if (!programme) return [];
+    return [{ label: `${programme.name} (${programme.code})`, value: row._count._all }];
+  });
+
+  return { scope, byCampus, totals, applicationsByMonth, enrollmentsByProgramme, recentApplications };
+}
+
 /* ------------------------------------------------------------------ students */
 
 export async function getStudents(query: ListQuery) {

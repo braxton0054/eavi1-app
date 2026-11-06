@@ -2,7 +2,7 @@ import { createApplication } from "@/lib/actions/college/applications";
 import { clearReportingDate, saveReportingDate } from "@/lib/actions/college/reporting";
 import { getApplications, getProgramOptions, getReportingDates } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
-import { common, labels, pages } from "@/lib/content/dashboard";
+import { common, labels, pages, shell } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
 import { ListFilters, Paginator, ResultCount, StepLink } from "@/components/dashboard/list-tools";
@@ -109,15 +109,19 @@ export default async function ApplicationsPage({
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
-      <DisclosureForm
-        id="new-application"
-        button={copy.create.button}
-        title={copy.create.title}
-        fields={copy.create.fields}
-        options={options}
-        action={createApplication}
-        submitLabel={common.create}
-      />
+      {scope.campusId !== null ? (
+        <DisclosureForm
+          id="new-application"
+          button={copy.create.button}
+          title={copy.create.title}
+          fields={copy.create.fields}
+          options={options}
+          action={createApplication}
+          submitLabel={common.create}
+        />
+      ) : (
+        <Notice tone="neutral" title={copy.create.button} body={shell.chooseCampus} />
+      )}
 
       <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
         <div className="space-y-4 p-4">
