@@ -20,14 +20,6 @@ enum Status {
   DISABLED
 }
 
-enum ProgramLevel {
-  CERTIFICATE
-  DIPLOMA
-  HIGHER_DIPLOMA
-  DEGREE
-  SHORT_COURSE
-}
-
 enum ApplicationStatus {
   SUBMITTED
   REVIEWING
@@ -114,15 +106,6 @@ enum PaymentMethod {
   CASH
   BANK
   CHEQUE
-}
-
-/// How often a programme's fees fall due. Describes the cadence of the fee
-/// components on the programme, not the rail a payment arrives by.
-enum FeeFrequency {
-  SEMESTER
-  TERM
-  MODULE
-  MONTH
 }
 
 enum CardStatus {
@@ -216,19 +199,65 @@ model Department {
   @@map("departments")
 }
 
+/// The body a programme is registered with and examined by: KNEC, CDAC, TVETA and
+/// the rest. Its code is the first half of every generated programme code.
+model ProgramBody {
+  id         String    @id @default(uuid())
+  name       String    @unique
+  /// Short upper-case letters used in programme codes, e.g. KNEC.
+  code       String    @unique
+  programs   Program[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("program_bodies")
+}
+
+/// The kind of programme: Certificate, Diploma, Degree and anything else the college
+/// adds. Its code is the middle of every generated programme code.
+model ProgramType {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  /// Short upper-case letters used in programme codes, e.g. DIP.
+  code      String    @unique
+  programs  Program[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("program_types")
+}
+
+/// How often a programme's fees fall due. Registered in programme settings so the
+/// list is not fixed by the code.
+model FeeCadence {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  programs  Program[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("fee_cadences")
+}
+
 /// A programme on the college catalogue, offered at one or more campuses.
+/// Every programme belongs to exactly one accrediting body and one type, and its
+/// code is generated from those two: KNEC-DIP-001.
 model Program {
   id             String        @id @default(uuid())
   code           String        @unique
   name           String
   departmentId   String
   department     Department    @relation(fields: [departmentId], references: [id])
-  level          ProgramLevel
+  bodyId         String
+  body           ProgramBody   @relation(fields: [bodyId], references: [id])
+  typeId         String
+  type           ProgramType   @relation(fields: [typeId], references: [id])
+  cadenceId      String
+  cadence        FeeCadence    @relation(fields: [cadenceId], references: [id])
   durationMonths Int
   /// Lowest KCSE aggregate the college admits against; the same scale the
   /// application form records an applicant's grade on.
   minKcseGrade   EntryGrade
-  feeFrequency   FeeFrequency
   description    String?
   curriculumUrl  String?
   feeStructureUrl String?

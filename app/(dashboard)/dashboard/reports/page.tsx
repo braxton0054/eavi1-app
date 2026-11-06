@@ -84,9 +84,9 @@ export default async function ReportsPage() {
     id: row.name,
     cells: {
       program: row.name,
-      level: (
+      type: (
         <StatusChip tone="neutral">
-          {row.level ? labels.programLevel[row.level] : common.notSet}
+          {row.type ?? common.notSet}
         </StatusChip>
       ),
       count: count(row.count),

@@ -76,7 +76,6 @@ export async function createApplication(formData: FormData) {
         programId,
         campusId,
         previousQualification: text(formData, "previousQualification"),
-        notes: text(formData, "notes"),
       },
     });
   });

@@ -1,15 +1,33 @@
-import { createDepartment, createProgram, uploadCurriculum, uploadFeeStructure } from "@/lib/actions/college/programs";
-import { getDepartmentOptions, getDepartments, getProgramOptions, getPrograms } from "@/lib/dal/college";
+import {
+  createDepartment,
+  createFeeCadence,
+  createProgram,
+  createProgramBody,
+  createProgramType,
+  renameFeeCadence,
+  uploadCurriculum,
+  uploadFeeStructure,
+} from "@/lib/actions/college/programs";
+import {
+  getDepartmentOptions,
+  getDepartments,
+  getFeeCadences,
+  getProgramBodies,
+  getProgramOptions,
+  getProgramRegistryOptions,
+  getProgramTypes,
+  getPrograms,
+} from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
-import { DisclosureForm } from "@/components/dashboard/record-form";
+import { DisclosureForm, RowForm, type OptionSets } from "@/components/dashboard/record-form";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
 import { StatusChip } from "@/components/dashboard/status-chip";
-import type { OptionSets } from "@/components/dashboard/record-form";
-
+import { SettingsDialog } from "@/components/dashboard/settings-dialog";
 
 const copy = pages.programs;
+const settings = copy.settings;
 
 export default async function ProgramsPage({
   searchParams,
@@ -19,25 +37,36 @@ export default async function ProgramsPage({
   const { invalid } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  const [rows, departments, departmentOptions, programOptions] = await Promise.all([
-    getPrograms({}),
-    getDepartments(),
-    getDepartmentOptions(),
-    getProgramOptions(scope.campusId),
-  ]);
+  const [rows, departments, departmentOptions, registries, bodies, types, cadences, programOptions] =
+    await Promise.all([
+      getPrograms({}),
+      getDepartments(),
+      getDepartmentOptions(),
+      getProgramRegistryOptions(),
+      getProgramBodies(),
+      getProgramTypes(),
+      getFeeCadences(),
+      getProgramOptions(scope.campusId),
+    ]);
 
-  const options: OptionSets = { departments: departmentOptions, programs: programOptions };
+  const options: OptionSets = {
+    departments: departmentOptions,
+    programs: programOptions,
+    bodies: registries.bodies,
+    programTypes: registries.programTypes,
+    feeCadences: registries.feeCadences,
+  };
 
   const programRows: Row[] = rows.map((program) => ({
     id: program.id,
     cells: {
       code: program.code,
       name: program.name,
+      body: program.body.name,
+      type: <StatusChip tone="neutral">{program.type.name}</StatusChip>,
       department: program.department.name,
-      level: <StatusChip tone="neutral">{labels.programLevel[program.level]}</StatusChip>,
       duration: copy.duration(program.durationMonths),
       minKcseGrade: labels.entryGrade[program.minKcseGrade],
-      feeFrequency: labels.feeFrequency[program.feeFrequency],
       students: String(program.enrolledCount),
       curriculum: program.curriculumUrl ? (
         <a href={program.curriculumUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-end px-2 text-sm font-medium text-eavi-primary-text underline underline-offset-4">
@@ -56,17 +85,119 @@ export default async function ProgramsPage({
     },
   }));
 
+  // A body or a type is only ever retired by taking its programmes away, so the count is shown.
+  const codedRows = (
+    items: { id: string; code: string; name: string; programs: { id: string }[] }[],
+  ): Row[] =>
+    items.map((item) => ({
+      id: item.id,
+      cells: { code: item.code, name: item.name, programs: String(item.programs.length) },
+    }));
+
+  const cadenceRows: Row[] = cadences.map((cadence) => ({
+    id: cadence.id,
+    cells: {
+      name: cadence.name,
+      programs: String(cadence.programs.length),
+      rename: (
+        <RowForm
+          id={`rename-cadence-${cadence.id}`}
+          button={settings.cadences.rename.button}
+          fields={settings.cadences.rename.fields}
+          action={renameFeeCadence}
+          submitLabel={common.save}
+          hidden={{ cadenceId: cadence.id }}
+        />
+      ),
+    },
+  }));
+
   const departmentRows: Row[] = departments.map((department) => ({
     id: department.id,
-    cells: {
-      name: department.name,
-      programs: String(department.programs.length),
-    },
+    cells: { name: department.name, programs: String(department.programs.length) },
   }));
 
   return (
     <div className="space-y-6">
-      <PageHeader title={copy.title} description={copy.description} />
+      <PageHeader
+        title={copy.title}
+        description={copy.description}
+        action={
+          <SettingsDialog label={settings.button} title={settings.title} description={settings.description}>
+            <Panel title={settings.bodies.heading} description={settings.bodies.description}>
+              <div className="space-y-4 p-4">
+                <DisclosureForm
+                  id="new-body"
+                  button={settings.bodies.create.button}
+                  title={settings.bodies.create.title}
+                  fields={settings.bodies.create.fields}
+                  action={createProgramBody}
+                  submitLabel={common.create}
+                />
+              </div>
+              {bodies.length === 0 ? (
+                <EmptyState body={settings.bodies.empty} icon="programs" />
+              ) : (
+                <DataTable columns={settings.bodies.columns} rows={codedRows(bodies)} caption={settings.bodies.heading} />
+              )}
+            </Panel>
+
+            <Panel title={settings.types.heading} description={settings.types.description}>
+              <div className="space-y-4 p-4">
+                <DisclosureForm
+                  id="new-program-type"
+                  button={settings.types.create.button}
+                  title={settings.types.create.title}
+                  fields={settings.types.create.fields}
+                  action={createProgramType}
+                  submitLabel={common.create}
+                />
+              </div>
+              {types.length === 0 ? (
+                <EmptyState body={settings.types.empty} icon="programs" />
+              ) : (
+                <DataTable columns={settings.types.columns} rows={codedRows(types)} caption={settings.types.heading} />
+              )}
+            </Panel>
+
+            <Panel title={settings.cadences.heading} description={settings.cadences.description}>
+              <div className="space-y-4 p-4">
+                <DisclosureForm
+                  id="new-fee-cadence"
+                  button={settings.cadences.create.button}
+                  title={settings.cadences.create.title}
+                  fields={settings.cadences.create.fields}
+                  action={createFeeCadence}
+                  submitLabel={common.create}
+                />
+              </div>
+              {cadenceRows.length === 0 ? (
+                <EmptyState body={settings.cadences.empty} icon="accounts" />
+              ) : (
+                <DataTable columns={cadenceColumns()} rows={cadenceRows} caption={settings.cadences.heading} />
+              )}
+            </Panel>
+
+            <Panel title={copy.departments.heading} description={copy.departments.description}>
+              <div className="space-y-4 p-4">
+                <DisclosureForm
+                  id="new-department"
+                  button={copy.departments.create.button}
+                  title={copy.departments.create.title}
+                  fields={copy.departments.create.fields}
+                  action={createDepartment}
+                  submitLabel={common.create}
+                />
+              </div>
+              {departmentRows.length === 0 ? (
+                <EmptyState body={copy.departments.empty} icon="programs" />
+              ) : (
+                <DataTable columns={copy.departments.columns} rows={departmentRows} caption={copy.departments.heading} />
+              )}
+            </Panel>
+          </SettingsDialog>
+        }
+      />
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
@@ -79,28 +210,6 @@ export default async function ProgramsPage({
         action={createProgram}
         submitLabel={common.create}
       />
-
-      <Panel title={copy.departments.heading} description={copy.departments.description}>
-        <div className="space-y-4 p-4">
-          <DisclosureForm
-            id="new-department"
-            button={copy.departments.create.button}
-            title={copy.departments.create.title}
-            fields={copy.departments.create.fields}
-            action={createDepartment}
-            submitLabel={common.create}
-          />
-        </div>
-        {departmentRows.length === 0 ? (
-          <EmptyState body={copy.departments.empty} icon="programs" />
-        ) : (
-          <DataTable
-            columns={copy.departments.columns}
-            rows={departmentRows}
-            caption={copy.departments.heading}
-          />
-        )}
-      </Panel>
 
       <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
         {programRows.length === 0 ? (
@@ -199,4 +308,9 @@ export default async function ProgramsPage({
       </Panel>
     </div>
   );
+}
+
+/** The payment type table carries its own rename control, so its last column has no label. */
+function cadenceColumns() {
+  return [...settings.cadences.columns, { key: "rename", label: "" }];
 }

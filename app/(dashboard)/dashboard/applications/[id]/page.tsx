@@ -69,7 +69,6 @@ export default async function ApplicationDetailPage({
     grade: application.grade ? labels.entryGrade[application.grade] : null,
     programId: `${application.program.name} (${application.program.code})`,
     previousQualification: application.previousQualification ?? common.notSet,
-    notes: application.notes ?? common.notSet,
   };
 
   const decisionValues: Record<string, ReactNode> = {
@@ -124,6 +123,19 @@ export default async function ApplicationDetailPage({
               <dd className="min-w-0 text-sm break-words">{fieldValues[field.name] ?? common.notSet}</dd>
             </div>
           ))}
+        </dl>
+      </Panel>
+
+      <Panel title={copy.detail.derivedHeading}>
+        <dl className="grid gap-x-6 gap-y-3 p-4 sm:grid-cols-2">
+          <div>
+            <dt className="text-xs text-eavi-muted-text">{copy.detail.awardingBody}</dt>
+            <dd className="min-w-0 text-sm break-words">{application.program.body.name}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-eavi-muted-text">{copy.detail.programmeType}</dt>
+            <dd className="min-w-0 text-sm break-words">{application.program.type.name}</dd>
+          </div>
         </dl>
       </Panel>
 

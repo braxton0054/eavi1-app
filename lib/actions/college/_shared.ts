@@ -247,6 +247,20 @@ export function nextCardSerial() {
   );
 }
 
+/**
+ * Programme codes are never typed: body, then type, then a serial that counts up only
+ * within that pair, so KNEC-DIP-001 and CDAC-DIP-001 can both exist.
+ */
+export function nextProgramCode(bodyCode: string, typeCode: string, bodyId: string, typeId: string) {
+  const prefix = `${bodyCode.toUpperCase()}-${typeCode.toUpperCase()}`;
+
+  return issueCode(
+    () => prisma.program.count({ where: { bodyId, typeId } }),
+    (sequence) => `${prefix}-${pad(sequence, 3)}`,
+    (code) => prisma.program.count({ where: { code } }),
+  );
+}
+
 /** Every screen whose tables must show the new row after a write. */
 export function refresh(...portalPaths: string[]) {
   for (const path of portalPaths) revalidatePath(path);

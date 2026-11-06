@@ -277,7 +277,15 @@ export async function getApplication(id: string) {
   const row = await prisma.application.findFirst({
     where: { id, ...campusWhere(scope.campusId) },
     include: {
-      program: { select: { name: true, code: true, id: true } },
+      program: {
+        select: {
+          name: true,
+          code: true,
+          id: true,
+          body: { select: { name: true } },
+          type: { select: { name: true } },
+        },
+      },
       campus: { select: { name: true } },
       decidedBy: { select: { fullName: true } },
     },
@@ -391,6 +399,8 @@ async function programsFor(campusId: number | null, q?: string) {
     include: {
       campuses: { select: { id: true, name: true } },
       department: { select: { id: true, name: true } },
+      body: { select: { id: true, name: true, code: true } },
+      type: { select: { id: true, name: true, code: true } },
       enrollments: { where: { status: "ACTIVE" }, select: { id: true } },
     },
   });
@@ -415,6 +425,49 @@ export async function getDepartmentOptions() {
   const rows = await prisma.department.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
 
   return rows.map((row) => ({ value: row.id, label: row.name }));
+}
+
+/**
+ * The three lists a programme is picked from. College-wide like departments: the same
+ * bodies, types and payment types across every campus, so codes stay comparable.
+ */
+export async function getProgramBodies() {
+  await requireCollegeAdmin();
+  return prisma.programBody.findMany({
+    orderBy: { name: "asc" },
+    include: { programs: { select: { id: true } } },
+  });
+}
+
+export async function getProgramTypes() {
+  await requireCollegeAdmin();
+  return prisma.programType.findMany({
+    orderBy: { name: "asc" },
+    include: { programs: { select: { id: true } } },
+  });
+}
+
+export async function getFeeCadences() {
+  await requireCollegeAdmin();
+  return prisma.feeCadence.findMany({
+    orderBy: { name: "asc" },
+    include: { programs: { select: { id: true } } },
+  });
+}
+
+export async function getProgramRegistryOptions() {
+  await requireCollegeAdmin();
+  const [bodies, types, cadences] = await Promise.all([
+    prisma.programBody.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.programType.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.feeCadence.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+  ]);
+
+  return {
+    bodies: bodies.map((row) => ({ value: row.id, label: row.name })),
+    programTypes: types.map((row) => ({ value: row.id, label: row.name })),
+    feeCadences: cadences.map((row) => ({ value: row.id, label: row.name })),
+  };
 }
 
 /* -------------------------------------------------------------------- tutors */
@@ -767,7 +820,9 @@ export async function getReports() {
       prisma.idCard.groupBy({ by: ["status"], _count: { _all: true }, where }),
     ]);
 
-  const programs = await prisma.program.findMany({ select: { id: true, name: true, code: true, level: true } });
+  const programs = await prisma.program.findMany({
+    select: { id: true, name: true, code: true, type: { select: { name: true } } },
+  });
   const tutors = await prisma.tutorProfile.findMany({
     where,
     include: { user: { select: { fullName: true } }, timetableSlots: { select: { startAt: true, endAt: true } } },
@@ -782,7 +837,11 @@ export async function getReports() {
     enrollments: programGroups
       .map((group) => {
         const program = programs.find((candidate) => candidate.id === group.programId);
-        return { name: program?.name ?? "Unknown programme", level: program?.level ?? null, count: group._count._all };
+        return {
+          name: program?.name ?? "Unknown programme",
+          type: program?.type.name ?? null,
+          count: group._count._all,
+        };
       })
       .sort((a, b) => b.count - a.count),
     fees: { billed, collected, outstanding: billed - collected },

@@ -55,6 +55,9 @@ export type Field = {
     | "invoices"
     | "campuses"
     | "departments"
+    | "bodies"
+    | "programTypes"
+    | "feeCadences"
     | "years";
 };
 
@@ -203,19 +206,6 @@ export const fieldErrors = {
 /** Enum value -> the wording a college administrator reads. */
 export const labels = {
   role: roles,
-  programLevel: {
-    CERTIFICATE: "Certificate",
-    DIPLOMA: "Diploma",
-    HIGHER_DIPLOMA: "Higher diploma",
-    DEGREE: "Degree",
-    SHORT_COURSE: "Short course",
-  },
-  feeFrequency: {
-    SEMESTER: "Per semester",
-    TERM: "Per term",
-    MODULE: "Per module",
-    MONTH: "Monthly",
-  },
   applicationStatus: {
     SUBMITTED: "Submitted",
     REVIEWING: "Under review",
@@ -372,7 +362,10 @@ export const pages = {
     },
     detail: {
       previousQualification: "Previous qualification",
-      notes: "Notes",
+      /** Not fields on the form: both come from the programme the applicant picked. */
+      derivedHeading: "From the programme",
+      awardingBody: "Awarding body",
+      programmeType: "Programme type",
       decision: "Decision",
       decidedBy: "Decided by",
       decidedAt: "Decided on",
@@ -400,7 +393,6 @@ export const pages = {
         },
         { name: "programId", label: "Programme", type: "select", required: true, optionKey: "programs" },
         { name: "previousQualification", label: "Previous qualification", type: "text", wide: true },
-        { name: "notes", label: "Notes", type: "textarea", wide: true },
       ] satisfies Field[],
     },
     decision: {
@@ -547,11 +539,11 @@ export const pages = {
     columns: [
       { key: "code", label: "Code" },
       { key: "name", label: "Programme" },
+      { key: "body", label: "Awarding body" },
+      { key: "type", label: "Programme type" },
       { key: "department", label: "Department" },
-      { key: "level", label: "Programme type" },
       { key: "duration", label: "Duration" },
       { key: "minKcseGrade", label: "Min KCSE" },
-      { key: "feeFrequency", label: "Fee payment type" },
       { key: "students", label: "Enrolled", align: "end" },
       { key: "curriculum", label: "Curriculum" },
       { key: "feeStructure", label: "Fee structure" },
@@ -564,16 +556,82 @@ export const pages = {
       button: "Add programme",
       title: "New programme",
       fields: [
-        { name: "departmentId", label: "Department", type: "select", required: true, optionKey: "departments" },
         { name: "name", label: "Programme name", type: "text", required: true, wide: true },
-        { name: "code", label: "Code", type: "text", required: true },
-        { name: "level", label: "Programme type", type: "select", required: true, options: toOptions(labels.programLevel) },
-        { name: "durationMonths", label: "Duration (months)", type: "number", required: true, step: "1" },
+        { name: "bodyId", label: "Awarding body", type: "select", required: true, optionKey: "bodies" },
+        { name: "typeId", label: "Programme type", type: "select", required: true, optionKey: "programTypes" },
+        { name: "departmentId", label: "Department", type: "select", required: true, optionKey: "departments" },
+        { name: "cadenceId", label: "Fee payment type", type: "select", required: true, optionKey: "feeCadences" },
+        { name: "durationMonths", label: "Duration (months)", type: "number", required: true, step: "1", hint: "Whole months only. A two-year course is 24." },
         { name: "minKcseGrade", label: "Minimum KCSE grade", type: "select", required: true, options: toOptions(labels.entryGrade) },
-        { name: "feeFrequency", label: "Fee payment type", type: "select", required: true, options: toOptions(labels.feeFrequency) },
         { name: "description", label: "Description", type: "textarea", wide: true },
       ] satisfies Field[],
       created: "Programme saved.",
+    },
+    settings: {
+      button: "Programme settings",
+      title: "Programme settings",
+      description:
+        "The lists a programme is picked from. Add a body, a type or a payment type here before you create a programme.",
+      bodies: {
+        heading: "Awarding bodies",
+        description: "The body a programme is registered and examined by, e.g. KNEC or CDAC.",
+        columns: [
+          { key: "code", label: "Code" },
+          { key: "name", label: "Body" },
+          { key: "programs", label: "Programmes", align: "end" },
+        ] satisfies Column[],
+        empty: "No bodies registered yet. Add one before creating a programme.",
+        create: {
+          button: "Add body",
+          title: "New awarding body",
+          fields: [
+            { name: "name", label: "Body name", type: "text", required: true, placeholder: "Kenya National Examinations Council" },
+            { name: "code", label: "Code", type: "text", required: true, hint: "Short letters used at the start of every programme code, e.g. KNEC." },
+          ] satisfies Field[],
+        },
+      },
+      types: {
+        heading: "Programme types",
+        description: "Certificate, diploma, degree and any other kind of programme the college offers.",
+        columns: [
+          { key: "code", label: "Code" },
+          { key: "name", label: "Type" },
+          { key: "programs", label: "Programmes", align: "end" },
+        ] satisfies Column[],
+        empty: "No programme types registered yet.",
+        create: {
+          button: "Add programme type",
+          title: "New programme type",
+          fields: [
+            { name: "name", label: "Type name", type: "text", required: true, placeholder: "Diploma" },
+            { name: "code", label: "Code", type: "text", required: true, hint: "Short letters used in every programme code of this type, e.g. DIP." },
+          ] satisfies Field[],
+        },
+      },
+      cadences: {
+        heading: "Fee payment type",
+        description: "The payment types a programme can be billed on. Rename one here to change every programme using it.",
+        columns: [
+          { key: "name", label: "Payment type" },
+          { key: "programs", label: "Programmes", align: "end" },
+        ] satisfies Column[],
+        empty: "No payment types registered yet.",
+        create: {
+          button: "Add payment type",
+          title: "New fee payment type",
+          fields: [
+            { name: "name", label: "Payment type name", type: "text", required: true, wide: true, placeholder: "Per semester" },
+          ] satisfies Field[],
+        },
+        rename: {
+          button: "Rename",
+          title: "Rename payment type",
+          fields: [
+            { name: "name", label: "New name", type: "text", required: true, wide: true },
+          ] satisfies Field[],
+          done: "Payment type renamed.",
+        },
+      },
     },
     departments: {
       heading: "Departments",
@@ -949,7 +1007,7 @@ export const pages = {
         empty: "No active enrollments to report on.",
         columns: [
           { key: "program", label: "Programme" },
-          { key: "level", label: "Programme type" },
+          { key: "type", label: "Programme type" },
           { key: "count", label: "Students", align: "end" },
         ] satisfies Column[],
       },
