@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Reference copy of the dashboard template the admin screens are built from.
+    "templates/**",
   ]),
 ]);
 
