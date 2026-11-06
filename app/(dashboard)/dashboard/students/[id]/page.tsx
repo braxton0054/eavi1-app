@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { getStudent } from "@/lib/dal/college";
+import { genderLabel } from "@/lib/content/apply";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { EmptyState, PageHeader, Panel } from "@/components/dashboard/panel";
@@ -84,7 +85,7 @@ export default async function StudentProfilePage({
     intakeId: activeEnrollment?.intake?.name ?? common.notSet,
     admissionNo: student.admissionNo,
     password: common.none,
-    gender: student.gender ? labels.gender[student.gender] : common.notSet,
+    gender: genderLabel(student.gender) ?? common.notSet,
     dateOfBirth: formatDate(student.dateOfBirth),
     nationalId: student.nationalId ?? common.notSet,
     guardianName: student.guardianName ?? common.notSet,

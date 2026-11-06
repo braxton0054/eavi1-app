@@ -7,8 +7,9 @@
 export type Choice = { value: string; label: string };
 
 /**
- * The genders an applicant states, in the order they read on the form. No form in the
- * system offers a third — a record that stored one earlier still reads back in the portal.
+ * The genders an applicant states, in the order they read on the form. No screen in the
+ * system offers or shows a third — a record that stored one before this rule reads as
+ * not stated until the office corrects it.
  */
 export const genderChoices: { value: "MALE" | "FEMALE"; label: string }[] = [
   { value: "MALE", label: "Male" },
@@ -17,6 +18,11 @@ export const genderChoices: { value: "MALE" | "FEMALE"; label: string }[] = [
 
 /** The gender values a form may submit. */
 export const genderValues = genderChoices.map((choice) => choice.value);
+
+/** How a stored gender reads. A record from before the two-option rule shows nothing. */
+export function genderLabel(value: string | null | undefined): string | null {
+  return genderChoices.find((choice) => choice.value === value)?.label ?? null;
+}
 
 export const gradeChoices = [
   { value: "A", label: "A" },

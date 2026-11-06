@@ -309,12 +309,6 @@ export const labels = {
     ACTIVE: "Running",
     COMPLETED: "Completed",
   },
-  gender: {
-    MALE: "Male",
-    FEMALE: "Female",
-    OTHER: "Other",
-    UNDECLARED: "Prefer not to say",
-  },
   /** Kenya Certificate of Secondary Education grades, as an applicant states one. */
   entryGrade: {
     A: "A",

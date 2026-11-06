@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { decideApplication } from "@/lib/actions/college/applications";
 import { getApplication } from "@/lib/dal/college";
+import { genderLabel } from "@/lib/content/apply";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { EmptyState, PageHeader, Panel } from "@/components/dashboard/panel";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
@@ -65,7 +66,7 @@ export default async function ApplicationDetailPage({
     fullName: application.fullName,
     email: application.email,
     phone: application.phone,
-    gender: application.gender ? labels.gender[application.gender] : null,
+    gender: genderLabel(application.gender),
     grade: application.grade ? labels.entryGrade[application.grade] : null,
     programId: `${application.program.name} (${application.program.code})`,
     previousQualification: application.previousQualification ?? common.notSet,
