@@ -9,6 +9,7 @@ import {
   Rows3Icon,
   ScrollTextIcon,
   ShapesIcon,
+  UserRoundIcon,
   UserRoundSearchIcon,
   UsersIcon,
   WalletIcon,
@@ -30,4 +31,5 @@ export const icons: Record<DashboardIcon, typeof LayoutDashboardIcon> = {
   cards: ReceiptIcon,
   reports: ScrollTextIcon,
   communication: MegaphoneIcon,
+  profile: UserRoundIcon,
 };

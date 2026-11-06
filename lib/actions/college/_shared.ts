@@ -11,6 +11,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { fieldErrors } from "@/lib/content/dashboard";
 import { isEmail, normalizeKenyanPhone } from "@/lib/validation";
 import { prisma } from "@/lib/prisma";
+import { storageConfigured, uploadFile } from "@/lib/storage";
 
 /** Thrown with wording the administrator can act on; the error boundary prints it as-is. */
 export class FieldError extends Error {}
@@ -107,6 +108,8 @@ export function orderedTimes(start: string, end: string) {
   if (end <= start) throw new FieldError(fieldErrors.timeOrder);
 }
 
+export function emailField(formData: FormData, name: string, label: string, optional?: false): string;
+export function emailField(formData: FormData, name: string, label: string, optional: true): string | null;
 export function emailField(formData: FormData, name: string, label: string, optional = false): string | null {
   const raw = text(formData, name);
   if (raw === null) {
@@ -136,6 +139,82 @@ export function passwordField(formData: FormData, name: string, label: string): 
 }
 
 /**
+ * Files travel through a Server Action, whose request body is capped in next.config.ts.
+ * The byte limit here is set below that so the multipart framing has room left over and an
+ * oversized file is refused with a sentence rather than a server error.
+ */
+export const MAX_UPLOAD_MB = 10;
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+
+/**
+ * A file the administrator attached. A file picker that was opened and cancelled arrives as
+ * an empty file, which counts as "nothing attached" instead of a missing answer.
+ * Asking for a non-optional file also makes the return non-nullable, so callers never cast.
+ */
+export async function fileField(
+  formData: FormData,
+  name: string,
+  label: string,
+  kind: "pdf" | "image",
+  optional: false,
+): Promise<File>;
+export async function fileField(
+  formData: FormData,
+  name: string,
+  label: string,
+  kind: "pdf" | "image",
+  optional?: true,
+): Promise<File | null>;
+export async function fileField(
+  formData: FormData,
+  name: string,
+  label: string,
+  kind: "pdf" | "image",
+  optional = true,
+): Promise<File | null> {
+  const raw = formData.get(name);
+  const file = raw instanceof File ? raw : null;
+  if (!file || file.size === 0) {
+    if (optional) return null;
+    throw new FieldError(fieldErrors.required(label));
+  }
+  if (file.size > MAX_UPLOAD_BYTES) throw new FieldError(fieldErrors.fileSize(label, MAX_UPLOAD_MB));
+
+  const lowerName = file.name.toLowerCase();
+  const isPdf = file.type === "application/pdf" || lowerName.endsWith(".pdf");
+  const isImage =
+    file.type === "image/jpeg" ||
+    file.type === "image/png" ||
+    [".jpg", ".jpeg", ".png"].some((extension) => lowerName.endsWith(extension));
+
+  if (kind === "pdf" && !isPdf) throw new FieldError(fieldErrors.pdf(label));
+  if (kind === "image" && !isImage) throw new FieldError(fieldErrors.image(label));
+
+  return file;
+}
+
+/**
+ * Checked before any row is written: a form that carries a file but has nowhere to put it
+ * must change nothing at all.
+ */
+export function assertStorageFor(files: readonly (File | null)[]) {
+  if (files.some((file) => file !== null) && !storageConfigured()) {
+    throw new FieldError(fieldErrors.storageOff);
+  }
+}
+
+/** The original filename never reaches a storage path; only the safe characters of it do. */
+export async function putFile(file: File, folder: string, keySeed: string) {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return uploadFile(
+    `${folder}/${keySeed}/${Date.now()}-${safeName}`,
+    buffer,
+    file.type || "application/octet-stream",
+  );
+}
+
+/**
  * A unique index the administrator tripped over reads better as a form message than as a
  * database error, so every action runs its write through this.
  */
@@ -148,6 +227,20 @@ export async function unique<T>(label: string, work: () => Promise<T>): Promise<
     }
     throw error;
   }
+}
+
+/**
+ * Anything other records already point at cannot be removed, and the database only says so
+ * as a constraint name. Counting the references first turns that into a sentence, and the
+ * row is left exactly as it was.
+ */
+export async function refuseWhenUsed(
+  blocked: string,
+  references: () => Promise<boolean>,
+  work: () => Promise<unknown>,
+): Promise<void> {
+  if (await references()) throw new FieldError(blocked);
+  await work();
 }
 
 /**

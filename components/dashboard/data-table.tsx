@@ -59,7 +59,9 @@ export function DataTable({
                     <TableCell
                       key={column.key}
                       className={cn(
-                        "max-w-[26rem] truncate",
+                        column.interactive
+                          ? "align-top"
+                          : "max-w-[26rem] truncate",
                         column.align === "end" && "text-right tabular-nums",
                       )}
                     >

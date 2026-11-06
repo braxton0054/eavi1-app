@@ -19,10 +19,12 @@ export type DashboardIcon =
   | "accounts"
   | "cards"
   | "reports"
-  | "communication";
+  | "communication"
+  | "profile";
 
 export type FieldType =
   | "text"
+  | "password"
   | "email"
   | "tel"
   | "date"
@@ -30,7 +32,8 @@ export type FieldType =
   | "number"
   | "select"
   | "textarea"
-  | "checkbox";
+  | "checkbox"
+  | "file";
 
 export type Field = {
   name: string;
@@ -40,6 +43,8 @@ export type Field = {
   hint?: string;
   placeholder?: string;
   step?: string;
+  /** Only for `type: "file"`: the picker filter, e.g. "application/pdf". */
+  accept?: string;
   /** Rendered at full width instead of half width on wide screens. */
   wide?: boolean;
   /** Static choices, e.g. an enum. */
@@ -61,7 +66,13 @@ export type Field = {
     | "years";
 };
 
-export type Column = { key: string; label: string; align?: "end" };
+export type Column = {
+  key: string;
+  label: string;
+  align?: "end";
+  /** A cell holding row controls is never truncated, or its popup would be clipped. */
+  interactive?: boolean;
+};
 
 export const shell = {
   brandName: "EAVI Portal",
@@ -75,6 +86,7 @@ export const shell = {
     label: "Account",
     role: "Role",
     signOut: "Sign out",
+    profile: "Profile and settings",
   },
   unavailable: {
     title: "Administration area",
@@ -98,7 +110,10 @@ export const navGroups: {
   {
     id: "administration",
     label: "Administration",
-    items: [{ href: "/dashboard", label: "Overview", icon: "overview" }],
+    items: [
+      { href: "/dashboard", label: "Overview", icon: "overview" },
+      { href: "/dashboard/profile", label: shell.account.profile, icon: "profile" },
+    ],
   },
   {
     id: "admissions",
@@ -201,6 +216,12 @@ export const fieldErrors = {
   semesterSlot: (label: string) => `${label} must be Semester 1, Semester 2 or Semester 3.`,
   semesterExists: (slot: string, year: number) => `${slot} ${year} is already configured.`,
   windowOverlap: (name: string) => `Those dates overlap ${name}.`,
+  pdf: (label: string) => `${label} must be a PDF file.`,
+  image: (label: string) => `${label} must be a JPG or PNG picture.`,
+  fileSize: (label: string, maxMb: number) => `${label} must be smaller than ${maxMb} MB.`,
+  storageOff: "File storage is not configured, so the college office must enable it first.",
+  currentPassword: "That is not your current password.",
+  passwordMismatch: "The two new passwords do not match.",
 };
 
 /** Enum value -> the wording a college administrator reads. */
@@ -315,6 +336,37 @@ export const labels = {
     DISABLED: "Disabled",
   },
 } as const;
+
+/**
+ * The two documents that belong to one programme. They are fields on the programme form
+ * itself, so the same wording is read by the form field and by the table cell.
+ */
+const programmeDocuments = {
+  curriculum: {
+    file: "Curriculum file (PDF)",
+    hint: "Optional. On an edit, leave this empty to keep the file already uploaded.",
+    none: "No curriculum uploaded yet.",
+    view: "View curriculum",
+  },
+  feeStructure: {
+    file: "Fee structure file (PDF)",
+    hint: "Optional. On an edit, leave this empty to keep the file already uploaded.",
+    none: "No fee structure uploaded yet.",
+    view: "View fee structure",
+  },
+};
+
+const profilePhoto = {
+  heading: "Profile photo",
+  description: "Shown next to your name at the top right of the portal.",
+  file: "Photo (JPG or PNG)",
+  hint: "A square picture reads best.",
+  button: "Save photo",
+  remove: "Remove photo",
+  removed: "Photo removed.",
+  none: "No photo uploaded yet.",
+  preview: "Your profile photo",
+};
 
 export const pages = {
   overview: {
@@ -520,22 +572,8 @@ export const pages = {
   programs: {
     title: "Programmes",
     description: "Courses on offer at this campus.",
-    curriculum: {
-      heading: "Curriculum upload",
-      program: "Programme",
-      file: "Curriculum file (PDF)",
-      button: "Upload curriculum",
-      saved: "Curriculum uploaded.",
-      none: "No curriculum uploaded yet.",
-    },
-    feeStructure: {
-      heading: "Fee structure upload",
-      program: "Programme",
-      file: "Fee structure file (PDF)",
-      button: "Upload fee structure",
-      saved: "Fee structure uploaded.",
-      none: "No fee structure uploaded yet.",
-    },
+    curriculum: programmeDocuments.curriculum,
+    feeStructure: programmeDocuments.feeStructure,
     columns: [
       { key: "code", label: "Code" },
       { key: "name", label: "Programme" },
@@ -547,6 +585,7 @@ export const pages = {
       { key: "students", label: "Enrolled", align: "end" },
       { key: "curriculum", label: "Curriculum" },
       { key: "feeStructure", label: "Fee structure" },
+      { key: "actions", label: common.actions, interactive: true },
     ] satisfies Column[],
     empty: {
       title: "No programmes yet",
@@ -564,8 +603,20 @@ export const pages = {
         { name: "durationMonths", label: "Duration (months)", type: "number", required: true, step: "1", hint: "Whole months only. A two-year course is 24." },
         { name: "minKcseGrade", label: "Minimum KCSE grade", type: "select", required: true, options: toOptions(labels.entryGrade) },
         { name: "description", label: "Description", type: "textarea", wide: true },
+        { name: "curriculum", label: programmeDocuments.curriculum.file, type: "file", accept: "application/pdf", hint: programmeDocuments.curriculum.hint, wide: true },
+        { name: "feeStructure", label: programmeDocuments.feeStructure.file, type: "file", accept: "application/pdf", hint: programmeDocuments.feeStructure.hint, wide: true },
       ] satisfies Field[],
       created: "Programme saved.",
+    },
+    edit: {
+      button: "Edit",
+      title: "Edit programme",
+      done: "Programme updated.",
+    },
+    remove: {
+      button: "Delete",
+      blocked:
+        "This programme already has applications, enrolments, exams, fees or timetable slots against it, so it cannot be deleted.",
     },
     settings: {
       button: "Programme settings",
@@ -589,6 +640,25 @@ export const pages = {
             { name: "code", label: "Code", type: "text", required: true, hint: "Short letters used at the start of every programme code, e.g. KNEC." },
           ] satisfies Field[],
         },
+        edit: {
+          button: "Edit",
+          title: "Edit awarding body",
+          fields: [
+            { name: "name", label: "Body name", type: "text", required: true },
+            {
+              name: "code",
+              label: "Code",
+              type: "text",
+              required: true,
+              hint: "Used on new programme codes only. Codes already issued keep their old letters.",
+            },
+          ] satisfies Field[],
+          done: "Awarding body updated.",
+        },
+        remove: {
+          button: "Delete",
+          blocked: "Programmes are still registered with this body, so it cannot be deleted.",
+        },
       },
       types: {
         heading: "Programme types",
@@ -607,6 +677,25 @@ export const pages = {
             { name: "code", label: "Code", type: "text", required: true, hint: "Short letters used in every programme code of this type, e.g. DIP." },
           ] satisfies Field[],
         },
+        edit: {
+          button: "Edit",
+          title: "Edit programme type",
+          fields: [
+            { name: "name", label: "Type name", type: "text", required: true },
+            {
+              name: "code",
+              label: "Code",
+              type: "text",
+              required: true,
+              hint: "Used on new programme codes only. Codes already issued keep their old letters.",
+            },
+          ] satisfies Field[],
+          done: "Programme type updated.",
+        },
+        remove: {
+          button: "Delete",
+          blocked: "Programmes of this type are already on file, so it cannot be deleted.",
+        },
       },
       cadences: {
         heading: "Fee payment type",
@@ -623,13 +712,17 @@ export const pages = {
             { name: "name", label: "Payment type name", type: "text", required: true, wide: true, placeholder: "Per semester" },
           ] satisfies Field[],
         },
-        rename: {
-          button: "Rename",
-          title: "Rename payment type",
+        edit: {
+          button: "Edit",
+          title: "Edit payment type",
           fields: [
             { name: "name", label: "New name", type: "text", required: true, wide: true },
           ] satisfies Field[],
           done: "Payment type renamed.",
+        },
+        remove: {
+          button: "Delete",
+          blocked: "Programmes are already billed on this payment type, so it cannot be deleted.",
         },
       },
     },
@@ -1086,6 +1179,47 @@ export const pages = {
       created: "Notice published.",
     },
     remove: { button: "Withdraw", done: "Notice withdrawn." },
+  },
+
+  profile: {
+    title: "Profile and settings",
+    description: "Your own picture, the address you sign in with and your password.",
+    photo: {
+      ...profilePhoto,
+      fields: [
+        {
+          name: "photo",
+          label: profilePhoto.file,
+          type: "file",
+          accept: "image/*",
+          required: true,
+          hint: profilePhoto.hint,
+          wide: true,
+        },
+      ] satisfies Field[],
+    },
+    email: {
+      heading: "Sign-in email",
+      description: "This is the address you type at the sign-in screen.",
+      current: "Current email",
+      fields: [
+        { name: "email", label: "New sign-in email", type: "email", required: true, wide: true },
+      ] satisfies Field[],
+      button: "Change email",
+      done: "Sign-in email updated.",
+    },
+    password: {
+      heading: "Login password",
+      description: "Your current password proves it is you; the new one is typed twice.",
+      fields: [
+        { name: "currentPassword", label: "Current password", type: "password", required: true },
+        { name: "password", label: "New password", type: "password", required: true },
+        { name: "confirmPassword", label: "Confirm new password", type: "password", required: true },
+      ] satisfies Field[],
+      button: "Change password",
+      done: "Password changed.",
+    },
+    signedInAs: (name: string, role: string) => `${name} · ${role}`,
   },
 } as const;
 

@@ -155,6 +155,8 @@ model User {
   email        String         @unique
   fullName     String
   phone        String?
+  /// The administrator's own picture, shown next to their name in the portal header.
+  photoUrl     String?
   passwordHash String
   role         Role           @default(STUDENT)
   status             Status         @default(ACTIVE)

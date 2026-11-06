@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { LogOutIcon } from "lucide-react";
+import { LogOutIcon, UserRoundIcon } from "lucide-react";
 
 import { DashboardMobileBar } from "@/components/dashboard/dashboard-mobile-bar";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
@@ -60,17 +60,6 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
                   </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <form action={signOut}>
-                  <ShimmerButton
-                    type="submit"
-                    className="w-full min-h-11 px-4 py-2.5 text-sm"
-                  >
-                    <LogOutIcon aria-hidden />
-                    {shell.account.signOut}
-                  </ShimmerButton>
-                </form>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarFooter>
         </Sidebar>
@@ -81,6 +70,27 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <span className="text-sm leading-tight font-medium sm:truncate">{shell.brandNote}</span>
             </div>
+
+            <Link
+              href="/dashboard/profile"
+              className="flex min-w-0 items-center gap-2 rounded-full py-1 ps-1 pe-3 outline-offset-2 hover:bg-eavi-plate focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <AccountBadge photoUrl={scope.photoUrl} />
+              <span className="sr-only max-w-[14rem] truncate text-sm font-medium sm:not-sr-only sm:block">
+                {scope.fullName}
+              </span>
+            </Link>
+
+            <form action={signOut}>
+              <ShimmerButton
+                type="submit"
+                aria-label={shell.account.signOut}
+                className="min-h-11 px-3 text-sm sm:px-4"
+              >
+                <LogOutIcon aria-hidden />
+                <span className="hidden sm:inline">{shell.account.signOut}</span>
+              </ShimmerButton>
+            </form>
           </header>
 
           <main id="main" className="flex-1 px-4 py-6 pb-24 sm:px-6 md:pb-6 lg:px-8">
@@ -91,5 +101,23 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
         </SidebarInset>
       </TooltipProvider>
     </SidebarProvider>
+  );
+}
+
+/**
+ * The administrator's own picture, kept next to the sign-out control so the account is
+ * reachable from any screen. The object host comes from the environment at runtime, so the
+ * stored file is shown as-is instead of through the image optimiser.
+ */
+function AccountBadge({ photoUrl }: { photoUrl: string | null }) {
+  return (
+    <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-eavi-plate ring-1 ring-eavi-border">
+      {photoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={photoUrl} alt="" className="size-full object-cover" />
+      ) : (
+        <UserRoundIcon aria-hidden className="size-4 text-eavi-muted-text" />
+      )}
+    </span>
   );
 }

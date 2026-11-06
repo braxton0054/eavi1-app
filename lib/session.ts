@@ -15,6 +15,8 @@ export type AdminScope = {
   fullName: string;
   email: string;
   role: (typeof ADMIN_ROLES)[number];
+  /** The administrator's own picture, read by the header and the profile screen. */
+  photoUrl: string | null;
   /** null means college-wide, which only a super admin can hold. */
   campusId: number | null;
   campusName: string;
@@ -63,6 +65,7 @@ export async function requireCollegeAdmin(): Promise<AdminScope> {
     fullName: user.fullName,
     email: user.email,
     role: user.role as (typeof ADMIN_ROLES)[number],
+    photoUrl: user.photoUrl ?? null,
     campusId: user.campusId,
     campusName: user.campus?.name ?? shell.allCampuses,
   };

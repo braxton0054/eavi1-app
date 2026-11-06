@@ -4,6 +4,11 @@ const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
     agentFeedback: true,
+    // A curriculum or fee-structure PDF is uploaded through a Server Action, and the
+    // default 1MB body cap rejects most real ones. Files are additionally capped in
+    // code at UPLOAD_MAX_BYTES, which leaves room for the multipart overhead this
+    // limit counts as well.
+    serverActions: { bodySizeLimit: "12mb" },
   },
   cacheComponents: false,
   // The Docker image ships only .next/standalone plus the traced files it needs.

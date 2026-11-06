@@ -4,9 +4,14 @@ import {
   createProgram,
   createProgramBody,
   createProgramType,
-  renameFeeCadence,
-  uploadCurriculum,
-  uploadFeeStructure,
+  deleteFeeCadence,
+  deleteProgram,
+  deleteProgramBody,
+  deleteProgramType,
+  updateFeeCadence,
+  updateProgram,
+  updateProgramBody,
+  updateProgramType,
 } from "@/lib/actions/college/programs";
 import {
   getDepartmentOptions,
@@ -15,11 +20,12 @@ import {
   getProgramBodies,
   getProgramOptions,
   getProgramRegistryOptions,
-  getProgramTypes,
   getPrograms,
+  getProgramTypes,
 } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
+import type { Column } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { DisclosureForm, RowForm, type OptionSets } from "@/components/dashboard/record-form";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
@@ -28,6 +34,23 @@ import { SettingsDialog } from "@/components/dashboard/settings-dialog";
 
 const copy = pages.programs;
 const settings = copy.settings;
+
+/** The row-level editor takes the same questions as the add form, so the field list is shared. */
+const programFields = copy.create.fields;
+
+type Program = Awaited<ReturnType<typeof getPrograms>>[number];
+
+/** Every answer the programme form collects, read back off the row being edited. */
+const programValues = (program: Program) => ({
+  name: program.name,
+  bodyId: program.bodyId,
+  typeId: program.typeId,
+  departmentId: program.departmentId,
+  cadenceId: program.cadenceId,
+  durationMonths: String(program.durationMonths),
+  minKcseGrade: program.minKcseGrade,
+  description: program.description ?? "",
+});
 
 export default async function ProgramsPage({
   searchParams,
@@ -68,19 +91,31 @@ export default async function ProgramsPage({
       duration: copy.duration(program.durationMonths),
       minKcseGrade: labels.entryGrade[program.minKcseGrade],
       students: String(program.enrolledCount),
-      curriculum: program.curriculumUrl ? (
-        <a href={program.curriculumUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-end px-2 text-sm font-medium text-eavi-primary-text underline underline-offset-4">
-          View
-        </a>
-      ) : (
-        <span className="text-eavi-muted-text">{copy.curriculum.none}</span>
-      ),
-      feeStructure: program.feeStructureUrl ? (
-        <a href={program.feeStructureUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-end px-2 text-sm font-medium text-eavi-primary-text underline underline-offset-4">
-          View
-        </a>
-      ) : (
-        <span className="text-eavi-muted-text">{copy.feeStructure.none}</span>
+      curriculum: documentCell(program.curriculumUrl, copy.curriculum),
+      feeStructure: documentCell(program.feeStructureUrl, copy.feeStructure),
+      actions: (
+        <div className="flex flex-wrap items-center gap-2">
+          <RowForm
+            id={`edit-program-${program.id}`}
+            button={copy.edit.button}
+            fields={programFields}
+            options={options}
+            values={programValues(program)}
+            hidden={{ programId: program.id }}
+            action={updateProgram}
+            submitLabel={common.update}
+            wide
+          />
+          <RowForm
+            id={`delete-program-${program.id}`}
+            button={copy.remove.button}
+            fields={[]}
+            hidden={{ programId: program.id }}
+            action={deleteProgram}
+            submitLabel={copy.remove.button}
+            tone="danger"
+          />
+        </div>
       ),
     },
   }));
@@ -88,26 +123,73 @@ export default async function ProgramsPage({
   // A body or a type is only ever retired by taking its programmes away, so the count is shown.
   const codedRows = (
     items: { id: string; code: string; name: string; programs: { id: string }[] }[],
+    section: "bodies" | "types",
   ): Row[] =>
-    items.map((item) => ({
-      id: item.id,
-      cells: { code: item.code, name: item.name, programs: String(item.programs.length) },
-    }));
+    items.map((item) => {
+      const edit = settings[section].edit;
+      const remove = settings[section].remove;
+      const hidden: Record<string, string> =
+        section === "bodies" ? { bodyId: item.id } : { typeId: item.id };
+      const action = section === "bodies" ? updateProgramBody : updateProgramType;
+
+      return {
+        id: item.id,
+        cells: {
+          code: item.code,
+          name: item.name,
+          programs: String(item.programs.length),
+          actions: (
+            <div className="flex flex-wrap items-center gap-2">
+              <RowForm
+                id={`edit-${section}-${item.id}`}
+                button={edit.button}
+                fields={edit.fields}
+                values={{ name: item.name, code: item.code }}
+                hidden={hidden}
+                action={action}
+                submitLabel={common.update}
+              />
+              <RowForm
+                id={`delete-${section}-${item.id}`}
+                button={remove.button}
+                fields={[]}
+                hidden={hidden}
+                action={section === "bodies" ? deleteProgramBody : deleteProgramType}
+                submitLabel={remove.button}
+                tone="danger"
+              />
+            </div>
+          ),
+        },
+      };
+    });
 
   const cadenceRows: Row[] = cadences.map((cadence) => ({
     id: cadence.id,
     cells: {
       name: cadence.name,
       programs: String(cadence.programs.length),
-      rename: (
-        <RowForm
-          id={`rename-cadence-${cadence.id}`}
-          button={settings.cadences.rename.button}
-          fields={settings.cadences.rename.fields}
-          action={renameFeeCadence}
-          submitLabel={common.save}
-          hidden={{ cadenceId: cadence.id }}
-        />
+      actions: (
+        <div className="flex flex-wrap items-center gap-2">
+          <RowForm
+            id={`edit-cadence-${cadence.id}`}
+            button={settings.cadences.edit.button}
+            fields={settings.cadences.edit.fields}
+            values={{ name: cadence.name }}
+            hidden={{ cadenceId: cadence.id }}
+            action={updateFeeCadence}
+            submitLabel={common.update}
+          />
+          <RowForm
+            id={`delete-cadence-${cadence.id}`}
+            button={settings.cadences.remove.button}
+            fields={[]}
+            hidden={{ cadenceId: cadence.id }}
+            action={deleteFeeCadence}
+            submitLabel={settings.cadences.remove.button}
+            tone="danger"
+          />
+        </div>
       ),
     },
   }));
@@ -138,7 +220,11 @@ export default async function ProgramsPage({
               {bodies.length === 0 ? (
                 <EmptyState body={settings.bodies.empty} icon="programs" />
               ) : (
-                <DataTable columns={settings.bodies.columns} rows={codedRows(bodies)} caption={settings.bodies.heading} />
+                <DataTable
+                  columns={withActions(settings.bodies.columns)}
+                  rows={codedRows(bodies, "bodies")}
+                  caption={settings.bodies.heading}
+                />
               )}
             </Panel>
 
@@ -156,7 +242,11 @@ export default async function ProgramsPage({
               {types.length === 0 ? (
                 <EmptyState body={settings.types.empty} icon="programs" />
               ) : (
-                <DataTable columns={settings.types.columns} rows={codedRows(types)} caption={settings.types.heading} />
+                <DataTable
+                  columns={withActions(settings.types.columns)}
+                  rows={codedRows(types, "types")}
+                  caption={settings.types.heading}
+                />
               )}
             </Panel>
 
@@ -174,7 +264,11 @@ export default async function ProgramsPage({
               {cadenceRows.length === 0 ? (
                 <EmptyState body={settings.cadences.empty} icon="accounts" />
               ) : (
-                <DataTable columns={cadenceColumns()} rows={cadenceRows} caption={settings.cadences.heading} />
+                <DataTable
+                  columns={withActions(settings.cadences.columns)}
+                  rows={cadenceRows}
+                  caption={settings.cadences.heading}
+                />
               )}
             </Panel>
 
@@ -205,7 +299,7 @@ export default async function ProgramsPage({
         id="new-program"
         button={copy.create.button}
         title={copy.create.title}
-        fields={copy.create.fields}
+        fields={programFields}
         options={options}
         action={createProgram}
         submitLabel={common.create}
@@ -218,99 +312,27 @@ export default async function ProgramsPage({
           <DataTable columns={copy.columns} rows={programRows} caption={copy.title} />
         )}
       </Panel>
-
-      <Panel title={copy.curriculum.heading}>
-        <form action={uploadCurriculum} className="grid gap-4 p-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium" htmlFor="curriculum-program">
-              {copy.curriculum.program}
-            </label>
-            <select
-              id="curriculum-program"
-              name="programId"
-              required
-              className="h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm"
-            >
-              <option value="">{common.none}</option>
-              {programOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium" htmlFor="curriculum-file">
-              {copy.curriculum.file}
-            </label>
-            <input
-              id="curriculum-file"
-              name="curriculum"
-              type="file"
-              accept="application/pdf"
-              required
-              className="h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1 file:text-eavi-primary-text"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <button
-              type="submit"
-              className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
-            >
-              {copy.curriculum.button}
-            </button>
-          </div>
-        </form>
-      </Panel>
-
-      <Panel title={copy.feeStructure.heading}>
-        <form action={uploadFeeStructure} className="grid gap-4 p-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium" htmlFor="feestructure-program">
-              {copy.feeStructure.program}
-            </label>
-            <select
-              id="feestructure-program"
-              name="programId"
-              required
-              className="h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm"
-            >
-              <option value="">{common.none}</option>
-              {programOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium" htmlFor="feestructure-file">
-              {copy.feeStructure.file}
-            </label>
-            <input
-              id="feestructure-file"
-              name="feeStructure"
-              type="file"
-              accept="application/pdf"
-              required
-              className="h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1 file:text-eavi-primary-text"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <button
-              type="submit"
-              className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
-            >
-              {copy.feeStructure.button}
-            </button>
-          </div>
-        </form>
-      </Panel>
     </div>
   );
 }
 
-/** The payment type table carries its own rename control, so its last column has no label. */
-function cadenceColumns() {
-  return [...settings.cadences.columns, { key: "rename", label: "" }];
+/** A programme's own document, read straight from its row rather than from a second screen. */
+function documentCell(url: string | null, document: { none: string; view: string }) {
+  if (!url) return <span className="text-eavi-muted-text">{document.none}</span>;
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex min-h-11 items-center justify-end px-2 text-sm font-medium text-eavi-primary-text underline underline-offset-4"
+    >
+      {document.view}
+    </a>
+  );
+}
+
+/** The registry tables each end in an unlabelled column of row-level Edit and Delete forms. */
+function withActions(columns: readonly Column[]): Column[] {
+  return [...columns, { key: "actions", label: "", interactive: true }];
 }

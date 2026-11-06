@@ -70,6 +70,21 @@ function Control({
     );
   }
 
+  if (field.type === "file") {
+    // A file input cannot be pre-filled by a browser, so an edit shows the current
+    // filename as text and only replaces it when a new one is picked.
+    return (
+      <input
+        id={htmlId}
+        name={field.name}
+        type="file"
+        accept={field.accept}
+        required={field.required}
+        className={cn(control, "text-sm file:mr-3 file:rounded-md file:border-0 file:bg-eavi-primary-soft file:px-3 file:py-1 file:text-eavi-primary-text")}
+      />
+    );
+  }
+
   return (
     <Input
       id={htmlId}
@@ -110,6 +125,9 @@ export function RecordForm({
     <form
       action={action}
       id={id}
+      // A file input is only carried in a multipart body, which the browser decides from
+      // this attribute rather than from the field list.
+      encType={fields.some((field) => field.type === "file") ? "multipart/form-data" : undefined}
       className={cn("grid gap-4", compact ? "grid-cols-1" : "sm:grid-cols-2")}
     >
       {Object.entries(hidden ?? {}).map(([name, value]) => (
@@ -183,8 +201,12 @@ export function RowForm(props: {
   action: FormAction;
   submitLabel: string;
   tone?: "neutral" | "danger";
+  /** Read-only lines under the submit button, e.g. the file already on the record. */
+  aside?: ReactNode;
+  /** Two columns in a wider card, for a row that carries a whole record's fields. */
+  wide?: boolean;
 }) {
-  const { button, tone = "neutral", ...form } = props;
+  const { button, tone = "neutral", wide = false, ...form } = props;
 
   return (
     <details>
@@ -198,8 +220,13 @@ export function RowForm(props: {
       >
         {button}
       </summary>
-      <div className="mt-2 w-72 max-w-full rounded-xl border border-eavi-border bg-eavi-card p-3 shadow-eavi-card">
-        <RecordForm {...form} compact submitLabel={form.submitLabel} />
+      <div
+        className={cn(
+          "mt-2 max-w-full rounded-xl border border-eavi-border bg-eavi-card p-3 shadow-eavi-card",
+          wide ? "w-[20rem] sm:w-[34rem]" : "w-72",
+        )}
+      >
+        <RecordForm {...form} compact={!wide} submitLabel={form.submitLabel} />
       </div>
     </details>
   );
