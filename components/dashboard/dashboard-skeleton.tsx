@@ -10,7 +10,7 @@ export function DashboardSkeleton() {
           <Skeleton key={index} className="h-8 w-full rounded-lg" />
         ))}
       </div>
-      <div className="flex-1 space-y-6 p-6">
+      <div className="flex-1 space-y-6 p-4 sm:p-6">
         <Skeleton className="h-16 w-full rounded-xl" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }, (_, index) => (

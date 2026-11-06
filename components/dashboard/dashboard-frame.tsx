@@ -2,8 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { LogOutIcon } from "lucide-react";
 
+import { DashboardMobileBar } from "@/components/dashboard/dashboard-mobile-bar";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
-import { ThemeToggle } from "@/components/home/theme-toggle";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { signOut } from "@/lib/actions/auth";
 import { roles, shell } from "@/lib/content/dashboard";
 import type { AdminScope } from "@/lib/session";
@@ -35,8 +36,8 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
                 <Image src="/logo.png" alt="" width={44} height={44} className="size-11" />
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">{shell.brandName}</span>
-                <span className="block truncate text-xs text-eavi-muted-text">
+                <span className="block text-sm leading-tight font-semibold sm:truncate">{shell.brandName}</span>
+                <span className="block text-xs leading-tight text-eavi-muted-text sm:truncate">
                   {scope.campusName}
                 </span>
               </span>
@@ -50,10 +51,10 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
           <SidebarFooter className="border-t border-eavi-border">
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton size="lg" asChild>
-                  <div className="flex-col items-start gap-0.5">
-                    <span className="truncate text-sm font-medium">{scope.fullName}</span>
-                    <span className="truncate text-xs text-eavi-muted-text">
+                <SidebarMenuButton size="lg" asChild className="max-md:h-auto">
+                  <div className="flex w-full min-w-0 flex-col items-start gap-0.5">
+                    <span className="text-sm leading-tight font-medium sm:truncate">{scope.fullName}</span>
+                    <span className="text-xs leading-tight text-eavi-muted-text sm:truncate">
                       {roles[scope.role]} · {scope.email}
                     </span>
                   </div>
@@ -61,13 +62,13 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <form action={signOut}>
-                  <button
+                  <ShimmerButton
                     type="submit"
-                    className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2"
+                    className="w-full min-h-11 px-4 py-2.5 text-sm"
                   >
-                    <LogOutIcon aria-hidden className="size-4" />
+                    <LogOutIcon aria-hidden />
                     {shell.account.signOut}
-                  </button>
+                  </ShimmerButton>
                 </form>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -75,17 +76,18 @@ export function DashboardFrame({ children, scope }: { children: React.ReactNode;
         </Sidebar>
 
         <SidebarInset className="min-w-0">
-          <header className="eavi-glass sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-eavi-border px-4 sm:px-6">
+          <header className="eavi-glass sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-eavi-border px-4 text-eavi-on-bg sm:px-6">
             <SidebarTrigger className="-ms-2" />
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <span className="truncate text-sm font-medium">{shell.brandNote}</span>
+              <span className="text-sm leading-tight font-medium sm:truncate">{shell.brandNote}</span>
             </div>
-            <ThemeToggle />
           </header>
 
-          <main id="main" className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <main id="main" className="flex-1 px-4 py-6 pb-24 sm:px-6 md:pb-6 lg:px-8">
             {children}
           </main>
+
+          <DashboardMobileBar />
         </SidebarInset>
       </TooltipProvider>
     </SidebarProvider>
