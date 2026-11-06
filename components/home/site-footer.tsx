@@ -26,7 +26,7 @@ export function SiteFooter() {
         </div>
 
         <nav aria-label={footer.quickLinks} className="flex flex-col gap-2 lg:col-span-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-eavi-band-muted">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-eavi-band-muted">
             {footer.quickLinks}
           </p>
           {nav.links.map((link) => (
@@ -43,7 +43,7 @@ export function SiteFooter() {
         </nav>
 
         <div className="flex flex-col gap-2 lg:col-span-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-eavi-band-muted">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-eavi-band-muted">
             {footer.campusesHeading}
           </p>
           {campuses.map((campus) => (
@@ -60,7 +60,7 @@ export function SiteFooter() {
         </div>
 
         <div className="flex flex-col gap-3 lg:col-span-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-eavi-band-muted">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-eavi-band-muted">
             {footer.contactHeading}
           </p>
           <ul className="flex flex-col gap-2.5">
@@ -79,7 +79,7 @@ export function SiteFooter() {
             ))}
           </ul>
 
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-eavi-band-muted">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-eavi-band-muted">
             {footer.socialHeading}
           </p>
           {footer.socials.length > 0 ? (
@@ -111,7 +111,7 @@ export function SiteFooter() {
           <span>{footer.privacy}</span>
           <span aria-hidden>·</span>
           <span>{footer.terms}</span>
-          <span className="rounded border border-dashed border-eavi-band-muted/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]">
+          <span className="rounded border border-dashed border-eavi-band-muted/50 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em]">
             {footer.legalPending}
           </span>
         </p>

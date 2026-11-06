@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRightIcon, MessageCircleIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { Reveal } from "@/components/home/reveal";
 import { ctaSection, contactSection, mainCampus, site } from "@/lib/content/home";
 
@@ -25,21 +25,18 @@ export function CtaBand() {
 
         <Reveal delay={0.08} className="w-full sm:w-auto">
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-            <Button
+            <ShimmerButton
               asChild
-              size="lg"
-              className="w-full rounded-full bg-eavi-plate text-eavi-primary-text hover:bg-eavi-primary-soft hover:text-eavi-primary-text sm:w-auto"
+              className="w-full px-8 py-4 text-base sm:w-auto"
             >
               <Link href="/apply">
                 {ctaSection.apply}
                 <ArrowRightIcon data-icon="inline-end" />
               </Link>
-            </Button>
-            <Button
+            </ShimmerButton>
+            <ShimmerButton
               asChild
-              size="lg"
-              variant="outline"
-              className="w-full rounded-full border-eavi-band-muted/50 bg-transparent text-eavi-band-foreground hover:bg-eavi-band-muted/15 hover:text-eavi-band-foreground sm:w-auto"
+              className="w-full border-eavi-band-muted/50 px-8 py-4 text-base sm:w-auto"
             >
               <a
                 href={site.whatsapp.href}
@@ -49,7 +46,7 @@ export function CtaBand() {
                 <MessageCircleIcon data-icon="inline-start" />
                 {ctaSection.whatsapp(mainCampus.name)}
               </a>
-            </Button>
+            </ShimmerButton>
           </div>
         </Reveal>
       </div>

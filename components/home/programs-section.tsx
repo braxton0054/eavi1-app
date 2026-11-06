@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { cn } from "cn";
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import {
   Card,
   CardContent,
@@ -15,7 +15,7 @@ import { ContentPlaceholder } from "@/components/home/content-placeholder";
 import { Section, SectionHeader } from "@/components/home/section";
 import { pending, programsSection } from "@/lib/content/home";
 
-const filterClass = "rounded-full px-5";
+const filterClass = "px-5";
 
 export function ProgramsSection() {
   const levels = useMemo(
@@ -38,6 +38,7 @@ export function ProgramsSection() {
         eyebrow={programsSection.eyebrow}
         heading={programsSection.heading}
         subheading={programsSection.subheading}
+        onBackground
       />
 
       {programsSection.items.length === 0 ? (
@@ -46,7 +47,7 @@ export function ProgramsSection() {
             {[0, 1, 2].map((slot) => (
               <div
                 key={slot}
-                className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-border bg-eavi-primary-soft/50 px-4 text-center text-xs font-medium text-eavi-muted-text"
+                className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-border bg-eavi-primary-soft px-4 text-center text-xs font-medium text-eavi-muted-text"
               >
                 {pending.label}
               </div>
@@ -66,16 +67,15 @@ export function ProgramsSection() {
             className="mt-6 flex flex-wrap gap-2"
           >
             {levels.map((level) => (
-              <Button
+              <ShimmerButton
                 key={level}
                 type="button"
-                variant={level === active ? "default" : "outline"}
                 aria-pressed={level === active}
                 onClick={() => setActive(level)}
-                className={cn(filterClass, level === active && "hover:bg-eavi-fill-hover")}
+                className={cn(filterClass)}
               >
                 {level}
-              </Button>
+              </ShimmerButton>
             ))}
           </div>
 
@@ -94,14 +94,14 @@ export function ProgramsSection() {
                       {program.description}
                     </p>
                     <div className="mt-auto flex gap-2">
-                      <Button asChild variant="outline" className="rounded-full">
+                      <ShimmerButton asChild>
                         <Link href="/apply">{programsSection.apply}</Link>
-                      </Button>
-                      <Button asChild variant="ghost" className="rounded-full">
+                      </ShimmerButton>
+                      <ShimmerButton asChild>
                         <Link href={programsSection.learnMoreHref}>
                           {programsSection.learnMore}
                         </Link>
-                      </Button>
+                      </ShimmerButton>
                     </div>
                   </CardContent>
                 </Card>

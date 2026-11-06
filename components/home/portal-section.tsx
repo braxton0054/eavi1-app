@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRightIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import {
   Card,
   CardContent,
@@ -20,6 +20,7 @@ export function PortalSection() {
         id="portal-heading"
         heading={portalSection.heading}
         subheading={portalSection.subheading}
+        onBackground
       />
 
       <div className="mt-6 grid items-stretch gap-4 sm:mt-8 sm:grid-cols-2 lg:grid-cols-4">
@@ -36,16 +37,12 @@ export function PortalSection() {
                   <CardDescription>{role.line}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="w-full rounded-full font-semibold"
-                  >
+                  <ShimmerButton asChild className="w-full font-semibold">
                     <Link href={portalSection.loginHref(role.role)}>
                       {portalSection.openPortal}
                       <ArrowRightIcon data-icon="inline-end" />
                     </Link>
-                  </Button>
+                  </ShimmerButton>
                 </CardContent>
               </Card>
             </Reveal>

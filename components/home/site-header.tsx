@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { SiteLogo } from "@/components/home/site-logo";
-import { ThemeToggle } from "@/components/home/theme-toggle";
 import { nav, site } from "@/lib/content/home";
 
 const menuButtonClass =
@@ -41,7 +40,7 @@ export function SiteHeader() {
               href={link.href}
               className={cn(
                 menuButtonClass,
-                "text-muted-foreground hover:bg-eavi-primary-soft hover:text-eavi-primary-text",
+                "text-eavi-on-bg hover:bg-eavi-primary-soft hover:text-eavi-primary-text",
               )}
             >
               {link.label}
@@ -50,7 +49,6 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <ThemeToggle />
           <Button
             asChild
             variant="outline"
@@ -82,7 +80,7 @@ export function SiteHeader() {
       <div
         id="site-menu"
         hidden={!open}
-        className="border-t border-border bg-background lg:hidden"
+        className="border-t border-border bg-eavi-card lg:hidden"
       >
         <nav
           aria-label={nav.ariaLabel}

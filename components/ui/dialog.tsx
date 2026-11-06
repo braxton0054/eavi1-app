@@ -4,7 +4,7 @@ import * as React from "react"
 import { cn } from "cn"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
-import { Button } from "@/components/ui/button"
+import { ShimmerButton } from "@/components/magicui/shimmer-button"
 import { XIcon } from "lucide-react"
 
 function Dialog({
@@ -39,7 +39,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-50 bg-black/45 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -69,15 +69,11 @@ function DialogContent({
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
-            <Button
-              variant="ghost"
-              className="absolute top-2 right-2"
-              size="icon-sm"
-            >
+            <ShimmerButton className="absolute -top-2 -right-2 size-11 px-0 py-0 md:size-7 md:top-2 md:right-2">
               <XIcon
               />
               <span className="sr-only">Close</span>
-            </Button>
+            </ShimmerButton>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -115,7 +111,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <ShimmerButton>Close</ShimmerButton>
         </DialogPrimitive.Close>
       )}
     </div>

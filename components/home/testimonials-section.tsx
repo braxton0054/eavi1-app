@@ -2,7 +2,7 @@
 
 import { ChevronLeftIcon, ChevronRightIcon, QuoteIcon } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { ContentPlaceholder } from "@/components/home/content-placeholder";
 import { Section, SectionHeader } from "@/components/home/section";
 import { pending, testimonialsSection } from "@/lib/content/home";
@@ -57,24 +57,22 @@ export function TestimonialsSection() {
           </figure>
 
           <div className="flex items-center gap-3">
-            <Button
+            <ShimmerButton
               type="button"
-              size="icon"
-              variant="outline"
               onClick={() => step(-1)}
               aria-label={testimonialsSection.previous}
+              className="size-11 px-0"
             >
               <ChevronLeftIcon />
-            </Button>
-            <Button
+            </ShimmerButton>
+            <ShimmerButton
               type="button"
-              size="icon"
-              variant="outline"
               onClick={() => step(1)}
               aria-label={testimonialsSection.next}
+              className="size-11 px-0"
             >
               <ChevronRightIcon />
-            </Button>
+            </ShimmerButton>
             <p className="text-xs font-medium text-muted-foreground tabular-nums">
               {testimonialsSection.slidePosition(index + 1, total)}
             </p>

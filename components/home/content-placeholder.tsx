@@ -18,11 +18,11 @@ export function ContentPlaceholder({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-dashed border-border bg-eavi-primary-soft/60 p-5",
+        "rounded-2xl border border-dashed border-border bg-eavi-primary-soft p-5",
         className,
       )}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-eavi-primary-text">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-eavi-primary-text">
         {label}
       </p>
       {fields && fields.length > 0 && (
@@ -30,7 +30,7 @@ export function ContentPlaceholder({
           {fields.map((field) => (
             <li
               key={field}
-              className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-eavi-muted-text"
+              className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-eavi-muted-text"
             >
               {field}
             </li>

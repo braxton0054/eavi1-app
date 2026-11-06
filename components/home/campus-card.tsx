@@ -4,7 +4,7 @@ import {
   MessageCircleIcon,
   PhoneIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import {
   Card,
   CardContent,
@@ -46,7 +46,7 @@ export function CampusCard({ campus }: { campus: Campus }) {
         <dl className="flex flex-col gap-2.5">
           {rows(campus).map((row) => (
             <div key={row.label} className="flex flex-col gap-0.5">
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 {row.label}
               </dt>
               <dd className="text-sm leading-6 font-medium">
@@ -78,7 +78,7 @@ export function CampusCard({ campus }: { campus: Campus }) {
 
         <div className="mt-auto flex aspect-[16/7] flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-eavi-primary-soft/50 px-3 text-center">
           <MapPinIcon className="size-5 text-eavi-primary-text" aria-hidden />
-          <p className="text-[11px] leading-4 font-medium text-eavi-muted-text">
+          <p className="text-xs leading-4 font-medium text-eavi-muted-text">
             {campusesSection.mapLabel(campus.name)} — {campusesSection.mapPending}
           </p>
         </div>
@@ -86,22 +86,14 @@ export function CampusCard({ campus }: { campus: Campus }) {
 
       <CardFooter className="flex-col items-stretch gap-2">
         <div className="flex w-full gap-2">
-          <Button
-            asChild
-            variant="outline"
-            className="flex-1 rounded-full"
-          >
+          <ShimmerButton asChild className="flex-1">
             <a href={`tel:${campus.tel}`}>
               {campusesSection.call}
               <span className="sr-only"> {campus.name}</span>
             </a>
-          </Button>
+          </ShimmerButton>
           {onWhatsApp && (
-            <Button
-              asChild
-              variant="secondary"
-              className="flex-1 rounded-full text-eavi-secondary-text"
-            >
+            <ShimmerButton asChild className="flex-1">
               <a
                 href={`https://wa.me/${campus.tel.replace(/[^0-9]/g, "")}`}
                 target="_blank"
@@ -110,7 +102,7 @@ export function CampusCard({ campus }: { campus: Campus }) {
                 <MessageCircleIcon data-icon="inline-start" />
                 {campusesSection.whatsapp}
               </a>
-            </Button>
+            </ShimmerButton>
           )}
         </div>
         <a

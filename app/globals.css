@@ -2,61 +2,67 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* next-themes owns the theme: it puts `dark` on <html> for the manual dark choice and
-   for the system choice, so the class is the single signal both modes follow. */
-@custom-variant dark (&:where(.dark, .dark *));
-
+/* One theme: #800080 everywhere the surface shows — page and cards are the same
+   purple, so cards read as bordered panels rather than a second colour, and nothing
+   emits white light. #800080 is dark enough (relative luminance .0615) that every text
+   token has room: AA needs .4516, and the lightest token in use sits at .89. Ratios
+   below are measured on the purple. It lives on :root so that Radix dialogs, sheets,
+   menus and tooltips — which mount on <body>, outside every layout wrapper —
+   inherit it too. */
 :root {
-  --eavi-bg: #ffffff;
-  --eavi-text: #1a1420;
-  --eavi-card: #ffffff;
-  --eavi-primary: #8e2a9e;
-  --eavi-primary-light: #b84fc4;
-  --eavi-primary-dark: #6b1f78;
-  --eavi-secondary: #2f8c55;
-  --eavi-muted: #f3eef5;
-  --eavi-border: #e5dce8;
+  --eavi-bg: #800080;
+  --eavi-card: #800080;
+  --eavi-text: #f5f1f8; /* 8.44 */
+  --eavi-muted: #891289; /* raised surface: table heads, ghost chips — text 7.49 */
+  --eavi-border: #9e3d9e;
+  --eavi-primary: #9c3f9c;
+  --eavi-secondary: #5c9b78;
 
-  /* Text and fill shades are picked so every pairing clears WCAG AA. */
-  --eavi-primary-text: #8e2a9e;
-  --eavi-secondary-text: #256e43;
-  --eavi-fill: #8e2a9e;
-  --eavi-fill-hover: #6b1f78;
-  --eavi-on-fill: #ffffff;
-  --eavi-muted-text: #5c5563;
-  --eavi-destructive: #b3261e;
+  --eavi-primary-text: #eadaf2; /* links, accents, focus ring — 7.09 */
+  --eavi-secondary-text: #adeec9; /* 7.11 */
+  --eavi-fill: #c3b0cf;
+  --eavi-fill-hover: #d0bfd9;
+  --eavi-on-fill: #2c1b38; /* 7.90 on fill */
+  --eavi-on-bg: #f5f1f8;
+  --eavi-muted-text: #dccfe4; /* 6.32 */
+  --eavi-destructive: #ffd0cb; /* 6.79 */
 
-  /* Tinted surface for chips, icon badges and section panels. Each pairing against
-     --eavi-text and --eavi-primary-text clears AA (5.99:1 and 15.31:1). */
-  --eavi-primary-soft: #f4e9f6;
-  /* Green is a confirmation color only, so its fill needs the darker shade: white
-     text on --eavi-secondary (#2f8c55) is only 4.2:1, on this it is 6.2:1. */
-  --eavi-success-fill: #256e43;
-  --eavi-on-success: #ffffff;
-  /* Portal status hues. Slate-teal and blush are brand accents and stay text-only —
-     they never become fills. Ratios measured on --eavi-card and --eavi-primary-soft. */
-  --eavi-info-text: #3d6f70;
-  --eavi-warn-text: #9c4a50;
-  --eavi-info-soft: color-mix(in oklab, #7fa3a4 16%, var(--eavi-card));
-  --eavi-warn-soft: color-mix(in oklab, #dfbdbe 24%, var(--eavi-card));
-  --eavi-success-soft: color-mix(in oklab, var(--eavi-secondary) 14%, var(--eavi-card));
-  --eavi-danger-soft: color-mix(in oklab, var(--eavi-destructive) 12%, var(--eavi-card));
-  --eavi-mesh-primary: color-mix(in oklab, var(--eavi-primary) 16%, transparent);
-  --eavi-mesh-secondary: color-mix(in oklab, var(--eavi-secondary) 12%, transparent);
-  /* Deep plum band for the closing CTA and the footer; white body text on it is 15.9:1. */
-  --eavi-band: #2a1030;
-  --eavi-band-foreground: #f6eff8;
-  --eavi-band-muted: #d9c7e0;
-  --eavi-shadow-tint: #6b1f78;
-  /* The logo artwork assumes a light plate, so it keeps one in both themes. */
+  /* Tinted surface for chips, icon badges and section panels: the accent dropped into
+     the page purple, so tints stay one hue and light text keeps clearing AA. */
+  --eavi-primary-soft: color-mix(in oklab, var(--eavi-primary-text) 20%, var(--eavi-card));
+  --eavi-success-fill: #a7d8bc;
+  --eavi-on-success: #14301f; /* 8.96 on the success fill */
+  /* Status hues. Slate-teal and blush are accents and stay text-only — they never
+     become fills. Ratios measured on --eavi-card and the soft tints. */
+  --eavi-info-text: #bbdfe1; /* 6.62 */
+  --eavi-warn-text: #f5cfd2; /* 6.61 */
+  --eavi-info-soft: color-mix(in oklab, var(--eavi-info-text) 20%, var(--eavi-card));
+  --eavi-warn-soft: color-mix(in oklab, var(--eavi-warn-text) 20%, var(--eavi-card));
+  --eavi-success-soft: color-mix(in oklab, var(--eavi-secondary-text) 20%, var(--eavi-card));
+  --eavi-danger-soft: color-mix(in oklab, var(--eavi-destructive) 20%, var(--eavi-card));
+  --eavi-mesh-primary: color-mix(in oklab, var(--eavi-primary) 26%, transparent);
+  --eavi-mesh-secondary: color-mix(in oklab, var(--eavi-secondary) 18%, transparent);
+  --eavi-band: #5c005c;
+  --eavi-band-foreground: #f5f1f8;
+  --eavi-band-muted: #dccfe4;
+  /* Tooltips and their arrows need a surface that separates from a same-colour page,
+     so they keep a deep ink chip rather than a tint of the palette. */
+  --eavi-tooltip: #2e0b33;
+  --eavi-tooltip-foreground: #f5f1f8; /* 15.53 */
+  /* The logo artwork assumes a light plate, so it always keeps one. */
   --eavi-plate: #ffffff;
+  /* Neumorphic lighting. With one purple on every surface, depth has to come from the
+     edges: a lit top-left rim and a cast shadow to the bottom-right, so a card reads as
+     extruded from the page rather than printed on it. */
+  --eavi-neum-hi: #a95aa9;
+  --eavi-neum-lo: #40003f;
 
   /* shadcn/ui semantic tokens, pointed at the brand palette above. */
   --background: var(--eavi-bg);
   --foreground: var(--eavi-text);
   --card: var(--eavi-card);
   --card-foreground: var(--eavi-text);
-  --popover: var(--eavi-card);
+  --popover: var(--eavi-muted);
   --popover-foreground: var(--eavi-text);
   --primary: var(--eavi-fill);
   --primary-foreground: var(--eavi-on-fill);
@@ -67,15 +73,15 @@
   --accent: var(--eavi-muted);
   --accent-foreground: var(--eavi-text);
   --destructive: var(--eavi-destructive);
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: #3a1e24;
   --border: var(--eavi-border);
   --input: var(--eavi-border);
   --ring: var(--eavi-primary-text);
-  --chart-1: #8e2a9e;
-  --chart-2: #2f8c55;
-  --chart-3: #b84fc4;
-  --chart-4: #4caf7d;
-  --chart-5: #6b1f78;
+  --chart-1: #eadaf2;
+  --chart-2: #adeec9;
+  --chart-3: #c3b0cf;
+  --chart-4: #ffd0cb;
+  --chart-5: #bbdfe1;
   --radius: 0.75rem;
   --sidebar: var(--eavi-card);
   --sidebar-foreground: var(--eavi-text);
@@ -92,8 +98,6 @@
   --color-eavi-text: var(--eavi-text);
   --color-eavi-card: var(--eavi-card);
   --color-eavi-primary: var(--eavi-primary);
-  --color-eavi-primary-light: var(--eavi-primary-light);
-  --color-eavi-primary-dark: var(--eavi-primary-dark);
   --color-eavi-secondary: var(--eavi-secondary);
   --color-eavi-muted: var(--eavi-muted);
   --color-eavi-border: var(--eavi-border);
@@ -102,6 +106,7 @@
   --color-eavi-fill: var(--eavi-fill);
   --color-eavi-fill-hover: var(--eavi-fill-hover);
   --color-eavi-on-fill: var(--eavi-on-fill);
+  --color-eavi-on-bg: var(--eavi-on-bg);
   --color-eavi-muted-text: var(--eavi-muted-text);
   --color-eavi-destructive: var(--eavi-destructive);
   --color-eavi-primary-soft: var(--eavi-primary-soft);
@@ -116,6 +121,8 @@
   --color-eavi-band: var(--eavi-band);
   --color-eavi-band-foreground: var(--eavi-band-foreground);
   --color-eavi-band-muted: var(--eavi-band-muted);
+  --color-eavi-tooltip: var(--eavi-tooltip);
+  --color-eavi-tooltip-foreground: var(--eavi-tooltip-foreground);
   --color-eavi-plate: var(--eavi-plate);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -160,35 +167,6 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-.dark {
-  --eavi-bg: #17121c;
-  --eavi-text: #f3eef5;
-  --eavi-card: #201a28;
-  --eavi-primary: #b84fc4;
-  --eavi-secondary: #4caf7d;
-  --eavi-muted: #241d2c;
-  --eavi-border: #33283b;
-
-  --eavi-primary-text: #cf7ad8;
-  --eavi-secondary-text: #4caf7d;
-  --eavi-fill: #a845b6;
-  --eavi-fill-hover: #ad4abb;
-  --eavi-on-fill: #ffffff;
-  --eavi-muted-text: #b9aec1;
-  --eavi-destructive: #f2a9a4;
-
-  --eavi-primary-soft: #2b1f33;
-  --eavi-success-fill: #256e43;
-  --eavi-info-text: #8fbfc0;
-  --eavi-warn-text: #e0a5a9;
-  --eavi-mesh-primary: color-mix(in oklab, var(--eavi-primary) 22%, transparent);
-  --eavi-mesh-secondary: color-mix(in oklab, var(--eavi-secondary) 14%, transparent);
-  --eavi-shadow-tint: #05030a;
-  --eavi-band: #120c16;
-  --eavi-band-foreground: #f3eef5;
-  --eavi-band-muted: #b9aec1;
 }
 
 body {
@@ -255,6 +233,50 @@ body {
   backdrop-filter: blur(14px) saturate(1.2);
 }
 
+/* Skeuomorphic control face: a sheen across the glass, a rim of light on the top edge,
+   and a bevel that flips to carved while pressed, so a button feels like it moves. */
+@utility eavi-control {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in oklab, white 16%, transparent),
+    transparent 52%,
+    color-mix(in oklab, black 14%, transparent)
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, white 28%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, black 24%, transparent),
+    0 3px 8px -3px color-mix(in oklab, var(--eavi-neum-lo) 90%, transparent);
+  &:active {
+    background-image: linear-gradient(
+      to bottom,
+      color-mix(in oklab, black 12%, transparent),
+      transparent 60%
+    );
+    box-shadow:
+      inset 0 2px 6px color-mix(in oklab, black 42%, transparent),
+      inset 0 -1px 0 color-mix(in oklab, white 10%, transparent);
+  }
+}
+
+/* The dome. A card and the page are the same colour, so the surface itself carries the
+   light: brightest just under the top edge, falling back into shade at the bottom. */
+@utility eavi-relief {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in oklab, white 8%, transparent),
+    transparent 46%,
+    color-mix(in oklab, black 9%, transparent)
+  );
+}
+
+/* Recessed wells: fields and trays sit *into* the surface instead of on it, which is
+   what tells them apart from the cards that hold them. */
+@utility eavi-carved {
+  box-shadow:
+    inset 0 2px 6px color-mix(in oklab, var(--eavi-neum-lo) 80%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, var(--eavi-neum-hi) 38%, transparent);
+}
+
 /* Hover lift for cards; visitors who ask for reduced motion get no movement. */
 @utility eavi-lift {
   transition:
@@ -269,18 +291,26 @@ body {
 }
 
 @theme {
-  /* Shadows are brand-tinted so lifted cards read purple, not grey. Dark mode swaps
-     the tint to near-black, because a purple glow on a plum card just looks muddy. */
-  --shadow-eavi-card: 0 1px 2px
-      color-mix(in oklab, var(--eavi-shadow-tint) 12%, transparent),
-    0 12px 28px -18px color-mix(in oklab, var(--eavi-shadow-tint) 45%, transparent);
-  --shadow-eavi-lift: 0 2px 4px
-      color-mix(in oklab, var(--eavi-shadow-tint) 14%, transparent),
-    0 22px 44px -20px color-mix(in oklab, var(--eavi-shadow-tint) 55%, transparent);
+  /* Cast pair plus bevel: the outer blur separates a card from an identical page,
+     the inner rim catches the light along the top edge and darkens the bottom one. */
+  --shadow-eavi-card:
+    inset 0 1px 0 color-mix(in oklab, var(--eavi-neum-hi) 75%, transparent),
+    inset 0 -2px 3px color-mix(in oklab, var(--eavi-neum-lo) 55%, transparent),
+    14px 18px 34px -16px color-mix(in oklab, var(--eavi-neum-lo) 95%, transparent),
+    -10px -10px 28px -12px color-mix(in oklab, var(--eavi-neum-hi) 55%, transparent);
+  --shadow-eavi-lift:
+    inset 0 1px 0 color-mix(in oklab, var(--eavi-neum-hi) 65%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, var(--eavi-neum-lo) 50%, transparent),
+    16px 20px 38px -16px color-mix(in oklab, var(--eavi-neum-lo) 92%, transparent),
+    -10px -10px 26px -12px color-mix(in oklab, var(--eavi-neum-hi) 48%, transparent);
 
   --animate-eavi-load: eavi-load 1.5s cubic-bezier(0.65, 0.05, 0.36, 0.95) infinite;
   --animate-eavi-rise: eavi-rise 0.5s ease-out both;
   --animate-eavi-fade: eavi-fade 1.8s ease-in-out infinite;
+
+  /* MagicUI ShimmerButton drives these two; the registry ships the component but not the keyframes. */
+  --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+  --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
 
   @keyframes eavi-load {
     0% {
@@ -309,6 +339,18 @@ body {
     }
     50% {
       opacity: 1;
+    }
+  }
+
+  @keyframes shimmer-slide {
+    to {
+      transform: translate(calc(100cqw - 100%), 0);
+    }
+  }
+
+  @keyframes spin-around {
+    to {
+      transform: translateZ(0) rotate(360deg);
     }
   }
 }

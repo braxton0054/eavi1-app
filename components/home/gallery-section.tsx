@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { CameraIcon, XIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { ContentPlaceholder } from "@/components/home/content-placeholder";
 import { Section, SectionHeader } from "@/components/home/section";
 import { gallerySection, pending } from "@/lib/content/home";
@@ -26,6 +26,7 @@ export function GallerySection() {
         eyebrow={gallerySection.eyebrow}
         heading={gallerySection.heading}
         subheading={gallerySection.subheading}
+        onBackground
       />
 
       {gallerySection.items.length === 0 ? (
@@ -33,9 +34,9 @@ export function GallerySection() {
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {[0, 1, 2, 3, 4, 5].map((slot) => (
               <li key={slot}>
-                <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-eavi-primary-soft/50">
+                <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-eavi-primary-soft">
                   <CameraIcon className="size-5 text-eavi-primary-text" aria-hidden />
-                  <p className="px-3 text-center text-[11px] leading-4 text-eavi-muted-text">
+                  <p className="px-3 text-center text-xs leading-4 text-eavi-muted-text">
                     {pending.label}
                   </p>
                 </div>
@@ -53,10 +54,10 @@ export function GallerySection() {
           <ul className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:grid-cols-3">
             {gallerySection.items.map((photo) => (
               <li key={photo.src}>
-                <Button
+                <ShimmerButton
                   type="button"
-                  variant="ghost"
-                  className="h-auto w-auto rounded-2xl p-0 hover:bg-transparent"
+                  borderRadius="1rem"
+                  className="h-auto w-auto p-0"
                   onClick={() => open(photo)}
                   aria-label={gallerySection.openImage(photo.caption)}
                 >
@@ -68,8 +69,8 @@ export function GallerySection() {
                     loading="lazy"
                     className="aspect-[4/3] w-full rounded-2xl object-cover ring-1 ring-foreground/10"
                   />
-                </Button>
-                <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                </ShimmerButton>
+                <p className="mt-1.5 text-xs leading-5 text-eavi-on-bg">
                   {photo.caption}
                 </p>
               </li>
@@ -92,16 +93,14 @@ export function GallerySection() {
                   className="max-h-[70vh] w-auto max-w-[90vw] object-contain"
                 />
                 <p className="px-4 py-3 text-sm">{active.caption}</p>
-                <Button
+                <ShimmerButton
                   type="button"
-                  size="icon"
-                  variant="ghost"
                   onClick={() => dialogRef.current?.close()}
                   aria-label={gallerySection.closeImage}
-                  className="absolute top-2 right-2"
+                  className="absolute top-2 right-2 size-11 px-0 py-0"
                 >
                   <XIcon />
-                </Button>
+                </ShimmerButton>
               </div>
             )}
           </dialog>

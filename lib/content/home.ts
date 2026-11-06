@@ -62,12 +62,6 @@ export const nav = {
   apply: "Apply Now",
   menu: "Open menu",
   closeMenu: "Close menu",
-  theme: {
-    label: "Theme",
-    light: "Light",
-    dark: "Dark",
-    system: "System",
-  },
 } as const;
 
 export const hero = {

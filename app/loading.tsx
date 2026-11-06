@@ -21,18 +21,18 @@ export default function Loading() {
         </div>
 
         <div className="flex flex-col items-center gap-1 text-center">
-          <h1 className="font-display text-[1.75rem] font-semibold leading-tight tracking-tight text-balance sm:text-4xl">
+          <h1 className="font-display text-[1.75rem] font-semibold leading-tight tracking-tight text-balance text-eavi-on-bg sm:text-4xl">
             East Africa Vision Institute
           </h1>
-          <p className="text-sm text-eavi-text/75">Eldoret, Kenya</p>
+          <p className="text-sm text-eavi-on-bg">Eldoret, Kenya</p>
         </div>
       </div>
 
       <div className="flex flex-col items-center gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-eavi-primary-text sm:text-xs">
+        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-eavi-on-bg">
           Leading the Leaders
         </p>
-        <p className="text-sm text-eavi-secondary-text">
+        <p className="text-sm text-eavi-on-bg">
           Nurturing quality and affordable education.
         </p>
       </div>
@@ -41,7 +41,7 @@ export default function Loading() {
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-eavi-muted">
           <span className="animate-eavi-load block h-full w-1/2 rounded-full bg-linear-to-r from-eavi-primary to-eavi-secondary motion-reduce:animate-none" />
         </div>
-        <p className="text-[10px] uppercase tracking-[0.3em] text-eavi-text/75">
+        <p className="text-xs uppercase tracking-[0.3em] text-eavi-on-bg">
           Loading
         </p>
       </div>
@@ -50,24 +50,24 @@ export default function Loading() {
         {campuses.map((campus) => (
           <div
             key={campus.name}
-            className="animate-eavi-fade motion-reduce:animate-none rounded-2xl border border-eavi-border bg-eavi-card p-4"
+            className="animate-eavi-fade motion-reduce:animate-none rounded-2xl border border-eavi-border bg-eavi-card shadow-eavi-card p-4"
           >
             <p className="text-xs font-semibold uppercase tracking-wider text-eavi-primary-text">
               {campus.name}
             </p>
-            <p className="mt-1 text-xs leading-5 text-eavi-text/75">
+            <p className="mt-1 text-xs leading-5 text-eavi-muted-text">
               {campus.place}
             </p>
             <p className="mt-2 text-xs font-medium text-eavi-secondary-text">
               {campus.phone}
               {campus.note && (
-                <span className="ml-2 font-normal text-eavi-text/75">
+                <span className="ml-2 font-normal text-eavi-muted-text">
                   {campus.note}
                 </span>
               )}
             </p>
             {campus.altPhone && (
-              <p className="text-xs text-eavi-text/75">
+              <p className="text-xs text-eavi-muted-text">
                 Alt: {campus.altPhone.phone}
               </p>
             )}

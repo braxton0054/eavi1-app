@@ -30,6 +30,7 @@ export function SectionHeader({
   subheading,
   action,
   className,
+  onBackground = false,
 }: {
   id?: string;
   eyebrow?: string;
@@ -37,6 +38,9 @@ export function SectionHeader({
   subheading?: string;
   action?: ReactNode;
   className?: string;
+  /** Set when the header renders straight onto the magenta page background instead of
+      a light section band, so the text switches to the on-background token. */
+  onBackground?: boolean;
 }) {
   return (
     <div
@@ -47,18 +51,31 @@ export function SectionHeader({
     >
       <div className="flex flex-col items-start gap-2">
         {eyebrow && (
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-eavi-primary-text">
+          <p
+            className={cn(
+              "text-xs font-semibold uppercase tracking-[0.24em]",
+              onBackground ? "text-eavi-on-bg" : "text-eavi-primary-text",
+            )}
+          >
             {eyebrow}
           </p>
         )}
         <h2
           id={id}
-          className="cn-font-heading text-balance text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-3xl"
+          className={cn(
+            "cn-font-heading text-balance text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-3xl",
+            onBackground && "text-eavi-on-bg",
+          )}
         >
           {heading}
         </h2>
         {subheading && (
-          <p className="max-w-2xl text-pretty text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
+          <p
+            className={cn(
+              "max-w-2xl text-pretty text-sm leading-6 sm:text-base sm:leading-7",
+              onBackground ? "text-eavi-on-bg" : "text-muted-foreground",
+            )}
+          >
             {subheading}
           </p>
         )}

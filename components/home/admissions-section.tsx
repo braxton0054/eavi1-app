@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRightIcon, DownloadIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { ContentPlaceholder } from "@/components/home/content-placeholder";
 import { Reveal } from "@/components/home/reveal";
 import { Section, SectionHeader } from "@/components/home/section";
@@ -19,12 +19,12 @@ export function AdmissionsSection() {
         heading={admissionsSection.heading}
         subheading={admissionsSection.subheading}
         action={
-          <Button asChild size="lg" className="rounded-full hover:bg-eavi-fill-hover">
+          <ShimmerButton asChild className="px-8 py-4 text-base">
             <Link href="/apply">
               {admissionsSection.apply}
               <ArrowRightIcon data-icon="inline-end" />
             </Link>
-          </Button>
+          </ShimmerButton>
         }
       />
 
@@ -43,13 +43,12 @@ export function AdmissionsSection() {
                 </div>
                 <p className="text-sm leading-6 text-muted-foreground">{step.line}</p>
                 {"href" in step && step.href && (
-                  <Button
+                  <ShimmerButton
                     asChild
-                    variant="outline"
-                    className="mt-auto self-start rounded-full"
+                    className="mt-auto self-start"
                   >
                     <Link href={step.href}>{step.action}</Link>
-                  </Button>
+                  </ShimmerButton>
                 )}
               </div>
             </Reveal>
@@ -59,12 +58,12 @@ export function AdmissionsSection() {
 
       <div className="mt-6 sm:mt-8">
         {admissionsSection.requirements.href ? (
-          <Button asChild variant="secondary" className="rounded-full">
+          <ShimmerButton asChild>
             <a href={admissionsSection.requirements.href} download>
               <DownloadIcon data-icon="inline-start" />
               {admissionsSection.requirements.label}
             </a>
-          </Button>
+          </ShimmerButton>
         ) : (
           <ContentPlaceholder
             className="sm:max-w-md"

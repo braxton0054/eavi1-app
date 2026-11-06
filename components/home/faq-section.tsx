@@ -11,6 +11,7 @@ export function FaqSection() {
         eyebrow={faqSection.eyebrow}
         heading={faqSection.heading}
         subheading={faqSection.subheading}
+        onBackground
       />
 
       <div className="mt-6 flex flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card sm:mt-8">
