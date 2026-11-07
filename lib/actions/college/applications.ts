@@ -58,7 +58,7 @@ export async function createApplication(formData: FormData) {
 
     const programId = requiredText(formData, "programId", fieldLabel("programId"));
     const program = await prisma.program.findFirst({
-      where: { id: programId, campuses: { some: { id: campusId } } },
+      where: { id: programId, archivedAt: null, campuses: { some: { id: campusId } } },
       select: { id: true },
     });
     if (!program) throw new FieldError(fieldErrors.notOnCampus);

@@ -21,6 +21,7 @@ import {
   unique,
 } from "@/lib/actions/college/_shared";
 import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
+import { registerEnrolmentUnits } from "@/lib/academics/registration";
 
 async function maybeUpload(file: FormDataEntryValue | null, folder: string, keySeed: string) {
   if (!file || !(file instanceof File) || file.size === 0) return null;
@@ -63,7 +64,7 @@ export async function enrolStudent(formData: FormData) {
 
     const programId = requiredText(formData, "programId", "Programme");
     const program = await prisma.program.findFirst({
-      where: { id: programId, campuses: { some: { id: campusId } } },
+      where: { id: programId, archivedAt: null, campuses: { some: { id: campusId } } },
       select: { id: true },
     });
     if (!program) throw new FieldError(fieldErrors.notOnCampus);
@@ -162,6 +163,14 @@ export async function enrolStudent(formData: FormData) {
         programId,
         startDate,
         numbers: invoiceNumbers,
+      });
+
+      // Every unit of the programme is recorded, with the first period opened, and one
+      // attachment record per stage. The profile can then show what is behind and ahead.
+      await registerEnrolmentUnits(tx, {
+        enrollmentId: enrollment.id,
+        studentId: profile.id,
+        programId,
       });
 
       // Parent/guardians (multiple)

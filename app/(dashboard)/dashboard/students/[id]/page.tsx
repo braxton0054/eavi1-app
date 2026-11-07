@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { generateEnrollmentFees, recordStudentPayment } from "@/lib/actions/college/accounts";
+import { registerUnitPeriod, saveUnitResult } from "@/lib/actions/college/program-units";
+import { recordStudentAttachment } from "@/lib/actions/college/attachments";
 import { getStudent } from "@/lib/dal/college";
 import { genderLabel } from "@/lib/content/apply";
 import { common, labels, pages } from "@/lib/content/dashboard";
@@ -11,7 +13,7 @@ import { EmptyState, PageHeader, Panel, StatTile } from "@/components/dashboard/
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { formatDate, money } from "@/lib/format";
-import type { Column } from "@/lib/content/dashboard";
+import type { Column, Field } from "@/lib/content/dashboard";
 
 const copy = pages.students;
 
@@ -36,6 +38,25 @@ const feeTone: Record<string, ChipTone> = {
   PAID: "success",
   OVERDUE: "danger",
   VOID: "neutral",
+};
+
+const unitTone: Record<string, ChipTone> = {
+  NOT_STARTED: "neutral",
+  REGISTERED: "info",
+  IN_PROGRESS: "warning",
+  COMPLETED: "success",
+  FAILED: "danger",
+  DEFERRED: "neutral",
+};
+
+const attachmentTone: Record<string, ChipTone> = {
+  NOT_ELIGIBLE: "neutral",
+  ELIGIBLE: "info",
+  ATTACHED: "warning",
+  IN_PROGRESS: "warning",
+  COMPLETED: "success",
+  FAILED: "danger",
+  DEFERRED: "neutral",
 };
 
 /** Prisma hands back Decimal objects for money; only Number(String(v)) is safe here. */
@@ -216,6 +237,111 @@ export default async function StudentProfilePage({
     },
   }));
 
+  /* ------------------------------------------------------------ academic progress */
+
+  const academicCopy = copy.profile.academic;
+  const attachmentCopy = pages.programs.attachments;
+
+  const units = activeEnrollment?.units ?? [];
+  const attachments = activeEnrollment?.attachments ?? [];
+  const completedUnits = units.filter((unit) => unit.status === "COMPLETED").length;
+
+  // Periods are read off the student's own placed units, so the same control works for a
+  // semester programme, a monthly one and a module-based one.
+  const periodOptions = [
+    ...new Map(
+      units.map((unit) => [unit.programUnit.periodKey, unit.programUnit.periodLabel]),
+    ).entries(),
+  ].map(([value, label]) => ({ value, label }));
+
+  const currentUnit =
+    [...units].reverse().find((unit) => unit.status === "IN_PROGRESS" || unit.status === "REGISTERED") ??
+    units.find((unit) => unit.status === "NOT_STARTED") ??
+    null;
+
+  const registerFields: Field[] = [
+    { name: "periodKey", label: academicCopy.period, type: "select", required: true, options: periodOptions },
+    { name: "override", label: academicCopy.override, type: "checkbox" },
+  ];
+
+  const unitRows: Row[] = units.map((unit) => ({
+    id: unit.id,
+    cells: {
+      unit: `${unit.programUnit.unit.code} · ${unit.programUnit.unit.name}`,
+      period: unit.programUnit.periodLabel,
+      status: (
+        <StatusChip tone={unitTone[unit.status] ?? "neutral"}>
+          {labels.unitStatus[unit.status]}
+        </StatusChip>
+      ),
+      result: unit.score !== null
+        ? `${Number(String(unit.score))}${unit.maxScore !== null ? `/${Number(String(unit.maxScore))}` : ""}${unit.grade ? ` · ${unit.grade}` : ""}`
+        : unit.grade ?? common.notSet,
+      actions: (
+        <RowForm
+          id={`unit-result-${unit.id}`}
+          button={academicCopy.resultTitle}
+          fields={academicCopy.resultFields}
+          values={{
+            status: unit.status,
+            score: unit.score !== null ? String(Number(String(unit.score))) : undefined,
+            maxScore: unit.maxScore !== null ? String(Number(String(unit.maxScore))) : undefined,
+            grade: unit.grade ?? undefined,
+            remark: unit.remark ?? undefined,
+          }}
+          hidden={{ studentUnitId: unit.id }}
+          action={saveUnitResult}
+          submitLabel={common.save}
+          wide
+        />
+      ),
+    },
+  }));
+
+  const attachmentRows: Row[] = attachments.map((attachment) => ({
+    id: attachment.id,
+    cells: {
+      stage: attachment.requirement.label,
+      status: (
+        <StatusChip tone={attachmentTone[attachment.status] ?? "neutral"}>
+          {labels.attachmentStatus[attachment.status]}
+        </StatusChip>
+      ),
+      host: attachment.hostOrganization ?? common.notSet,
+      dates: [
+        attachment.startDate ? `From ${formatDate(attachment.startDate)}` : null,
+        attachment.expectedEndDate ? `to ${formatDate(attachment.expectedEndDate)}` : null,
+      ]
+        .filter(Boolean)
+        .join(" ") || common.notSet,
+      supervisor: attachment.supervisorName ?? common.notSet,
+      result: [attachment.grade, attachment.completedAt ? formatDate(attachment.completedAt) : null]
+        .filter(Boolean)
+        .join(" · ") || common.notSet,
+      actions: (
+        <RowForm
+          id={`attachment-${attachment.id}`}
+          button={attachmentCopy.record}
+          fields={attachmentCopy.fields}
+          values={{
+            status: attachment.status,
+            hostOrganization: attachment.hostOrganization ?? undefined,
+            supervisorName: attachment.supervisorName ?? undefined,
+            supervisorPhone: attachment.supervisorPhone ?? undefined,
+            supervisorEmail: attachment.supervisorEmail ?? undefined,
+            grade: attachment.grade ?? undefined,
+            assessmentNote: attachment.assessmentNote ?? undefined,
+            remark: attachment.remark ?? undefined,
+          }}
+          hidden={{ attachmentId: attachment.id }}
+          action={recordStudentAttachment}
+          submitLabel={common.save}
+          wide
+        />
+      ),
+    },
+  }));
+
   const cardRows: Row[] = student.idCards.map((card) => ({
     id: card.id,
     cells: {
@@ -346,6 +472,53 @@ export default async function StudentProfilePage({
             columns={feeCopy.historyColumns as Column[]}
             rows={paymentRows}
             caption={feeCopy.history}
+          />
+        )}
+      </Panel>
+
+      <Panel
+        title={academicCopy.title}
+        description={
+          activeEnrollment
+            ? `${academicCopy.progress(completedUnits, units.length)} · ${academicCopy.currentPeriod}: ${
+                currentUnit?.programUnit.periodLabel ?? academicCopy.empty
+              }`
+            : undefined
+        }
+      >
+        {!activeEnrollment || units.length === 0 ? (
+          <p className="p-4 text-sm text-eavi-muted-text">{academicCopy.empty}</p>
+        ) : (
+          <>
+            <div className="border-b border-eavi-border p-4">
+              <DisclosureForm
+                id={`register-period-${activeEnrollment.id}`}
+                button={academicCopy.register}
+                title={academicCopy.registerTitle}
+                fields={registerFields}
+                hidden={{ enrollmentId: activeEnrollment.id }}
+                action={registerUnitPeriod}
+                submitLabel={academicCopy.register}
+              />
+            </div>
+
+            <DataTable
+              columns={academicCopy.columns as Column[]}
+              rows={unitRows}
+              caption={academicCopy.title}
+            />
+          </>
+        )}
+      </Panel>
+
+      <Panel title={attachmentCopy.studentTitle}>
+        {attachmentRows.length === 0 ? (
+          <p className="p-4 text-sm text-eavi-muted-text">{attachmentCopy.studentEmpty}</p>
+        ) : (
+          <DataTable
+            columns={attachmentCopy.studentColumns as Column[]}
+            rows={attachmentRows}
+            caption={attachmentCopy.studentTitle}
           />
         )}
       </Panel>

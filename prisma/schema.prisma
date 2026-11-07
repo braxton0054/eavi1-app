@@ -101,6 +101,38 @@ enum InvoiceStatus {
   VOID
 }
 
+/// How a programme is delivered. Units are grouped by whichever of these it uses, so a
+/// monthly course is not forced into semesters.
+enum ProgramStructure {
+  SEMESTER
+  MONTHLY
+  MODULE
+  CUSTOM
+}
+
+/// Where a student stands on one unit. `COMPLETED` is the only state that counts towards
+/// finishing a stage; progression past a stage is an administrator's decision, never a
+/// side effect of a date passing.
+enum UnitStatus {
+  NOT_STARTED
+  REGISTERED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  DEFERRED
+}
+
+/// The attachment lifecycle, from "not yet due" to an outcome.
+enum AttachmentStatus {
+  NOT_ELIGIBLE
+  ELIGIBLE
+  ATTACHED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  DEFERRED
+}
+
 /// How a programme's fee is split into payable periods. The cadence row carries the kind so
 /// the period rows can be generated from the duration instead of being typed one by one.
 /// Terms are not here on purpose: this college runs semesters, and a term is a semester.
@@ -272,6 +304,11 @@ model Program {
   cadenceId      String
   cadence        FeeCadence    @relation(fields: [cadenceId], references: [id])
   durationMonths Int
+  /// Semesters, months or modules. Decides how the unit planner groups its rows.
+  structure      ProgramStructure @default(SEMESTER)
+  /// Set when the programme stops taking new admissions; its history stays readable.
+  archivedAt     DateTime?
+  archivedReason String?
   /// Lowest KCSE aggregate the college admits against; the same scale the
   /// application form records an applicant's grade on.
   minKcseGrade   EntryGrade
@@ -284,6 +321,9 @@ model Program {
   applications   Application[]
   feeItems       FeeItem[]
   feePlans       ProgramFeePlan[]
+  units          ProgramUnit[]
+  modules        ProgramModule[]
+  attachmentRequirements AttachmentRequirement[]
   exams          Exam[]
   timetableSlots TimetableSlot[]
   idCards        IdCard[]
@@ -326,6 +366,7 @@ model StudentProfile {
   enrollments         Enrollment[]
   invoices            Invoice[]
   payments            Payment[]
+  attachments         StudentAttachment[]
   idCards             IdCard[]
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
@@ -513,6 +554,9 @@ model Enrollment {
   grades      Grade[]
   /// The fee schedule generated for this enrolment, one invoice per payable period.
   invoices    Invoice[]
+  /// The student's standing on each unit of the programme.
+  units       StudentUnit[]
+  attachments StudentAttachment[]
 
   @@unique([studentId, programId])
   @@index([campusId, status])
@@ -582,6 +626,145 @@ model Grade {
 
   @@unique([examId, enrollmentId])
   @@map("grades")
+}
+
+/// A unit of study that can be taught in more than one programme. The definition is shared;
+/// where it sits in a programme is a separate row, so a unit is never copied to be reused.
+model Unit {
+  id           String        @id @default(uuid())
+  code         String        @unique
+  name         String
+  description  String?
+  programUnits ProgramUnit[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("units")
+}
+
+/// One unit placed in one period of a programme: "Semester 1 of year 1", "month 3", or a
+/// module. `periodKey` is the machine-readable identity of that period, which is what keeps
+/// the same unit reusable in two periods without duplicating the unit itself.
+model ProgramUnit {
+  id          String         @id @default(uuid())
+  programId   String
+  program     Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  unitId      String
+  unit        Unit           @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  moduleId    String?
+  module      ProgramModule? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  /// "Y1S2", "M3", "MOD:<id>" or a slug for a custom structure.
+  periodKey   String
+  periodLabel String
+  yearIndex   Int?
+  semesterNo  Int?
+  monthIndex  Int?
+  /// Reading order inside its period.
+  sequence    Int            @default(0)
+  isCore      Boolean        @default(true)
+  studentUnits StudentUnit[]
+  createdAt   DateTime       @default(now())
+
+  @@unique([programId, unitId, periodKey])
+  @@index([programId, periodKey])
+  @@map("program_units")
+}
+
+/// A module of a module-based programme. Its units are ProgramUnit rows that point here.
+model ProgramModule {
+  id            String        @id @default(uuid())
+  programId     String
+  program       Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  code          String
+  name          String
+  description   String?
+  durationMonths Int?
+  sequence      Int           @default(0)
+  assessmentNote String?
+  isActive      Boolean       @default(true)
+  units         ProgramUnit[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([programId, code])
+  @@index([programId, sequence])
+  @@map("program_modules")
+}
+
+/// A student's registration and result for one placed unit. One row per student per unit,
+/// created when the student enrols so the whole programme is visible from day one.
+model StudentUnit {
+  id            String      @id @default(uuid())
+  enrollmentId  String
+  enrollment    Enrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  programUnitId String
+  programUnit   ProgramUnit @relation(fields: [programUnitId], references: [id], onDelete: Cascade)
+  status        UnitStatus  @default(NOT_STARTED)
+  score         Decimal?    @db.Decimal(6, 2)
+  maxScore      Decimal?    @db.Decimal(6, 2)
+  grade         String?
+  remark        String?
+  registeredAt  DateTime?
+  completedAt   DateTime?
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([enrollmentId, programUnitId])
+  @@index([enrollmentId, status])
+  @@map("student_units")
+}
+
+/// Where an industrial attachment falls in a programme: after a given semester or month, or
+/// after every academic period. Several requirements can be configured for one programme.
+model AttachmentRequirement {
+  id              String              @id @default(uuid())
+  programId       String
+  program         Program             @relation(fields: [programId], references: [id], onDelete: Cascade)
+  sequence        Int                 @default(1)
+  label           String
+  afterYearIndex  Int?
+  afterSemesterNo Int?
+  afterMonthIndex Int?
+  afterAllPeriods Boolean             @default(false)
+  durationWeeks   Int?
+  durationMonths  Int?
+  startsAt        DateTime?
+  endsAt          DateTime?
+  prerequisiteNote String?
+  assessmentNote  String?
+  isActive        Boolean             @default(true)
+  studentAttachments StudentAttachment[]
+  createdAt       DateTime            @default(now())
+
+  @@unique([programId, sequence])
+  @@index([programId])
+  @@map("attachment_requirements")
+}
+
+/// One student's placement against one requirement.
+model StudentAttachment {
+  id              String                @id @default(uuid())
+  studentId       String
+  student         StudentProfile        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  enrollmentId    String
+  enrollment      Enrollment            @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  requirementId   String
+  requirement     AttachmentRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  status          AttachmentStatus      @default(NOT_ELIGIBLE)
+  hostOrganization String?
+  supervisorName  String?
+  supervisorPhone String?
+  supervisorEmail String?
+  startDate       DateTime?
+  expectedEndDate DateTime?
+  completedAt     DateTime?
+  assessmentNote  String?
+  grade           String?
+  remark          String?
+  updatedAt       DateTime              @updatedAt
+
+  @@unique([enrollmentId, requirementId])
+  @@index([studentId, status])
+  @@map("student_attachments")
 }
 
 /// One published version of a programme's fee structure. Amounts live in the period rows

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { EntryGrade, FeePeriodKind } from "@/generated/prisma/enums";
+import { EntryGrade, FeePeriodKind, ProgramStructure } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
@@ -21,12 +21,16 @@ import {
   text,
   unique,
 } from "@/lib/actions/college/_shared";
+import { archiveRefusal, deletionRefusal, lifecycleCounts } from "@/lib/academics/lifecycle";
 import type { Field } from "@/lib/content/dashboard";
 
 const GRADES = Object.keys(EntryGrade) as (keyof typeof EntryGrade)[];
 
 /** The billing periods a registered payment type can stand for. */
 const FEE_KINDS = Object.keys(FeePeriodKind) as (keyof typeof FeePeriodKind)[];
+
+/** Semesters, months, modules or a hand-built structure. */
+const STRUCTURES = Object.keys(ProgramStructure) as (keyof typeof ProgramStructure)[];
 
 const copy = pages.programs;
 const settings = copy.settings;
@@ -69,7 +73,7 @@ async function cadenceChoice(id: string, label: string) {
 async function knownProgram(programId: string, campusId: number | null) {
   const program = await prisma.program.findFirst({
     where: { id: programId, campuses: campusId === null ? undefined : { some: { id: campusId } } },
-    select: { id: true, code: true },
+    select: { id: true, code: true, archivedAt: true },
   });
   if (!program) throw new FieldError(fieldErrors.notOnCampus);
 
@@ -90,6 +94,7 @@ async function programmeAnswers(formData: FormData) {
   const type = await codedChoice("programType", requiredText(formData, "typeId", fieldLabel("typeId")), fieldLabel("typeId"));
   const cadenceId = await cadenceChoice(requiredText(formData, "cadenceId", fieldLabel("cadenceId")), fieldLabel("cadenceId"));
   const minKcseGrade = enumField(formData, "minKcseGrade", GRADES, fieldLabel("minKcseGrade"));
+  const structure = enumField(formData, "structure", STRUCTURES, fieldLabel("structure"));
 
   return {
     name,
@@ -99,6 +104,7 @@ async function programmeAnswers(formData: FormData) {
     type,
     cadenceId,
     minKcseGrade,
+    structure,
     description: text(formData, "description"),
   };
 }
@@ -156,6 +162,7 @@ export async function createProgram(formData: FormData) {
         cadence: { connect: { id: answers.cadenceId } },
         minKcseGrade: answers.minKcseGrade,
         durationMonths: answers.durationMonths,
+        structure: answers.structure,
         description: answers.description,
         campuses: { connect: campuses },
       },
@@ -185,6 +192,20 @@ export async function updateProgram(formData: FormData) {
     const answers = await programmeAnswers(formData);
     const documents = await programmeDocuments(formData);
 
+    // Period keys are stored on each placed unit, so the structure cannot change underneath
+    // them without silently detaching the unit plan. It is locked once units exist.
+    const existing = await prisma.program.findUnique({
+      where: { id: program.id },
+      select: { structure: true, _count: { select: { units: true } } },
+    });
+    if (
+      existing &&
+      existing.structure !== answers.structure &&
+      existing._count.units > 0
+    ) {
+      throw new FieldError(copy.edit.structureLocked);
+    }
+
     await prisma.program.update({
       where: { id: program.id },
       data: {
@@ -195,6 +216,7 @@ export async function updateProgram(formData: FormData) {
         cadenceId: answers.cadenceId,
         minKcseGrade: answers.minKcseGrade,
         durationMonths: answers.durationMonths,
+        structure: answers.structure,
         description: answers.description,
       },
     });
@@ -204,8 +226,38 @@ export async function updateProgram(formData: FormData) {
 }
 
 /**
- * Paperwork is the reason a programme cannot simply vanish: an application, an enrolment, an
- * exam, a bill or a timetable slot that stopped pointing at it would read as corrupt data.
+ * Archiving is the safe exit. The programme stops taking new admissions, but its enrolments,
+ * results, attachments and bills stay exactly where they are and remain reportable.
+ *
+ * It is refused while students are still studying, because they need the programme to stay
+ * active for them; completed cohorts can be archived.
+ */
+export async function archiveProgram(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+  const programId = hiddenId(formData, "programId", copy.archive.button);
+
+  return onSave("/dashboard/programs", AFFECTED, async () => {
+    const program = await knownProgram(programId, scope.campusId);
+    if (program.archivedAt) return;
+
+    const counts = await lifecycleCounts(prisma, program.id);
+    if (archiveRefusal(counts) === "active") {
+      throw new FieldError(copy.archive.blocked(counts.activeEnrollments));
+    }
+
+    await prisma.program.update({
+      where: { id: program.id },
+      data: { archivedAt: new Date(), archivedReason: text(formData, "reason") },
+    });
+  });
+}
+
+/**
+ * Permanent deletion is only for a programme that nothing has ever been recorded against.
+ *
+ * Enrolments, applications, exams, timetables, cards, invoices and payments are historical
+ * records, so any of them sends the administrator to Archiving instead. Nothing here cascades
+ * through a student's academic or financial history.
  */
 export async function deleteProgram(formData: FormData) {
   const scope = await requireCollegeAdmin();
@@ -214,19 +266,13 @@ export async function deleteProgram(formData: FormData) {
   return onSave("/dashboard/programs", AFFECTED, async () => {
     const program = await knownProgram(programId, scope.campusId);
 
-    const counts = await Promise.all([
-      prisma.application.count({ where: { programId: program.id } }),
-      prisma.enrollment.count({ where: { programId: program.id } }),
-      prisma.exam.count({ where: { programId: program.id } }),
-      prisma.feeItem.count({ where: { programId: program.id } }),
-      prisma.timetableSlot.count({ where: { programId: program.id } }),
-    ]);
+    const counts = await lifecycleCounts(prisma, program.id);
+    const refusal = deletionRefusal(counts);
 
-    await refuseWhenUsed(
-      copy.remove.blocked,
-      async () => counts.some((count) => count > 0),
-      () => prisma.program.delete({ where: { id: program.id } }),
-    );
+    if (refusal === "active") throw new FieldError(copy.remove.active(counts.activeEnrollments));
+    if (refusal === "history") throw new FieldError(copy.remove.history);
+
+    await prisma.program.delete({ where: { id: program.id } });
   });
 }
 

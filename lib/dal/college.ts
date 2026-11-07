@@ -8,6 +8,8 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { campusWhere, requireCollegeAdmin, type AdminScope } from "@/lib/session";
 import { pagination } from "@/lib/content/dashboard";
+import { generatedPeriods, type Structure } from "@/lib/academics/structure";
+import { planningSemesters } from "@/lib/academics/planning";
 
 export type ListQuery = { q?: string; status?: string; page?: number };
 
@@ -343,7 +345,49 @@ export async function getStudent(id: string) {
       ...studentInclude(),
       enrollments: {
         orderBy: { enrolledAt: "desc" },
-        include: { program: { select: { name: true, code: true } }, intake: { select: { name: true } } },
+        include: {
+          program: {
+            select: { name: true, code: true, structure: true, durationMonths: true },
+          },
+          intake: { select: { name: true } },
+          // The whole unit plan with the student's standing, and any attachment stages.
+          units: {
+            orderBy: [
+              { programUnit: { yearIndex: "asc" } },
+              { programUnit: { semesterNo: "asc" } },
+              { programUnit: { monthIndex: "asc" } },
+              { programUnit: { sequence: "asc" } },
+            ],
+            include: {
+              programUnit: {
+                select: {
+                  id: true,
+                  periodKey: true,
+                  periodLabel: true,
+                  yearIndex: true,
+                  semesterNo: true,
+                  monthIndex: true,
+                  unit: { select: { code: true, name: true } },
+                  module: { select: { name: true } },
+                },
+              },
+            },
+          },
+          attachments: {
+            orderBy: { requirement: { sequence: "asc" } },
+            include: {
+              requirement: {
+                select: {
+                  label: true,
+                  afterAllPeriods: true,
+                  afterYearIndex: true,
+                  afterSemesterNo: true,
+                  afterMonthIndex: true,
+                },
+              },
+            },
+          },
+        },
       },
       invoices: {
         orderBy: { createdAt: "desc" },
@@ -537,6 +581,7 @@ async function programsFor(campusId: number | null, q?: string) {
         select: { id: true, version: true, totalAmount: true },
         take: 1,
       },
+      _count: { select: { units: true } },
     },
   });
 
@@ -656,6 +701,139 @@ export async function getProgramFees(programId: string) {
     calendar,
     cadences,
   };
+}
+
+/* -------------------------------------------------------------------- units */
+
+/** Every unit definition, shared by all programmes that teach it. */
+export async function getUnitCatalogue() {
+  await requireCollegeAdmin();
+  return prisma.unit.findMany({
+    orderBy: { code: "asc" },
+    include: { _count: { select: { programUnits: true } } },
+  });
+}
+
+export async function getUnitOptions() {
+  await requireCollegeAdmin();
+  const rows = await prisma.unit.findMany({ orderBy: { code: "asc" }, select: { id: true, code: true, name: true } });
+  return rows.map((row) => ({ value: row.id, label: `${row.code} · ${row.name}` }));
+}
+
+/** A programme the caller can see, with its periods worked out from its own structure. */
+async function programForPlanning(programId: string) {
+  const scope = await requireCollegeAdmin();
+
+  const program = await prisma.program.findFirst({
+    where: {
+      id: programId,
+      ...(scope.campusId === null ? {} : { campuses: { some: { id: scope.campusId } } }),
+    },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      structure: true,
+      durationMonths: true,
+      archivedAt: true,
+      campuses: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+    },
+  });
+  if (!program) throw new Error("not_found");
+
+  const campusId = scope.campusId ?? program.campuses[0]?.id ?? null;
+  const perYear = await planningSemesters(campusId);
+  const periods = generatedPeriods(program.structure as Structure, program.durationMonths, perYear);
+
+  return { scope, program, campusId, perYear, periods };
+}
+
+export async function getProgramUnitsPlan(programId: string) {
+  const { scope, program, periods, perYear } = await programForPlanning(programId);
+
+  const [placed, modules, units] = await Promise.all([
+    prisma.programUnit.findMany({
+      where: { programId: program.id },
+      orderBy: [{ yearIndex: "asc" }, { semesterNo: "asc" }, { monthIndex: "asc" }, { sequence: "asc" }],
+      include: {
+        unit: { select: { id: true, code: true, name: true } },
+        module: { select: { id: true, name: true } },
+        _count: { select: { studentUnits: true } },
+      },
+    }),
+    prisma.programModule.findMany({
+      where: { programId: program.id },
+      orderBy: [{ sequence: "asc" }, { code: "asc" }],
+      include: { _count: { select: { units: true } } },
+    }),
+    prisma.unit.findMany({
+      orderBy: { code: "asc" },
+      include: { _count: { select: { programUnits: true } } },
+    }),
+  ]);
+
+  return { scope, program, periods, perYear, placed, modules, units };
+}
+
+export async function getProgramAttachmentPlan(programId: string) {
+  const { scope, program, periods } = await programForPlanning(programId);
+
+  const [requirements, enrolled] = await Promise.all([
+    prisma.attachmentRequirement.findMany({
+      where: { programId: program.id },
+      orderBy: { sequence: "asc" },
+      include: { _count: { select: { studentAttachments: true } } },
+    }),
+    prisma.enrollment.count({ where: { programId: program.id, status: "ACTIVE" } }),
+  ]);
+
+  return { scope, program, periods, requirements, enrolled };
+}
+
+/** The programme overview: what it contains, who is on it, and the lifecycle actions. */
+export async function getProgramDetail(programId: string) {
+  const scope = await requireCollegeAdmin();
+
+  const program = await prisma.program.findFirst({
+    where: {
+      id: programId,
+      ...(scope.campusId === null ? {} : { campuses: { some: { id: scope.campusId } } }),
+    },
+    include: {
+      department: { select: { name: true } },
+      body: { select: { name: true, code: true } },
+      type: { select: { name: true, code: true } },
+      cadence: { select: { name: true } },
+      campuses: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+      feePlans: { where: { isActive: true }, select: { version: true, totalAmount: true }, take: 1 },
+      modules: { orderBy: { sequence: "asc" }, select: { id: true, code: true, name: true, _count: { select: { units: true } } } },
+      attachmentRequirements: {
+        orderBy: { sequence: "asc" },
+        select: {
+          id: true,
+          label: true,
+          afterAllPeriods: true,
+          afterYearIndex: true,
+          afterSemesterNo: true,
+          afterMonthIndex: true,
+          durationWeeks: true,
+          durationMonths: true,
+          _count: { select: { studentAttachments: true } },
+        },
+      },
+      _count: {
+        select: { units: true, modules: true, attachmentRequirements: true, applications: true },
+      },
+    },
+  });
+  if (!program) throw new Error("not_found");
+
+  const [activeEnrollments, completedEnrollments] = await Promise.all([
+    prisma.enrollment.count({ where: { programId: program.id, status: "ACTIVE" } }),
+    prisma.enrollment.count({ where: { programId: program.id, status: "COMPLETED" } }),
+  ]);
+
+  return { scope, program, activeEnrollments, completedEnrollments };
 }
 
 /* -------------------------------------------------------------------- tutors */
@@ -1213,7 +1391,9 @@ function debtRows(invoices: DebtInvoice[]) {
 
 export async function getProgramOptions(campusId: number | null) {
   const rows = await prisma.program.findMany({
-    where: campusId === null ? {} : { campuses: { some: { id: campusId } } },
+    // An archived programme keeps its history but no longer takes new students, so it is
+    // absent from every picker that would admit or enrol someone.
+    where: { archivedAt: null, ...(campusId === null ? {} : { campuses: { some: { id: campusId } } }) },
     orderBy: { name: "asc" },
     select: { id: true, name: true, code: true },
   });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import {
+  archiveProgram,
   createDepartment,
   createFeeCadence,
   createProgram,
@@ -38,6 +39,12 @@ import { money } from "@/lib/format";
 const copy = pages.programs;
 const settings = copy.settings;
 
+/** The actions menu and the links inside it, kept in one place for every row. */
+const menuToggle =
+  "inline-flex min-h-11 cursor-pointer list-none items-center rounded-lg border border-eavi-border px-3 text-sm font-medium text-eavi-primary-text [&::-webkit-details-marker]:hidden";
+const menuLink =
+  "rounded-lg px-3 py-2 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted";
+
 /** The row-level editor takes the same questions as the add form, so the field list is shared. */
 const programFields = copy.create.fields;
 
@@ -50,6 +57,7 @@ const programValues = (program: Program) => ({
   typeId: program.typeId,
   departmentId: program.departmentId,
   cadenceId: program.cadenceId,
+  structure: program.structure,
   durationMonths: String(program.durationMonths),
   minKcseGrade: program.minKcseGrade,
   description: program.description ?? "",
@@ -90,6 +98,7 @@ export default async function ProgramsPage({
       name: program.name,
       body: program.body.name,
       type: <StatusChip tone="neutral">{program.type.name}</StatusChip>,
+      structure: labels.programStructure[program.structure],
       department: program.department.name,
       duration: copy.duration(program.durationMonths),
       minKcseGrade: labels.entryGrade[program.minKcseGrade],
@@ -106,35 +115,66 @@ export default async function ProgramsPage({
       ),
       curriculum: documentCell(program.curriculumUrl, copy.curriculum),
       feeStructure: documentCell(program.feeStructureUrl, copy.feeStructure),
+      status: program.archivedAt ? (
+        <StatusChip tone="neutral">{copy.detail.archived}</StatusChip>
+      ) : (
+        <StatusChip tone="success">{common.active}</StatusChip>
+      ),
       actions: (
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={`/dashboard/programs/${program.id}/fees`}
-            className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-3 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
-          >
-            {copy.feePlan.link}
-          </Link>
-          <RowForm
-            id={`edit-program-${program.id}`}
-            button={copy.edit.button}
-            fields={programFields}
-            options={options}
-            values={programValues(program)}
-            hidden={{ programId: program.id }}
-            action={updateProgram}
-            submitLabel={common.update}
-            wide
-          />
-          <RowForm
-            id={`delete-program-${program.id}`}
-            button={copy.remove.button}
-            fields={[]}
-            hidden={{ programId: program.id }}
-            action={deleteProgram}
-            submitLabel={copy.remove.button}
-            tone="danger"
-          />
-        </div>
+        <details className="relative">
+          <summary className={menuToggle}>{copy.detail.actions}</summary>
+          <div className="mt-2 flex w-56 flex-col gap-1 rounded-xl border border-eavi-border bg-eavi-card p-2 shadow-eavi-card">
+            <Link href={`/dashboard/programs/${program.id}`} className={menuLink}>
+              {copy.detail.view}
+            </Link>
+            <Link href={`/dashboard/programs/${program.id}/fees`} className={menuLink}>
+              {copy.detail.manageFees}
+            </Link>
+            <Link href={`/dashboard/programs/${program.id}/units`} className={menuLink}>
+              {copy.detail.manageUnits}
+            </Link>
+            <Link href={`/dashboard/programs/${program.id}/attachment`} className={menuLink}>
+              {copy.detail.manageAttachment}
+            </Link>
+
+            <div className="border-t border-eavi-border pt-1">
+              <RowForm
+                id={`edit-program-${program.id}`}
+                button={copy.edit.button}
+                fields={programFields}
+                options={options}
+                values={programValues(program)}
+                hidden={{ programId: program.id }}
+                action={updateProgram}
+                submitLabel={common.update}
+                wide
+              />
+            </div>
+
+            {program.archivedAt ? null : (
+              <RowForm
+                id={`archive-program-${program.id}`}
+                button={copy.archive.button}
+                fields={[
+                  { name: "reason", label: copy.archive.reason, type: "text", wide: true },
+                ]}
+                hidden={{ programId: program.id }}
+                action={archiveProgram}
+                submitLabel={copy.archive.button}
+              />
+            )}
+
+            <RowForm
+              id={`delete-program-${program.id}`}
+              button={copy.remove.button}
+              fields={[]}
+              hidden={{ programId: program.id }}
+              action={deleteProgram}
+              submitLabel={copy.remove.button}
+              tone="danger"
+            />
+          </div>
+        </details>
       ),
     },
   }));

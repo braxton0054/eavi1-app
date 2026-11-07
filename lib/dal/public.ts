@@ -22,7 +22,8 @@ export type ApplyOptions = {
  */
 export async function getApplyOptions(): Promise<ApplyOptions> {
   const programs = await prisma.program.findMany({
-    where: { campuses: { some: { takesApplicants: true } } },
+    // An archived course keeps its students but must not collect new applications.
+    where: { archivedAt: null, campuses: { some: { takesApplicants: true } } },
     orderBy: { name: "asc" },
     select: { id: true, name: true, code: true },
   });
@@ -44,7 +45,7 @@ export async function assignCampus(
   programId: string,
 ): Promise<{ id: number; name: string } | null> {
   const campuses = await prisma.campus.findMany({
-    where: { takesApplicants: true, programs: { some: { id: programId } } },
+    where: { takesApplicants: true, programs: { some: { id: programId, archivedAt: null } } },
     orderBy: { id: "asc" },
     select: { id: true, name: true },
   });

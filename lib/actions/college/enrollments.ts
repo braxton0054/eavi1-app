@@ -15,6 +15,7 @@ import {
   unique,
 } from "@/lib/actions/college/_shared";
 import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
+import { registerEnrolmentUnits } from "@/lib/academics/registration";
 
 const STATUSES = Object.keys(EnrollmentStatus) as (keyof typeof EnrollmentStatus)[];
 
@@ -45,6 +46,7 @@ export async function createEnrollment(formData: FormData) {
     const program = await prisma.program.findFirst({
       where: {
         id: programId,
+        archivedAt: null,
         ...(scope.campusId === null ? {} : { campuses: { some: { id: scope.campusId } } }),
       },
       select: { id: true },
@@ -98,6 +100,12 @@ export async function createEnrollment(formData: FormData) {
         programId,
         startDate: intake?.commenceAt ?? new Date(),
         numbers: invoiceNumbers,
+      });
+
+      await registerEnrolmentUnits(tx, {
+        enrollmentId: enrollment.id,
+        studentId,
+        programId,
       });
     });
   });
