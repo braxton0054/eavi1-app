@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { CardStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
@@ -56,12 +58,14 @@ export async function createCard(formData: FormData) {
     }
 
     // The card follows the student, so a super admin's request is filed under their campus.
+    // The token is the unguessable half of the QR verification link; the serial stays sequential.
     const serial = await nextCardSerial();
 
     await unique(serialLabel, () =>
       prisma.idCard.create({
         data: {
           serial,
+          verifyToken: randomUUID(),
           studentId,
           campusId: student.campusId,
           programId: programId ?? null,
