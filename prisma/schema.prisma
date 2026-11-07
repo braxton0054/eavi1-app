@@ -103,10 +103,10 @@ enum InvoiceStatus {
 
 /// How a programme's fee is split into payable periods. The cadence row carries the kind so
 /// the period rows can be generated from the duration instead of being typed one by one.
+/// Terms are not here on purpose: this college runs semesters, and a term is a semester.
 enum FeePeriodKind {
   MONTHLY
   SEMESTER
-  TERM
   ACADEMIC_YEAR
   ONE_TIME
   CUSTOM

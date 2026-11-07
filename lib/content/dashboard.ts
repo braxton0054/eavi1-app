@@ -323,6 +323,14 @@ export const labels = {
     BANK: "Bank transfer",
     CHEQUE: "Cheque",
   },
+  /** How a registered payment type turns the programme duration into payable periods. */
+  feePeriodKind: {
+    MONTHLY: "One period per month",
+    SEMESTER: "One period per semester",
+    ACADEMIC_YEAR: "One period per academic year",
+    ONE_TIME: "A single payment",
+    CUSTOM: "Custom schedule",
+  },
   /** A fee period reads differently from a whole invoice: a part payment is normal here. */
   periodStatus: {
     PENDING: "Pending",
@@ -747,6 +755,7 @@ export const pages = {
     feePlan: {
       title: "Fee structure",
       link: "Fees",
+      setLink: "Set fees",
       description:
         "Split the programme fee into the periods a student pays. Publishing a version never changes the bills of students already enrolled.",
       cadence: "Payment method",
@@ -768,7 +777,7 @@ export const pages = {
       customHint: "Custom schedules are entered by hand: label each period and its amount.",
       calendarTitle: "Academic calendar",
       calendarNote:
-        "Semester and term periods are dated from the campus calendar when a student enrols. Two intakes starting in different months therefore follow the same schedule shifted to their own start.",
+        "Semester periods are dated from the campus calendar when a student enrols. Two intakes starting in different months therefore follow the same schedule shifted to their own start.",
       calendarEmpty:
         "This campus has no semesters on its calendar yet, so semester periods fall back to the offsets below.",
       calendarColumns: [
@@ -866,9 +875,11 @@ export const pages = {
       },
       cadences: {
         heading: "Fee payment type",
-        description: "The payment types a programme can be billed on. Rename one here to change every programme using it.",
+        description:
+          "The payment types a programme can be billed on. Each one says how the programme duration becomes payable periods, so new methods are registered here rather than written into the code.",
         columns: [
           { key: "name", label: "Payment type" },
+          { key: "kind", label: "Billing period" },
           { key: "programs", label: "Programmes", align: "end" },
         ] satisfies Column[],
         empty: "No payment types registered yet.",
@@ -877,6 +888,15 @@ export const pages = {
           title: "New fee payment type",
           fields: [
             { name: "name", label: "Payment type name", type: "text", required: true, wide: true, placeholder: "Per semester" },
+            {
+              name: "kind",
+              label: "Billing period",
+              type: "select",
+              required: true,
+              wide: true,
+              options: toOptions(labels.feePeriodKind),
+              hint: "Decides how many fee rows a programme gets, and whether they follow the academic calendar.",
+            },
           ] satisfies Field[],
         },
         edit: {
@@ -884,6 +904,7 @@ export const pages = {
           title: "Edit payment type",
           fields: [
             { name: "name", label: "New name", type: "text", required: true, wide: true },
+            { name: "kind", label: "Billing period", type: "select", required: true, wide: true, options: toOptions(labels.feePeriodKind) },
           ] satisfies Field[],
           done: "Payment type renamed.",
         },

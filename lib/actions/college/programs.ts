@@ -1,6 +1,8 @@
 "use server";
 
-import { EntryGrade } from "@/generated/prisma/enums";
+import { redirect } from "next/navigation";
+
+import { EntryGrade, FeePeriodKind } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
@@ -22,6 +24,9 @@ import {
 import type { Field } from "@/lib/content/dashboard";
 
 const GRADES = Object.keys(EntryGrade) as (keyof typeof EntryGrade)[];
+
+/** The billing periods a registered payment type can stand for. */
+const FEE_KINDS = Object.keys(FeePeriodKind) as (keyof typeof FeePeriodKind)[];
 
 const copy = pages.programs;
 const settings = copy.settings;
@@ -158,6 +163,10 @@ export async function createProgram(formData: FormData) {
     });
 
     await saveProgrammeDocuments(program.id, documents);
+
+    // Choosing a payment type and a duration is only half of setting a programme up; the
+    // amounts are entered on the fee screen, so the administrator lands there next.
+    redirect(`/dashboard/programs/${program.id}/fees`);
   });
 }
 
@@ -438,8 +447,11 @@ export async function createFeeCadence(formData: FormData) {
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
     const name = requiredText(formData, "name", registryFieldLabel("cadences", "name"));
+    const kind = enumField(formData, "kind", FEE_KINDS, registryFieldLabel("cadences", "kind"));
 
-    await unique(registryFieldLabel("cadences", "name"), () => prisma.feeCadence.create({ data: { name } }));
+    await unique(registryFieldLabel("cadences", "name"), () =>
+      prisma.feeCadence.create({ data: { name, kind } }),
+    );
   });
 }
 
@@ -453,12 +465,15 @@ export async function updateFeeCadence(formData: FormData) {
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
     const name = requiredText(formData, "name", registryEditLabel("cadences", "name"));
+    const kind = enumField(formData, "kind", FEE_KINDS, registryEditLabel("cadences", "kind"));
 
     const known = await prisma.feeCadence.findUnique({ where: { id: cadenceId }, select: { id: true } });
     if (!known) throw new FieldError(fieldErrors.choice(settings.cadences.heading));
 
+    // The kind only decides how *future* plans are generated; plans already published keep
+    // the period rows they were saved with.
     await unique(settings.cadences.edit.title, () =>
-      prisma.feeCadence.update({ where: { id: cadenceId }, data: { name } }),
+      prisma.feeCadence.update({ where: { id: cadenceId }, data: { name, kind } }),
     );
   });
 }
@@ -470,13 +485,15 @@ export async function deleteFeeCadence(formData: FormData) {
   return onSave("/dashboard/programs", AFFECTED, async () => {
     const known = await prisma.feeCadence.findUnique({
       where: { id: cadenceId },
-      select: { id: true, _count: { select: { programs: true } } },
+      select: { id: true, _count: { select: { programs: true, plans: true } } },
     });
     if (!known) throw new FieldError(fieldErrors.choice(settings.cadences.heading));
 
+    // A published fee plan also pins the payment type, even when no programme row still
+    // points at it, so both counts have to clear before the delete is attempted.
     await refuseWhenUsed(
       settings.cadences.remove.blocked,
-      async () => known._count.programs > 0,
+      async () => known._count.programs > 0 || known._count.plans > 0,
       () => prisma.feeCadence.delete({ where: { id: known.id } }),
     );
   });

@@ -94,7 +94,16 @@ export default async function ProgramsPage({
       duration: copy.duration(program.durationMonths),
       minKcseGrade: labels.entryGrade[program.minKcseGrade],
       students: String(program.enrolledCount),
-      fees: program.feePlans[0] ? money(program.feePlans[0].totalAmount) : common.notSet,
+      fees: program.feePlans[0] ? (
+        money(program.feePlans[0].totalAmount)
+      ) : (
+        <Link
+          href={`/dashboard/programs/${program.id}/fees`}
+          className="font-medium text-eavi-primary-text underline-offset-4 hover:underline"
+        >
+          {copy.feePlan.setLink}
+        </Link>
+      ),
       curriculum: documentCell(program.curriculumUrl, copy.curriculum),
       feeStructure: documentCell(program.feeStructureUrl, copy.feeStructure),
       actions: (
@@ -178,6 +187,7 @@ export default async function ProgramsPage({
     id: cadence.id,
     cells: {
       name: cadence.name,
+      kind: labels.feePeriodKind[cadence.kind],
       programs: String(cadence.programs.length),
       actions: (
         <div className="flex flex-wrap items-center gap-2">
@@ -185,7 +195,7 @@ export default async function ProgramsPage({
             id={`edit-cadence-${cadence.id}`}
             button={settings.cadences.edit.button}
             fields={settings.cadences.edit.fields}
-            values={{ name: cadence.name }}
+            values={{ name: cadence.name, kind: cadence.kind }}
             hidden={{ cadenceId: cadence.id }}
             action={updateFeeCadence}
             submitLabel={common.update}

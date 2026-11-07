@@ -4,13 +4,7 @@
  * enrolment runs the same code on the server to date the bills, so the two can never drift.
  */
 
-export type FeeKind =
-  | "MONTHLY"
-  | "SEMESTER"
-  | "TERM"
-  | "ACADEMIC_YEAR"
-  | "ONE_TIME"
-  | "CUSTOM";
+export type FeeKind = "MONTHLY" | "SEMESTER" | "ACADEMIC_YEAR" | "ONE_TIME" | "CUSTOM";
 
 /** A period as it is typed into the fee editor. Amounts stay strings until the action. */
 export type PeriodDraft = {
@@ -65,7 +59,6 @@ export function periodCount(kind: FeeKind, durationMonths: number, semestersPerY
     case "MONTHLY":
       return Math.min(MAX_PERIODS, months);
     case "SEMESTER":
-    case "TERM":
       return Math.min(MAX_PERIODS, Math.max(1, Math.round((months / 12) * perYear)));
     case "ACADEMIC_YEAR":
       return Math.min(MAX_PERIODS, Math.max(1, Math.ceil(months / 12)));
@@ -93,11 +86,6 @@ function periodLabel(
       const semesterNo = (index % perYear) + 1;
       return { label: `Year ${yearIndex} · Semester ${semesterNo}`, yearIndex, semesterNo };
     }
-    case "TERM": {
-      const yearIndex = Math.floor(index / perYear) + 1;
-      const semesterNo = (index % perYear) + 1;
-      return { label: `Year ${yearIndex} · Term ${semesterNo}`, yearIndex, semesterNo };
-    }
     case "ACADEMIC_YEAR":
       return { label: `Year ${index + 1}`, yearIndex: index + 1, semesterNo: null };
     case "ONE_TIME":
@@ -113,7 +101,6 @@ function offsetDays(kind: FeeKind, index: number, perYear: number): number {
     case "MONTHLY":
       return Math.round(index * 30.4375);
     case "SEMESTER":
-    case "TERM":
       return Math.round((index / perYear) * 365);
     case "ACADEMIC_YEAR":
       return index * 365;
@@ -213,7 +200,7 @@ export function resolvePeriods(
   const holding = semesterHolding(ordered, start);
   if (holding) baseIndex = ordered.indexOf(holding);
 
-  const calendarLinked = kind === "SEMESTER" || kind === "TERM";
+  const calendarLinked = kind === "SEMESTER";
 
   return periods.map((period, index) => {
     const semester = calendarLinked ? ordered[baseIndex + index] ?? null : null;
@@ -224,7 +211,7 @@ export function resolvePeriods(
         ? addMonths(start, index)
         : kind === "ACADEMIC_YEAR"
           ? addMonths(start, index * 12)
-          : kind === "SEMESTER" || kind === "TERM"
+          : kind === "SEMESTER"
             ? addMonths(start, Math.round((index / perYear) * 12))
             : kind === "ONE_TIME"
               ? start
