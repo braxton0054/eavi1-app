@@ -4,12 +4,15 @@ import { InvoiceStatus, PaymentMethod } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { fieldErrors, labels, pages } from "@/lib/content/dashboard";
+import { money } from "@/lib/format";
 import {
   FieldError,
   dateField,
   enumField,
   hiddenId,
   nextInvoiceNumber,
+  nextInvoiceNumbers,
+  nextReceiptNumber,
   onSave,
   requiredDate,
   requiredNumber,
@@ -18,6 +21,9 @@ import {
   semesterOnCampus,
   unique,
 } from "@/lib/actions/college/_shared";
+import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
+import { recomputeInvoice } from "@/lib/fees/ledger";
+import { allocateStudentPayment } from "@/lib/fees/payment";
 
 const METHODS = Object.keys(PaymentMethod) as (keyof typeof PaymentMethod)[];
 
@@ -35,33 +41,8 @@ const invoiceLabel =
 /** The table, the overview counters and the student profile all read this. */
 const AFFECTED = ["/dashboard/accounts", "/dashboard", "/dashboard/students"];
 
-/** Prisma hands back Decimal objects; only Number(String(v)) is safe for money. */
-const sumAmounts = (rows: { amount: unknown }[]) =>
-  rows.reduce((total, row) => total + (Number(String(row.amount)) || 0), 0);
-
-/**
- * The invoice status is always derived from its own rows, never typed in: lines decide what
- * is owed, payments decide how far it has got. A void invoice is left exactly as it is.
- */
-async function recompute(invoiceId: string) {
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
-    select: { status: true, lines: { select: { amount: true } }, payments: { select: { amount: true } } },
-  });
-  if (!invoice || invoice.status === InvoiceStatus.VOID) return;
-
-  const billed = sumAmounts(invoice.lines);
-  const paid = sumAmounts(invoice.payments);
-
-  const status =
-    invoice.lines.length > 0 && billed - paid <= 0
-      ? InvoiceStatus.PAID
-      : paid > 0 && paid < billed
-        ? InvoiceStatus.PARTIAL
-        : InvoiceStatus.OPEN;
-
-  await prisma.invoice.update({ where: { id: invoiceId }, data: { status } });
-}
+/** The status of one invoice is recomputed from its own rows after every write. */
+const recompute = (invoiceId: string) => recomputeInvoice(prisma, invoiceId);
 
 /** Proves a form-supplied invoice id sits on the admin's campus and returns its owner. */
 async function campusInvoice(campusId: number | null, invoiceId: string) {
@@ -188,6 +169,97 @@ export async function recordPayment(formData: FormData) {
     });
 
     await recompute(invoice.id);
+  });
+}
+
+/**
+ * One receipt, spread across a student's unpaid periods oldest-due first.
+ *
+ * The money is not parked in a new account: each period it settles gets a real payment row
+ * with the same receipt number, and each invoice's status is recomputed the same way a
+ * single-invoice payment is. That keeps the accounts module the single source of truth.
+ */
+export async function recordStudentPayment(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+
+  return onSave("/dashboard/accounts", AFFECTED, async () => {
+    const studentId = requiredText(formData, "studentId", fieldLabel("studentId"));
+    const amount = requiredNumber(formData, "amount", fieldLabel("amount"));
+    if (amount <= 0) throw new FieldError(fieldErrors.number(fieldLabel("amount")));
+
+    const method = enumField(formData, "method", METHODS, fieldLabel("method"));
+    const reference = text(formData, "reference");
+    const paidAt = requiredDate(formData, "paidAt", fieldLabel("paidAt"));
+
+    const student = await prisma.studentProfile.findFirst({
+      where: { id: studentId, ...(scope.campusId === null ? {} : { campusId: scope.campusId }) },
+      select: { id: true },
+    });
+    if (!student) throw new FieldError(fieldErrors.notOnCampus);
+
+    const receiptNo = await nextReceiptNumber();
+
+    await prisma.$transaction(async (tx) => {
+      const outcome = await allocateStudentPayment(tx, {
+        studentId: student.id,
+        amount,
+        method,
+        reference,
+        paidAt,
+        receiptNo,
+      });
+
+      if (!outcome.ok) {
+        throw outcome.reason === "overpay"
+          ? new FieldError(pages.accounts.payment.student.overpay(money(outcome.outstanding)))
+          : new FieldError(pages.accounts.payment.student.nothingOwed);
+      }
+    });
+  });
+}
+
+/**
+ * Bills a student who was enrolled before their programme's fee structure was published.
+ * Reads the same generator enrolment uses, so a backfilled schedule is identical and the
+ * unique key still refuses a second run.
+ */
+export async function generateEnrollmentFees(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+  const enrollmentId = hiddenId(formData, "enrollmentId", fieldLabel("studentId"));
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    select: {
+      id: true,
+      studentId: true,
+      programId: true,
+      campusId: true,
+      enrolledAt: true,
+      intake: { select: { commenceAt: true } },
+    },
+  });
+  if (!enrollment || (scope.campusId !== null && enrollment.campusId !== scope.campusId)) {
+    throw new FieldError(fieldErrors.notOnCampus);
+  }
+
+  const studentPath = `/dashboard/students/${enrollment.studentId}`;
+
+  return onSave(studentPath, [...AFFECTED, studentPath], async () => {
+    const plan = await activePlanFor(enrollment.programId);
+    if (!plan) throw new FieldError(pages.students.profile.fees.noPlan);
+
+    const numbers = await nextInvoiceNumbers(plan.periods.length);
+
+    await prisma.$transaction(async (tx) => {
+      await generateFeeSchedule(tx, {
+        studentId: enrollment.studentId,
+        enrollmentId: enrollment.id,
+        campusId: enrollment.campusId,
+        programId: enrollment.programId,
+        startDate: enrollment.intake?.commenceAt ?? enrollment.enrolledAt,
+        numbers,
+      });
+    });
   });
 }
 

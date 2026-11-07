@@ -12,6 +12,7 @@ import {
   dateField,
   enumField,
   nextAdmissionNo,
+  nextInvoiceNumbers,
   onSave,
   passwordField,
   phoneField,
@@ -19,6 +20,7 @@ import {
   text,
   unique,
 } from "@/lib/actions/college/_shared";
+import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
 
 async function maybeUpload(file: FormDataEntryValue | null, folder: string, keySeed: string) {
   if (!file || !(file instanceof File) || file.size === 0) return null;
@@ -83,6 +85,15 @@ export async function enrolStudent(formData: FormData) {
     const issuedAdmissionNo = admissionNoInput ?? (await nextAdmissionNo());
     const passwordHash = await hashPassword(password);
 
+    // The fee schedule is known before the write begins, so the invoice numbers for the
+    // whole programme can be reserved without one query per period inside the transaction.
+    const plan = await activePlanFor(programId);
+    const invoiceNumbers = await nextInvoiceNumbers(plan?.periods.length ?? 0);
+    const intake = intakeId
+      ? await prisma.intake.findUnique({ where: { id: intakeId }, select: { commenceAt: true } })
+      : null;
+    const startDate = intake?.commenceAt ?? new Date();
+
     const profilePhotoUrl = await maybeUpload(formData.get("profilePhoto"), "profile-photos", applicationId);
     const birthCertificateUrl = await maybeUpload(formData.get("birthCertificate"), "birth-certificates", applicationId);
     const primarySchoolDocUrl = await maybeUpload(formData.get("primarySchoolDoc"), "school-docs", applicationId);
@@ -131,7 +142,7 @@ export async function enrolStudent(formData: FormData) {
         }),
       );
 
-      await tx.enrollment.create({
+      const enrollment = await tx.enrollment.create({
         data: {
           studentId: profile.id,
           programId,
@@ -139,6 +150,18 @@ export async function enrolStudent(formData: FormData) {
           campusId,
           status: EnrollmentStatus.ACTIVE,
         },
+        select: { id: true },
+      });
+
+      // The student's fee obligations are written in the same transaction as the enrolment,
+      // so an admitted student never exists without the bills their programme implies.
+      await generateFeeSchedule(tx, {
+        studentId: profile.id,
+        enrollmentId: enrollment.id,
+        campusId,
+        programId,
+        startDate,
+        numbers: invoiceNumbers,
       });
 
       // Parent/guardians (multiple)

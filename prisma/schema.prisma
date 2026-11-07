@@ -101,6 +101,17 @@ enum InvoiceStatus {
   VOID
 }
 
+/// How a programme's fee is split into payable periods. The cadence row carries the kind so
+/// the period rows can be generated from the duration instead of being typed one by one.
+enum FeePeriodKind {
+  MONTHLY
+  SEMESTER
+  TERM
+  ACADEMIC_YEAR
+  ONE_TIME
+  CUSTOM
+}
+
 enum PaymentMethod {
   MPESA
   CASH
@@ -231,13 +242,16 @@ model ProgramType {
 }
 
 /// How often a programme's fees fall due. Registered in programme settings so the
-/// list is not fixed by the code.
+/// list is not fixed by the code. `kind` decides how the payable periods are generated:
+/// twelve monthly periods, one per calendar semester, a single payment, and so on.
 model FeeCadence {
-  id        String    @id @default(uuid())
-  name      String    @unique
+  id        String         @id @default(uuid())
+  name      String         @unique
+  kind      FeePeriodKind  @default(CUSTOM)
   programs  Program[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  plans     ProgramFeePlan[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   @@map("fee_cadences")
 }
@@ -269,6 +283,7 @@ model Program {
   enrollments    Enrollment[]
   applications   Application[]
   feeItems       FeeItem[]
+  feePlans       ProgramFeePlan[]
   exams          Exam[]
   timetableSlots TimetableSlot[]
   idCards        IdCard[]
@@ -496,6 +511,8 @@ model Enrollment {
   enrolledAt  DateTime         @default(now())
   withdrawnAt DateTime?
   grades      Grade[]
+  /// The fee schedule generated for this enrolment, one invoice per payable period.
+  invoices    Invoice[]
 
   @@unique([studentId, programId])
   @@index([campusId, status])
@@ -567,19 +584,62 @@ model Grade {
   @@map("grades")
 }
 
-/// A billable component of a programme's fees, optionally per term.
-model FeeItem {
-  id         String   @id @default(uuid())
-  programId  String
-  program    Program  @relation(fields: [programId], references: [id])
-  semesterId String?
-  semester   Semester? @relation(fields: [semesterId], references: [id])
-  label      String
-  amount     Decimal  @db.Decimal(12, 2)
-  isOptional Boolean  @default(false)
-  createdAt  DateTime @default(now())
+/// One published version of a programme's fee structure. Amounts live in the period rows
+/// below; a plan is never edited in place, because students already enrolled hold invoices
+/// copied from it. Saving a change writes version n+1 and retires version n.
+model ProgramFeePlan {
+  id             String       @id @default(uuid())
+  programId      String
+  program        Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  version        Int
+  cadenceId      String
+  cadence        FeeCadence   @relation(fields: [cadenceId], references: [id])
+  /// Copied from the programme when the version is published, so the period list stays
+  /// readable even if the programme's duration is later corrected.
+  durationMonths Int
+  totalAmount    Decimal      @db.Decimal(12, 2)
+  note           String?
+  /// Exactly one plan per programme is active; the partial unique index in the migration
+  /// enforces that, which a plain unique constraint cannot do.
+  isActive       Boolean      @default(true)
+  periods        FeeItem[]
+  invoices       Invoice[]
+  createdAt      DateTime     @default(now())
 
+  @@unique([programId, version])
+  @@index([programId, isActive])
+  @@map("program_fee_plans")
+}
+
+/// A billable component of a programme's fees. Under a fee plan each row is one payable
+/// period (a month, a semester, a year) in the order the student meets it. `semesterId` is
+/// only set on legacy per-term components, which are not part of a plan.
+model FeeItem {
+  id            String          @id @default(uuid())
+  programId     String
+  program       Program         @relation(fields: [programId], references: [id])
+  planId        String?
+  plan          ProgramFeePlan? @relation(fields: [planId], references: [id], onDelete: Cascade)
+  semesterId    String?
+  semester      Semester?       @relation(fields: [semesterId], references: [id])
+  label         String
+  amount        Decimal         @db.Decimal(12, 2)
+  isOptional    Boolean         @default(false)
+  /// Position in the plan, 1-based. Null on legacy rows that predate plans.
+  sequence      Int?
+  /// Which year of the programme the period sits in (1 = first year), for calendar linking.
+  yearIndex     Int?
+  /// Which semester or term of that year, numbered from the institution's own calendar.
+  semesterNo    Int?
+  /// Days after the student's start that this period falls due. The calendar link overrides
+  /// it when the campus has a real semester for this period.
+  dueOffsetDays Int?
+  invoices      Invoice[]       @relation("FeePeriodInvoices")
+  createdAt     DateTime        @default(now())
+
+  @@unique([planId, sequence])
   @@index([programId])
+  @@index([planId])
   @@map("fee_items")
 }
 
@@ -593,6 +653,16 @@ model Invoice {
   semesterId String?
   semester   Semester?     @relation(fields: [semesterId], references: [id])
   programId String?
+  /// Set on a bill generated from a programme's fee plan. Null on a manually raised bill.
+  enrollmentId String?
+  enrollment   Enrollment?     @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  feePlanId    String?
+  feePlan      ProgramFeePlan? @relation(fields: [feePlanId], references: [id], onDelete: SetNull)
+  feePeriodId  String?
+  feePeriod    FeeItem?        @relation("FeePeriodInvoices", fields: [feePeriodId], references: [id], onDelete: SetNull)
+  /// Which academic year and semester of the student's programme this period belongs to.
+  periodYear     Int?
+  periodSemester Int?
   dueAt     DateTime?
   status    InvoiceStatus @default(OPEN)
   note      String?
@@ -601,8 +671,11 @@ model Invoice {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
+  /// Retrying the same enrolment can never bill a period twice.
+  @@unique([enrollmentId, feePeriodId])
   @@index([studentId])
   @@index([campusId, status])
+  @@index([feePlanId])
   @@map("invoices")
 }
 
@@ -626,10 +699,14 @@ model Payment {
   amount    Decimal       @db.Decimal(12, 2)
   method    PaymentMethod
   reference String?
+  /// One receipt can be split across several overdue periods; every row it created carries
+  /// the same number, which is how a finance officer traces the money back to one payment.
+  receiptNo String?
   paidAt    DateTime      @default(now())
 
   @@index([invoiceId])
   @@index([studentId])
+  @@index([receiptNo])
   @@map("payments")
 }
 

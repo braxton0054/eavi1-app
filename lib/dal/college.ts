@@ -347,7 +347,15 @@ export async function getStudent(id: string) {
       },
       invoices: {
         orderBy: { createdAt: "desc" },
-        include: { lines: true, payments: { orderBy: { paidAt: "desc" } } },
+        include: {
+          lines: true,
+          payments: { orderBy: { paidAt: "desc" } },
+          // A generated bill carries the period it came from and, where the plan was tied
+          // to the calendar, the actual semester it falls in.
+          feePeriod: { select: { sequence: true, label: true } },
+          feePlan: { select: { version: true } },
+          semester: { select: { name: true, startDate: true, endDate: true } },
+        },
       },
       idCards: { orderBy: { createdAt: "desc" }, include: { program: { select: { name: true } } } },
     },
@@ -523,6 +531,12 @@ async function programsFor(campusId: number | null, q?: string) {
       body: { select: { id: true, name: true, code: true } },
       type: { select: { id: true, name: true, code: true } },
       enrollments: { where: { status: "ACTIVE" }, select: { id: true } },
+      // The fee column reads the published version, not a draft the administrator abandoned.
+      feePlans: {
+        where: { isActive: true },
+        select: { id: true, version: true, totalAmount: true },
+        take: 1,
+      },
     },
   });
 
@@ -588,6 +602,59 @@ export async function getProgramRegistryOptions() {
     bodies: bodies.map((row) => ({ value: row.id, label: row.name })),
     programTypes: types.map((row) => ({ value: row.id, label: row.name })),
     feeCadences: cadences.map((row) => ({ value: row.id, label: row.name })),
+  };
+}
+
+/**
+ * Everything the fee editor needs: the programme, the version currently live, the payment
+ * methods, and the campus calendar the semester periods will be dated against.
+ */
+export async function getProgramFees(programId: string) {
+  const scope = await requireCollegeAdmin();
+
+  const program = await prisma.program.findFirst({
+    where: {
+      id: programId,
+      ...(scope.campusId === null ? {} : { campuses: { some: { id: scope.campusId } } }),
+    },
+    include: {
+      campuses: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+      feePlans: {
+        where: { isActive: true },
+        include: {
+          cadence: { select: { id: true, name: true, kind: true } },
+          periods: { orderBy: { sequence: "asc" } },
+        },
+      },
+    },
+  });
+  if (!program) throw new Error("not_found");
+
+  // The preview calendar belongs to the campus being worked in; a college-wide admin sees
+  // the first campus that offers the programme.
+  const campusId = scope.campusId ?? program.campuses[0]?.id ?? null;
+
+  const [calendar, cadences] = await Promise.all([
+    campusId === null
+      ? Promise.resolve([])
+      : prisma.semester.findMany({
+          where: { campusId },
+          orderBy: { startDate: "asc" },
+          select: { id: true, year: true, semesterNo: true, name: true, startDate: true, endDate: true, status: true },
+        }),
+    prisma.feeCadence.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, kind: true },
+    }),
+  ]);
+
+  return {
+    scope,
+    program,
+    campusId,
+    plan: program.feePlans[0] ?? null,
+    calendar,
+    cadences,
   };
 }
 
@@ -872,6 +939,102 @@ export async function getAccounts(query: ListQuery) {
 }
 
 const INVOICEABLE = { OPEN: "", PARTIAL: "", PAID: "", VOID: "" };
+
+/**
+ * The finance desk's view of the generated fee schedules: what they expect, what has been
+ * collected, what is late, and the same figures split by programme and by academic period.
+ * Only invoices produced by a fee plan are counted, so a one-off bill raised by hand does
+ * not distort the revenue picture.
+ */
+export async function getFinanceOverview() {
+  const scope = await requireCollegeAdmin();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const [invoices, programs] = await Promise.all([
+    prisma.invoice.findMany({
+      where: {
+        AND: [
+          campusWhere(scope.campusId),
+          { enrollmentId: { not: null } },
+          { status: { not: "VOID" } },
+        ],
+      },
+      select: {
+        programId: true,
+        periodYear: true,
+        periodSemester: true,
+        dueAt: true,
+        lines: { select: { amount: true } },
+        payments: { select: { amount: true } },
+      },
+    }),
+    prisma.program.findMany({ select: { id: true, name: true, code: true } }),
+  ]);
+
+  const programById = new Map(programs.map((program) => [program.id, program]));
+
+  const rows = invoices.map((invoice) => {
+    const expected = invoice.lines.reduce((sum, line) => sum + money(line.amount), 0);
+    const collected = invoice.payments.reduce((sum, payment) => sum + money(payment.amount), 0);
+    return {
+      programId: invoice.programId,
+      program: invoice.programId ? programById.get(invoice.programId) ?? null : null,
+      year: invoice.periodYear,
+      semester: invoice.periodSemester,
+      dueAt: invoice.dueAt,
+      expected,
+      collected,
+      balance: expected - collected,
+    };
+  });
+
+  const total = (pick: (row: (typeof rows)[number]) => number) => rows.reduce((sum, row) => sum + pick(row), 0);
+
+  const overdue = rows.filter((row) => row.balance > 0.005 && row.dueAt !== null && row.dueAt < today);
+
+  const byProgram = new Map<string, { name: string; expected: number; collected: number; outstanding: number }>();
+  for (const row of rows) {
+    const key = row.programId ?? "unknown";
+    const entry = byProgram.get(key) ?? {
+      name: row.program ? `${row.program.name} (${row.program.code})` : "Unassigned",
+      expected: 0,
+      collected: 0,
+      outstanding: 0,
+    };
+    entry.expected += row.expected;
+    entry.collected += row.collected;
+    entry.outstanding += Math.max(0, row.balance);
+    byProgram.set(key, entry);
+  }
+
+  const byPeriod = new Map<string, { name: string; expected: number; collected: number; outstanding: number }>();
+  for (const row of rows) {
+    const name =
+      row.year === null
+        ? "Period not linked to a calendar year"
+        : row.semester === null
+          ? `Year ${row.year}`
+          : `Year ${row.year} · Semester ${row.semester}`;
+    const entry = byPeriod.get(name) ?? { name, expected: 0, collected: 0, outstanding: 0 };
+    entry.expected += row.expected;
+    entry.collected += row.collected;
+    entry.outstanding += Math.max(0, row.balance);
+    byPeriod.set(name, entry);
+  }
+
+  return {
+    totals: {
+      expected: total((row) => row.expected),
+      collected: total((row) => row.collected),
+      outstanding: total((row) => Math.max(0, row.balance)),
+      overdue: overdue.reduce((sum, row) => sum + row.balance, 0),
+      overdueCount: overdue.length,
+    },
+    byProgram: [...byProgram.values()].sort((a, b) => b.expected - a.expected),
+    byPeriod: [...byPeriod.values()].sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
 
 /* --------------------------------------------------------------------- cards */
 

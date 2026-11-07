@@ -332,6 +332,36 @@ export function nextInvoiceNumber() {
   );
 }
 
+/**
+ * A whole fee schedule is billed in one transaction, so it needs its numbers reserved up
+ * front: each one is checked against the table and against the ones already reserved here,
+ * because `count()` cannot see rows the transaction has not written yet.
+ */
+export async function nextInvoiceNumbers(count: number): Promise<string[]> {
+  const reserved: string[] = [];
+  let sequence = (await prisma.invoice.count()) + 1;
+
+  while (reserved.length < count) {
+    const code = `INV/${year()}/${pad(sequence, 5)}`;
+    if (!reserved.includes(code) && (await prisma.invoice.count({ where: { number: code } })) === 0) {
+      reserved.push(code);
+    }
+    sequence += 1;
+    if (sequence > 10_000_000) throw new FieldError(fieldErrors.exhausted);
+  }
+
+  return reserved;
+}
+
+/** The reference a payer is given; one receipt may settle several periods. */
+export function nextReceiptNumber() {
+  return issueCode(
+    () => prisma.payment.count({ where: { receiptNo: { not: null } } }),
+    (sequence) => `RCP/${year()}/${pad(sequence, 4)}`,
+    (code) => prisma.payment.count({ where: { receiptNo: code } }),
+  );
+}
+
 export function nextCardSerial() {
   return issueCode(
     () => prisma.idCard.count(),

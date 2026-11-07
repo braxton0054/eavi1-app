@@ -1,11 +1,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { generateEnrollmentFees, recordStudentPayment } from "@/lib/actions/college/accounts";
 import { getStudent } from "@/lib/dal/college";
 import { genderLabel } from "@/lib/content/apply";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
-import { EmptyState, PageHeader, Panel } from "@/components/dashboard/panel";
+import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
+import { EmptyState, PageHeader, Panel, StatTile } from "@/components/dashboard/panel";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { formatDate, money } from "@/lib/format";
@@ -26,6 +28,14 @@ const cardTone: Record<string, ChipTone> = {
   ISSUED: "success",
   LOST: "danger",
   REPLACED: "warning",
+};
+
+const feeTone: Record<string, ChipTone> = {
+  PENDING: "warning",
+  PARTIAL: "info",
+  PAID: "success",
+  OVERDUE: "danger",
+  VOID: "neutral",
 };
 
 /** Prisma hands back Decimal objects for money; only Number(String(v)) is safe here. */
@@ -109,26 +119,102 @@ export default async function StudentProfilePage({
     },
   }));
 
-  const invoiceRows: Row[] = student.invoices.map((invoice) => {
+  const feeCopy = copy.profile.fees;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // A fee period's status is derived, never stored: what is owed comes from the lines, what
+  // was paid from the payments, and "overdue" simply means the due date has gone by.
+  const feeRows = student.invoices.map((invoice) => {
     const billed = sum(invoice.lines);
     const paid = sum(invoice.payments);
-    return {
-      id: invoice.id,
-      cells: {
-        number: invoice.number,
-        issued: formatDate(invoice.createdAt),
-        dueAt: formatDate(invoice.dueAt),
-        billed: money(billed),
-        paid: money(paid),
-        balance: money(billed - paid),
-        status: (
-          <StatusChip tone={invoice.status === "PAID" ? "success" : invoice.status === "VOID" ? "neutral" : "warning"}>
-            {labels.invoiceStatus[invoice.status]}
-          </StatusChip>
-        ),
-      },
-    };
+    const balance = billed - paid;
+    const overdue =
+      invoice.status !== "VOID" &&
+      balance > 0.005 &&
+      invoice.dueAt !== null &&
+      new Date(invoice.dueAt) < today;
+
+    const status: keyof typeof labels.periodStatus =
+      invoice.status === "VOID"
+        ? "VOID"
+        : balance <= 0.005
+          ? "PAID"
+          : overdue
+            ? "OVERDUE"
+            : paid > 0.005
+              ? "PARTIAL"
+              : "PENDING";
+
+    return { invoice, billed, paid, balance, status };
   });
+
+  const payable = feeRows.filter((row) => row.status !== "VOID");
+  const billed = payable.reduce((total, row) => total + row.billed, 0);
+  const collected = payable.reduce((total, row) => total + row.paid, 0);
+  const outstanding = Math.max(0, billed - collected);
+  const settled = payable.filter((row) => row.status === "PAID").length;
+
+  const unpaid = payable
+    .filter((row) => row.balance > 0.005)
+    .sort(
+      (a, b) =>
+        (a.invoice.dueAt?.getTime() ?? Number.MAX_SAFE_INTEGER) -
+        (b.invoice.dueAt?.getTime() ?? Number.MAX_SAFE_INTEGER),
+    );
+  const nextDue = unpaid[0] ?? null;
+  const overdueRows = unpaid.filter((row) => row.status === "OVERDUE");
+  const overdueAmount = overdueRows.reduce((total, row) => total + row.balance, 0);
+
+  const current =
+    [...payable]
+      .filter((row) => row.invoice.dueAt !== null && new Date(row.invoice.dueAt) <= today)
+      .sort(
+        (a, b) =>
+          (b.invoice.dueAt?.getTime() ?? 0) - (a.invoice.dueAt?.getTime() ?? 0),
+      )[0] ?? null;
+
+  const feeTableRows: Row[] = payable.map((row) => ({
+    id: row.invoice.id,
+    cells: {
+      period: row.invoice.feePeriod?.label ?? row.invoice.note ?? row.invoice.number,
+      calendar: row.invoice.semester?.name ?? common.notSet,
+      dueAt: formatDate(row.invoice.dueAt),
+      amount: money(row.billed),
+      paid: money(row.paid),
+      balance: (
+        <span className={row.balance > 0.005 ? "text-eavi-destructive" : undefined}>
+          {money(row.balance)}
+        </span>
+      ),
+      status: (
+        <StatusChip tone={feeTone[row.status] ?? "neutral"}>
+          {labels.periodStatus[row.status]}
+        </StatusChip>
+      ),
+    },
+  }));
+
+  const payments = student.invoices
+    .flatMap((invoice) =>
+      invoice.payments.map((payment) => ({
+        payment,
+        period: invoice.feePeriod?.label ?? invoice.number,
+      })),
+    )
+    .sort((a, b) => b.payment.paidAt.getTime() - a.payment.paidAt.getTime());
+
+  const paymentRows: Row[] = payments.map(({ payment, period }) => ({
+    id: payment.id,
+    cells: {
+      paidAt: formatDate(payment.paidAt),
+      receipt: payment.receiptNo ?? common.notSet,
+      period,
+      method: labels.paymentMethod[payment.method],
+      reference: payment.reference ?? common.notSet,
+      amount: money(payment.amount),
+    },
+  }));
 
   const cardRows: Row[] = student.idCards.map((card) => ({
     id: card.id,
@@ -184,18 +270,82 @@ export default async function StudentProfilePage({
         )}
       </Panel>
 
-      <Panel title={copy.profile.finance}>
-        {invoiceRows.length === 0 ? (
-          <EmptyState title={pages.accounts.empty.title} body={pages.accounts.empty.body} icon="accounts" />
+      <section aria-label={feeCopy.overview} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatTile label={feeCopy.totalFees} value={money(billed)} icon="accounts" tone="neutral" />
+        <StatTile label={feeCopy.paid} value={money(collected)} icon="accounts" tone="money" />
+        <StatTile
+          label={feeCopy.outstanding}
+          value={money(outstanding)}
+          icon="accounts"
+          tone="attention"
+        />
+        <StatTile
+          label={feeCopy.nextDue}
+          value={nextDue ? money(nextDue.balance) : feeCopy.settled}
+          icon="calendar"
+          tone="neutral"
+        />
+      </section>
+
+      <Panel
+        title={feeCopy.obligations}
+        description={`${feeCopy.progress(settled, payable.length)} · ${feeCopy.currentPeriod}: ${
+          current?.invoice.feePeriod?.label ?? feeCopy.notStarted
+        }`}
+      >
+        {feeTableRows.length === 0 ? (
+          <div className="space-y-4 p-4">
+            <p className="text-sm text-eavi-muted-text">{feeCopy.empty}</p>
+            {activeEnrollment ? (
+              <RowForm
+                id={`generate-fees-${activeEnrollment.id}`}
+                button={feeCopy.generate}
+                fields={[]}
+                hidden={{ enrollmentId: activeEnrollment.id }}
+                action={generateEnrollmentFees}
+                submitLabel={feeCopy.generate}
+              />
+            ) : (
+              <p className="text-sm text-eavi-muted-text">{feeCopy.noEnrollment}</p>
+            )}
+          </div>
+        ) : (
+          <>
+            <DataTable
+              columns={feeCopy.columns as Column[]}
+              rows={feeTableRows}
+              caption={feeCopy.obligations}
+            />
+            <div className="flex flex-wrap items-center gap-4 border-t border-eavi-border p-4">
+              <DisclosureForm
+                id={`student-payment-${student.id}`}
+                button={pages.accounts.payment.student.button}
+                title={pages.accounts.payment.student.title}
+                fields={pages.accounts.payment.student.fields.filter(
+                  (field) => field.name !== "studentId",
+                )}
+                hidden={{ studentId: student.id }}
+                action={recordStudentPayment}
+                submitLabel={common.record}
+              />
+              {overdueRows.length > 0 ? (
+                <p className="text-sm text-eavi-destructive">
+                  {feeCopy.overdue}: {money(overdueAmount)}
+                </p>
+              ) : null}
+            </div>
+          </>
+        )}
+      </Panel>
+
+      <Panel title={feeCopy.history}>
+        {paymentRows.length === 0 ? (
+          <p className="p-4 text-sm text-eavi-muted-text">{feeCopy.historyEmpty}</p>
         ) : (
           <DataTable
-            columns={[
-              ...ordered(pages.accounts.invoiceColumns, ["number", "issued", "dueAt"]),
-              { key: "billed", label: pages.accounts.summary.billed, align: "end" },
-              ...ordered(pages.accounts.invoiceColumns, ["paid", "balance", "status"]),
-            ]}
-            rows={invoiceRows}
-            caption={copy.profile.finance}
+            columns={feeCopy.historyColumns as Column[]}
+            rows={paymentRows}
+            caption={feeCopy.history}
           />
         )}
       </Panel>

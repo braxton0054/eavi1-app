@@ -2,10 +2,12 @@ import {
   addInvoiceLine,
   createInvoice,
   recordPayment,
+  recordStudentPayment,
   voidInvoice,
 } from "@/lib/actions/college/accounts";
 import {
   getAccounts,
+  getFinanceOverview,
   getInvoiceOptions,
   getStudentOptions,
   getSemesterOptions,
@@ -41,8 +43,9 @@ export default async function AccountsPage({
   const { q, status, page, invalid } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  const [list, studentOptions, semesterOptions, invoiceOptions] = await Promise.all([
+  const [list, finance, studentOptions, semesterOptions, invoiceOptions] = await Promise.all([
     getAccounts({ q, status, page: Number(page) || 1 }),
+    getFinanceOverview(),
     getStudentOptions(scope.campusId),
     getSemesterOptions(),
     getInvoiceOptions(scope.campusId),
@@ -152,6 +155,28 @@ export default async function AccountsPage({
     },
   }));
 
+  // Revenue split the two ways the finance desk is asked for it: by programme, and by the
+  // academic period the fee fell in.
+  const financeProgramRows: Row[] = finance.byProgram.map((row) => ({
+    id: row.name,
+    cells: {
+      name: row.name,
+      expected: money(row.expected),
+      collected: money(row.collected),
+      outstanding: money(row.outstanding),
+    },
+  }));
+
+  const financePeriodRows: Row[] = finance.byPeriod.map((row) => ({
+    id: row.name,
+    cells: {
+      name: row.name,
+      expected: money(row.expected),
+      collected: money(row.collected),
+      outstanding: money(row.outstanding),
+    },
+  }));
+
   return (
     <div className="space-y-6">
       <PageHeader title={copy.title} />
@@ -163,6 +188,62 @@ export default async function AccountsPage({
           <StatTile key={tile.label} label={tile.label} value={tile.value} icon="accounts" tone={tile.tone} />
         ))}
       </section>
+
+      <section aria-label={copy.finance.title} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatTile
+          label={copy.finance.expected}
+          value={money(finance.totals.expected)}
+          icon="accounts"
+          tone="neutral"
+        />
+        <StatTile
+          label={copy.finance.collected}
+          value={money(finance.totals.collected)}
+          icon="accounts"
+          tone="money"
+        />
+        <StatTile
+          label={copy.finance.outstanding}
+          value={money(finance.totals.outstanding)}
+          icon="accounts"
+          tone="attention"
+        />
+        <StatTile
+          label={copy.finance.overdue}
+          value={money(finance.totals.overdue)}
+          icon="calendar"
+          tone="attention"
+        />
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel
+          title={copy.finance.byProgram}
+          description={copy.finance.overdueCount(finance.totals.overdueCount)}
+        >
+          {financeProgramRows.length === 0 ? (
+            <p className="p-4 text-sm text-eavi-muted-text">{copy.finance.empty}</p>
+          ) : (
+            <DataTable
+              columns={copy.finance.columns as Column[]}
+              rows={financeProgramRows}
+              caption={copy.finance.byProgram}
+            />
+          )}
+        </Panel>
+
+        <Panel title={copy.finance.byPeriod} description={copy.finance.description}>
+          {financePeriodRows.length === 0 ? (
+            <p className="p-4 text-sm text-eavi-muted-text">{copy.finance.byPeriodEmpty}</p>
+          ) : (
+            <DataTable
+              columns={copy.finance.periodColumns as Column[]}
+              rows={financePeriodRows}
+              caption={copy.finance.byPeriod}
+            />
+          )}
+        </Panel>
+      </div>
 
       {scope.campusId !== null ? (
         <DisclosureForm
@@ -177,6 +258,19 @@ export default async function AccountsPage({
       ) : (
         <Notice tone="neutral" title={copy.create.button} body={shell.chooseCampus} />
       )}
+
+      <div className="space-y-2">
+        <p className="text-xs text-eavi-muted-text">{copy.payment.student.hint}</p>
+        <DisclosureForm
+          id="new-student-payment"
+          button={copy.payment.student.button}
+          title={copy.payment.student.title}
+          fields={copy.payment.student.fields}
+          options={options}
+          action={recordStudentPayment}
+          submitLabel={common.record}
+        />
+      </div>
 
       <DisclosureForm
         id="new-payment"

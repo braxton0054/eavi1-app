@@ -8,11 +8,13 @@ import {
   FieldError,
   enumField,
   hiddenId,
+  nextInvoiceNumbers,
   onSave,
   requiredText,
   text,
   unique,
 } from "@/lib/actions/college/_shared";
+import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
 
 const STATUSES = Object.keys(EnrollmentStatus) as (keyof typeof EnrollmentStatus)[];
 
@@ -64,18 +66,40 @@ export async function createEnrollment(formData: FormData) {
     });
     if (existing) throw new FieldError(fieldErrors.duplicate(fieldLabel("programId")));
 
-    await unique(fieldLabel("studentId"), () =>
-      prisma.enrollment.create({
-        data: {
-          studentId,
-          programId,
-          intakeId: intakeId ?? null,
-          cohort,
-          campusId: scope.campusId ?? student.campusId,
-          status: EnrollmentStatus.ACTIVE,
-        },
-      }),
-    );
+    const campusId = scope.campusId ?? student.campusId;
+
+    // A second programme enrolment brings its own fee schedule, so the numbers are reserved
+    // up front and the bills are written with the enrolment in one transaction.
+    const plan = await activePlanFor(programId);
+    const invoiceNumbers = await nextInvoiceNumbers(plan?.periods.length ?? 0);
+    const intake = intakeId
+      ? await prisma.intake.findUnique({ where: { id: intakeId }, select: { commenceAt: true } })
+      : null;
+
+    await prisma.$transaction(async (tx) => {
+      const enrollment = await unique(fieldLabel("studentId"), () =>
+        tx.enrollment.create({
+          data: {
+            studentId,
+            programId,
+            intakeId: intakeId ?? null,
+            cohort,
+            campusId,
+            status: EnrollmentStatus.ACTIVE,
+          },
+          select: { id: true },
+        }),
+      );
+
+      await generateFeeSchedule(tx, {
+        studentId,
+        enrollmentId: enrollment.id,
+        campusId,
+        programId,
+        startDate: intake?.commenceAt ?? new Date(),
+        numbers: invoiceNumbers,
+      });
+    });
   });
 }
 

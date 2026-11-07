@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
   createDepartment,
   createFeeCadence,
@@ -31,6 +33,7 @@ import { DisclosureForm, RowForm, type OptionSets } from "@/components/dashboard
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
 import { StatusChip } from "@/components/dashboard/status-chip";
 import { SettingsDialog } from "@/components/dashboard/settings-dialog";
+import { money } from "@/lib/format";
 
 const copy = pages.programs;
 const settings = copy.settings;
@@ -91,10 +94,17 @@ export default async function ProgramsPage({
       duration: copy.duration(program.durationMonths),
       minKcseGrade: labels.entryGrade[program.minKcseGrade],
       students: String(program.enrolledCount),
+      fees: program.feePlans[0] ? money(program.feePlans[0].totalAmount) : common.notSet,
       curriculum: documentCell(program.curriculumUrl, copy.curriculum),
       feeStructure: documentCell(program.feeStructureUrl, copy.feeStructure),
       actions: (
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/dashboard/programs/${program.id}/fees`}
+            className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-3 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
+          >
+            {copy.feePlan.link}
+          </Link>
           <RowForm
             id={`edit-program-${program.id}`}
             button={copy.edit.button}

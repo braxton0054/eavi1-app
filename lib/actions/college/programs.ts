@@ -221,6 +221,108 @@ export async function deleteProgram(formData: FormData) {
   });
 }
 
+/** Every row of the fee form arrives as its own parallel list, in the order it is drawn. */
+function column(formData: FormData, name: string): string[] {
+  return formData.getAll(name).map((value) => String(value ?? "").trim());
+}
+
+/**
+ * Publishes a new version of a programme's fee structure.
+ *
+ * The previous version is retired rather than edited, so an enrolled student keeps the
+ * amounts their invoices were written from. Enrolments made after this point pick up the
+ * new version.
+ */
+export async function saveProgramFeePlan(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+  const programId = hiddenId(formData, "programId", copy.feePlan.title);
+  const feesPath = `/dashboard/programs/${programId}/fees`;
+
+  return onSave(feesPath, ["/dashboard/programs", feesPath, "/dashboard"], async () => {
+    const program = await knownProgram(programId, scope.campusId);
+
+    const cadenceId = requiredText(formData, "cadenceId", copy.feePlan.cadence);
+    const cadence = await prisma.feeCadence.findUnique({ where: { id: cadenceId }, select: { id: true } });
+    if (!cadence) throw new FieldError(fieldErrors.choice(copy.feePlan.cadence));
+
+    const durationMonths = requiredNumber(formData, "durationMonths", copy.feePlan.duration);
+    if (durationMonths < 1) throw new FieldError(fieldErrors.number(copy.feePlan.duration));
+
+    const labels = column(formData, "periodLabel");
+    const amounts = column(formData, "periodAmount");
+    const years = column(formData, "periodYear");
+    const semesters = column(formData, "periodSemester");
+    const offsets = column(formData, "periodOffset");
+
+    if (labels.length === 0) throw new FieldError(copy.feePlan.noPeriods);
+    if (amounts.length !== labels.length) throw new FieldError(copy.feePlan.noPeriods);
+
+    const periods = labels.map((label, index) => {
+      const amount = Number(String(amounts[index] ?? "").replace(/,/g, ""));
+      if (!Number.isFinite(amount) || amount < 0) {
+        throw new FieldError(fieldErrors.number(`${label} ${copy.feePlan.amount}`));
+      }
+      const yearIndex = Number(years[index]);
+      const semesterNo = Number(semesters[index]);
+      const offset = Number(offsets[index]);
+
+      return {
+        label: label || copy.feePlan.periodFallback(index + 1),
+        amount,
+        yearIndex: Number.isFinite(yearIndex) && yearIndex > 0 ? Math.round(yearIndex) : null,
+        semesterNo: Number.isFinite(semesterNo) && semesterNo > 0 ? Math.round(semesterNo) : null,
+        dueOffsetDays: Number.isFinite(offset) && offset > 0 ? Math.round(offset) : 0,
+      };
+    });
+
+    const total = periods.reduce((sum, period) => sum + period.amount, 0);
+    if (total <= 0) throw new FieldError(copy.feePlan.zeroTotal);
+
+    await prisma.$transaction(async (tx) => {
+      const last = await tx.programFeePlan.findFirst({
+        where: { programId: program.id },
+        orderBy: { version: "desc" },
+        select: { version: true },
+      });
+
+      const version = (last?.version ?? 0) + 1;
+
+      // Retired first: the partial unique index allows one active version per programme.
+      await tx.programFeePlan.updateMany({
+        where: { programId: program.id, isActive: true },
+        data: { isActive: false },
+      });
+
+      const plan = await tx.programFeePlan.create({
+        data: {
+          programId: program.id,
+          version,
+          cadenceId: cadence.id,
+          durationMonths: Math.round(durationMonths),
+          totalAmount: total,
+          note: text(formData, "note"),
+          isActive: true,
+        },
+        select: { id: true },
+      });
+
+      await tx.feeItem.createMany({
+        data: periods.map((period, index) => ({
+          programId: program.id,
+          planId: plan.id,
+          sequence: index + 1,
+          label: period.label,
+          amount: period.amount,
+          yearIndex: period.yearIndex,
+          semesterNo: period.semesterNo,
+          dueOffsetDays: period.dueOffsetDays,
+          isOptional: false,
+        })),
+      });
+    });
+  });
+}
+
 /** Short codes are the letters on every programme code, so they are stored upper-case. */
 function registryCode(value: string, label: string) {
   const code = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
