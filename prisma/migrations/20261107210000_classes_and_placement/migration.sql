@@ -41,6 +41,24 @@ CREATE TABLE "class_memberships" (
     CONSTRAINT "class_memberships_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+-- The audit log is created here rather than in a later migration, because this is the first
+-- migration that writes indexes onto it. Applied in timestamp order, a table introduced
+-- afterwards would leave these statements referencing something that does not exist yet.
+CREATE TABLE "audit_logs" (
+    "id" TEXT NOT NULL,
+    "campusId" INTEGER,
+    "actorId" TEXT,
+    "actorEmail" TEXT,
+    "action" TEXT NOT NULL,
+    "entityType" TEXT NOT NULL,
+    "entityId" TEXT NOT NULL,
+    "detail" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE INDEX "audit_logs_entityType_entityId_idx" ON "audit_logs"("entityType", "entityId");
 
