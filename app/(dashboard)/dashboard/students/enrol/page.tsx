@@ -1,4 +1,5 @@
 import { getApplication, getApplications, getIntakeOptions, getProgramOptions } from "@/lib/dal/college";
+import { getClassOptions, getPlacementOptionsByProgram } from "@/lib/dal/classes";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { EnrolmentForm } from "@/components/enrolment-form";
@@ -19,6 +20,13 @@ export default async function EnrolStudentPage({
     getApplications({ page: 1 }),
     getProgramOptions(scope.campusId),
     getIntakeOptions(),
+  ]);
+
+  // Classes and stages follow the programme the student is being enrolled on, so every
+  // offered programme carries its own stage list and the form switches between them.
+  const [classOptions, placementsByProgram] = await Promise.all([
+    getClassOptions(scope.campusId),
+    getPlacementOptionsByProgram(programOptions.map((option) => option.value)),
   ]);
 
   const enrolledIds = new Set(
@@ -55,7 +63,10 @@ export default async function EnrolStudentPage({
           reference: app.reference,
         };
       }
-    } catch {
+    } catch (error) {
+      // A bare catch here once hid a real failure: the office saw an empty form with no
+      // explanation. Log it so the cause is in the server log, never silently dropped.
+      console.error("enrol: could not load application", applicationId, error);
       selectedApplication = null;
     }
   }
@@ -84,7 +95,14 @@ export default async function EnrolStudentPage({
       ) : (
         <Panel>
           <div className="p-4 sm:p-6">
-            <EnrolmentForm application={selectedApplication} applications={availableApps} programs={programOptions} intakes={intakeOptions} />
+            <EnrolmentForm
+              application={selectedApplication}
+              applications={availableApps}
+              programs={programOptions}
+              intakes={intakeOptions}
+              classes={classOptions}
+              placementsByProgram={placementsByProgram}
+            />
           </div>
         </Panel>
       )}

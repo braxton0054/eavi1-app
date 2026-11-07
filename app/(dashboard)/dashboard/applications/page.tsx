@@ -1,9 +1,11 @@
+import Link from "next/link";
+
 import { createApplication } from "@/lib/actions/college/applications";
 import { clearReportingDate, saveReportingDate } from "@/lib/actions/college/reporting";
 import { getApplications, getProgramOptions, getReportingDates } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages, shell } from "@/lib/content/dashboard";
-import { DataTable, type Row } from "@/components/dashboard/data-table";
+import { RecordCard, RecordCardGrid, type RecordCardData } from "@/components/dashboard/record-card";
 import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
 import { ListFilters, Paginator, ResultCount, StepLink } from "@/components/dashboard/list-tools";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
@@ -53,29 +55,42 @@ export default async function ApplicationsPage({
     label,
   }));
 
-  const rows: Row[] = list.rows.map((application) => ({
-    id: application.id,
-    href: `/dashboard/applications/${application.id}`,
-    cells: {
-      reference: application.reference,
-      fullName: application.fullName,
-      contact: (
-        <span className="flex flex-col">
-          <span>{application.phone}</span>
-          {application.email ? (
-            <span className="text-xs text-eavi-muted-text">{application.email}</span>
-          ) : null}
-        </span>
-      ),
-      program: `${application.program.name} (${application.program.code})`,
+  // One applicant, one card. The whole card opens the application; a closed one offers no
+  // enrol button, because there is nothing left to admit.
+  const cards: RecordCardData[] = list.rows.map((application) => {
+    const open = application.status === "SUBMITTED" || application.status === "REVIEWING";
+
+    return {
+      id: application.id,
+      href: `/dashboard/applications/${application.id}`,
+      eyebrow: application.reference,
+      title: application.fullName,
+      subtitle: `${application.program.name} (${application.program.code})`,
       status: (
         <StatusChip tone={applicationTone[application.status] ?? "info"}>
           {labels.applicationStatus[application.status]}
         </StatusChip>
       ),
-      received: formatDate(application.createdAt),
-    },
-  }));
+      facts: [
+        { label: copy.card.contact, value: application.phone, showLabel: true },
+        {
+          label: "Email",
+          value: application.email ?? copy.card.noEmail,
+          showLabel: true,
+          tone: application.email ? "default" : "muted",
+        },
+        { label: copy.card.received, value: formatDate(application.createdAt), showLabel: true },
+      ],
+      action: open ? (
+        <Link
+          href={`/dashboard/students/enrol?application=${application.id}`}
+          className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
+        >
+          {copy.card.enrol}
+        </Link>
+      ) : undefined,
+    };
+  });
 
   /* ------------------------------------------------------- application dates */
 
@@ -135,11 +150,15 @@ export default async function ApplicationsPage({
           <ResultCount total={list.total} />
         </div>
 
-        {rows.length === 0 ? (
+        {cards.length === 0 ? (
           <EmptyState title={copy.empty.title} body={copy.empty.body} icon="applications" />
         ) : (
           <>
-            <DataTable columns={copy.columns} rows={rows} caption={copy.title} />
+            <RecordCardGrid>
+              {cards.map((card) => (
+                <RecordCard key={card.id} card={card} openLabel={copy.card.open} />
+              ))}
+            </RecordCardGrid>
             <div className="border-t border-eavi-border p-4">
               <Paginator
                 basePath="/dashboard/applications"

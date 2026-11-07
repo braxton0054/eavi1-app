@@ -205,11 +205,13 @@ export function RowForm(props: {
   aside?: ReactNode;
   /** Two columns in a wider card, for a row that carries a whole record's fields. */
   wide?: boolean;
+  /** Layout on the outer <details>, so the trigger can sit where the row needs it. */
+  className?: string;
 }) {
-  const { button, tone = "neutral", wide = false, ...form } = props;
+  const { button, tone = "neutral", wide = false, className, ...form } = props;
 
   return (
-    <details>
+    <details className={className}>
       <summary
         className={cn(
           "inline-flex min-h-11 cursor-pointer list-none items-center rounded-lg border px-3 text-sm font-medium underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden",

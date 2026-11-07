@@ -16,6 +16,7 @@ import {
 } from "@/lib/actions/college/_shared";
 import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
 import { registerEnrolmentUnits } from "@/lib/academics/registration";
+import { nextPeriod } from "@/lib/academics/progression";
 
 const STATUSES = Object.keys(EnrollmentStatus) as (keyof typeof EnrollmentStatus)[];
 
@@ -56,9 +57,13 @@ export async function createEnrollment(formData: FormData) {
     if (intakeId) {
       const intake = await prisma.intake.findUnique({
         where: { id: intakeId },
-        select: { id: true },
+        select: { id: true, campusId: true },
       });
       if (!intake) throw new FieldError(fieldErrors.choice(fieldLabel("intakeId")));
+      // A cohort belongs to one campus; a student cannot join another campus's intake.
+      if (intake.campusId !== (scope.campusId ?? student.campusId)) {
+        throw new FieldError(fieldErrors.notOnCampus);
+      }
     }
 
     // One student cannot sit on the same programme twice.
@@ -75,8 +80,14 @@ export async function createEnrollment(formData: FormData) {
     const plan = await activePlanFor(programId);
     const invoiceNumbers = await nextInvoiceNumbers(plan?.periods.length ?? 0);
     const intake = intakeId
-      ? await prisma.intake.findUnique({ where: { id: intakeId }, select: { commenceAt: true } })
+      ? await prisma.intake.findUnique({
+          where: { id: intakeId },
+          select: { id: true, startsAt: true },
+        })
       : null;
+
+    // Every student follows an intake's progression, so one is mandatory rather than optional.
+    if (!intake) throw new FieldError(fieldErrors.choice(fieldLabel("intakeId")));
 
     await prisma.$transaction(async (tx) => {
       const enrollment = await unique(fieldLabel("studentId"), () =>
@@ -84,9 +95,13 @@ export async function createEnrollment(formData: FormData) {
           data: {
             studentId,
             programId,
-            intakeId: intakeId ?? null,
+            intakeId: intake.id,
             cohort,
             campusId,
+            // The student starts at their intake's first period, not wherever the campus
+            // calendar happens to be.
+            yearIndex: 1,
+            semesterNo: 1,
             status: EnrollmentStatus.ACTIVE,
           },
           select: { id: true },
@@ -98,7 +113,9 @@ export async function createEnrollment(formData: FormData) {
         enrollmentId: enrollment.id,
         campusId,
         programId,
-        startDate: intake?.commenceAt ?? new Date(),
+        // Fees count from the intake's own Semester 1.
+        startDate: intake.startsAt,
+        intakeId: intake.id,
         numbers: invoiceNumbers,
       });
 
@@ -132,6 +149,55 @@ export async function setEnrollmentStatus(formData: FormData) {
         status,
         withdrawnAt: status === EnrollmentStatus.WITHDRAWN ? new Date() : null,
       },
+    });
+  });
+}
+
+/**
+ * Moves one student on to their next academic period.
+ *
+ * Progression normally advances on its own: a student's period is counted from their intake,
+ * so when a semester's worth of time passes they are in the next one. This action exists for
+ * the deliberate case — a resit held back, a term repeated, a cohort advanced early — and it
+ * records when the office made the decision.
+ */
+export async function promoteEnrollment(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+
+  return onSave("/dashboard/enrollments", AFFECTED, async () => {
+    const enrollmentId = hiddenId(formData, "enrollmentId", fieldLabel("studentId"));
+
+    const enrollment = await prisma.enrollment.findFirst({
+      where: {
+        id: enrollmentId,
+        ...(scope.campusId === null ? {} : { campusId: scope.campusId }),
+      },
+      select: {
+        id: true,
+        campusId: true,
+        programId: true,
+        yearIndex: true,
+        semesterNo: true,
+      },
+    });
+    if (!enrollment) throw new FieldError(fieldErrors.notOnCampus);
+
+    // The campus calendar decides how many periods a year has, so the promotion uses the
+    // same shape the student's own plan was built with.
+    const calendar = await prisma.semester.findMany({
+      where: { campusId: enrollment.campusId },
+      select: { semesterNo: true },
+    });
+    const semestersPerYear = new Set(calendar.map((row) => row.semesterNo)).size || undefined;
+
+    const next = nextPeriod(
+      { yearIndex: enrollment.yearIndex, semesterNo: enrollment.semesterNo },
+      semestersPerYear,
+    );
+
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { yearIndex: next.yearIndex, semesterNo: next.semesterNo, promotedAt: new Date() },
     });
   });
 }

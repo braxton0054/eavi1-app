@@ -53,9 +53,10 @@ export async function createStudent(formData: FormData) {
     if (intakeId) {
       const intake = await prisma.intake.findUnique({
         where: { id: intakeId },
-        select: { id: true },
+        select: { id: true, campusId: true },
       });
       if (!intake) throw new FieldError(fieldErrors.choice(fieldLabel("intakeId")));
+      if (intake.campusId !== campusId) throw new FieldError(fieldErrors.notOnCampus);
     }
 
     const admissionNo = text(formData, "admissionNo");
@@ -107,12 +108,27 @@ export async function createStudent(formData: FormData) {
       );
 
       if (programId) {
+        // A register entry without a chosen cohort joins the earliest intake on this campus,
+        // so every enrolment counts its semesters from a real intake date.
+        const intake =
+          intakeId ??
+          (
+            await prisma.intake.findFirst({
+              where: { campusId },
+              orderBy: { startsAt: "asc" },
+              select: { id: true },
+            })
+          )?.id ??
+          null;
+
         await tx.enrollment.create({
           data: {
             studentId: profile.id,
             programId,
-            intakeId: intakeId ?? null,
+            intakeId: intake!,
             campusId,
+            yearIndex: 1,
+            semesterNo: 1,
             status: EnrollmentStatus.ACTIVE,
           },
         });

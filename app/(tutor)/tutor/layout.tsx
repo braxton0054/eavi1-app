@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import { connection } from "next/server";
 
 import { DashboardFrame } from "@/components/dashboard/dashboard-frame";
-import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { requireTutor } from "@/lib/session";
 import { mobileNav, shell, tutorNavGroups } from "@/lib/content/dashboard";
 
@@ -13,8 +12,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-async function TutorContent({ children }: { children: React.ReactNode }) {
+/**
+ * The same rule as the college portal: the tutor's scope comes from a cookie, so a
+ * streaming fallback could only ever be the empty shell. No `loading.tsx` boundary here.
+ */
+export default async function TutorLayout({ children }: { children: React.ReactNode }) {
+  await connection();
   const scope = await requireTutor();
+
   return (
     <DashboardFrame
       scope={scope}
@@ -26,13 +31,5 @@ async function TutorContent({ children }: { children: React.ReactNode }) {
     >
       {children}
     </DashboardFrame>
-  );
-}
-
-export default function TutorLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <TutorContent>{children}</TutorContent>
-    </Suspense>
   );
 }

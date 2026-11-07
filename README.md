@@ -35,6 +35,30 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
+## Seed data: local testing only
+
+`npm run db:seed` fills a **developer's** database with the campuses and logins needed to
+click through the portal. It is not a provisioning step and must not run in production.
+
+A production database is loaded with the college's own records — its campuses, programmes,
+staff, intakes and students — entered through the portal or imported by the office. Nothing
+is generated for it.
+
+The seed enforces that:
+
+- It refuses to run when `DATABASE_URL` points at a hosted database (Neon, Supabase, RDS,
+  Azure, Render, Railway, Vercel) or when `NODE_ENV=production`.
+- It never invents a password: an unset or short `SEED_CAMPUS_ADMIN_PASSWORD` stops it
+  rather than creating a guessable account.
+- It creates no intakes, programmes or students. Those are the school's own data, and
+  creating them silently would put rows in the system nobody asked for.
+
+On production, apply migrations and stop:
+
+```bash
+npx prisma migrate deploy
+```
+
 ## Placeholders to fill before launch
 
 Nothing here is invented. Each item renders on the live page as a dashed

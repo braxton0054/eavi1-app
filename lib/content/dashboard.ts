@@ -57,6 +57,8 @@ export type Field = {
     | "semesters"
     | "intakes"
     | "enrollments"
+    | "classes"
+    | "placements"
     | "invoices"
     | "campuses"
     | "departments"
@@ -87,6 +89,8 @@ export const shell = {
   allCampuses: "All campuses",
   chooseCampus: "Choose a campus from the College overview to add records here.",
   tutorNote: "Tutor portal",
+  /** The campus switcher that a super admin works from, shown in the portal header. */
+  scopeLabel: "Campus",
   account: {
     label: "Account",
     role: "Role",
@@ -123,6 +127,7 @@ export const navGroups: NavGroup[] = [
       { href: "/dashboard/applications", label: "Applications", icon: "applications" },
       { href: "/dashboard/students", label: "Students", icon: "students" },
       { href: "/dashboard/enrollments", label: "Enrollments", icon: "enrollments" },
+      { href: "/dashboard/classes", label: "Classes", icon: "students" },
     ],
   },
   {
@@ -199,6 +204,7 @@ export const mobileNav: Record<"admin" | "tutor", NavItem[]> = {
     { href: "/dashboard/applications", label: "Applications", icon: "applications" },
     { href: "/dashboard/students", label: "Students", icon: "students" },
     { href: "/dashboard/enrollments", label: "Enrollments", icon: "enrollments" },
+    { href: "/dashboard/classes", label: "Classes", icon: "students" },
   ],
   tutor: [
     { href: "/tutor", label: "Today", icon: "overview" },
@@ -209,6 +215,7 @@ export const mobileNav: Record<"admin" | "tutor", NavItem[]> = {
 };
 
 export const common = {
+  print: "Print",
   search: "Search",
   searchPlaceholder: "Type to filter",
   clear: "Clear",
@@ -272,6 +279,8 @@ export const fieldErrors = {
   semesterSlot: (label: string) => `${label} must be Semester 1, Semester 2 or Semester 3.`,
   semesterExists: (slot: string, year: number) => `${slot} ${year} is already configured.`,
   windowOverlap: (name: string) => `Those dates overlap ${name}.`,
+  semesterAlreadyActive: (name: string) =>
+    `${name} is still marked active. Mark it completed before making another semester active.`,
   pdf: (label: string) => `${label} must be a PDF file.`,
   image: (label: string) => `${label} must be a JPG or PNG picture.`,
   fileSize: (label: string, maxMb: number) => `${label} must be smaller than ${maxMb} MB.`,
@@ -402,7 +411,9 @@ export const labels = {
   },
   semesterStatus: {
     PLANNED: "Planned",
-    ACTIVE: "Running",
+    // The calendar decides what is current from the dates, so this status only says the term
+    // was opened, not that it is the one running today.
+    ACTIVE: "Opened",
     COMPLETED: "Completed",
   },
   /** Kenya Certificate of Secondary Education grades, as an applicant states one. */
@@ -534,6 +545,15 @@ export const pages = {
       { key: "status", label: "Status" },
       { key: "received", label: "Received" },
     ] satisfies Column[],
+    /** One applicant, one card — the same treatment as programmes, students and invoices. */
+    card: {
+      open: "Open application",
+      received: "Received",
+      contact: "Contact",
+      noEmail: "No email",
+      enrol: "Enrol",
+      decided: "Decided",
+    },
     empty: {
       title: "No applications match",
       body: "Log an application or clear the filters.",
@@ -617,6 +637,17 @@ export const pages = {
     title: "Students",
     description: "Registered students at this campus.",
     searchLabel: "Search by name, admission number or guardian",
+    /** The phone/desktop card. The table is gone: one student, one card, one tap. */
+    card: {
+      open: "Open student",
+      noProgram: "No active enrolment",
+      balance: "Fee balance",
+      cleared: "Fees cleared",
+      owing: "Owes",
+      idCard: "ID card",
+      noPhone: "No phone",
+      noCard: "No ID card issued",
+    },
     columns: [
       { key: "admissionNo", label: "Admission no." },
       { key: "fullName", label: "Name" },
@@ -637,7 +668,14 @@ export const pages = {
         { name: "email", label: "Email (sign-in)", type: "email", required: true },
         { name: "phone", label: "Phone", type: "tel" },
         { name: "programId", label: "Programme", type: "select", required: true, optionKey: "programs" },
-        { name: "intakeId", label: "Intake", type: "select", optionKey: "intakes" },
+        {
+          name: "intakeId",
+          label: "Intake",
+          type: "select",
+          required: true,
+          optionKey: "intakes",
+          hint: "The cohort fixes which semester the student starts in.",
+        },
         { name: "admissionNo", label: "Admission number", type: "text", hint: "Leave blank to issue one automatically." },
         { name: "password", label: "Temporary password", type: "text", required: true, hint: "Minimum 10 characters." },
         { name: "gender", label: "Gender", type: "select", options: genderChoices },
@@ -653,6 +691,68 @@ export const pages = {
     profile: {
       guardian: "Guardian",
       personal: "Personal details",
+      photoAlt: (name: string) => `Photograph of ${name}`,
+      noPhoto: "No photo",
+      /** Identity details, grouped so a reader can find a thing instead of scanning a wall. */
+      groups: {
+        contact: "Contact",
+        academic: "Programme",
+        personal: "Personal",
+        guardian: "Guardian",
+      },
+      enrolled: "Enrolled",
+      activeNow: "Currently enrolled",
+      notEnrolled: "Not currently enrolled",
+      missingHint: "Nothing recorded for this section yet.",
+      /** Printed header and footer. A sheet on a desk has no screen around it to say what it is. */
+      print: {
+        title: "Student record",
+        printedOn: (date: string) => `Printed ${date}`,
+        confidential:
+          "Confidential. Contains personal data held under the institute's student records.",
+        verifiedBy: "Verified against the student register.",
+        noPhoto: "No photograph on file",
+        /** Section headings that only exist on paper; the screen uses panel titles. */
+        identity: "Identity and enrolment",
+        finance: "Fees and payments",
+        schedule: "Payment schedule",
+        history: "Payment history",
+        outreach: "Academic progress, attachment and cards",
+        /** Table heads. Short, because the print table is only 182mm wide. */
+        columns: {
+          period: "Period",
+          invoice: "Invoice",
+          due: "Due date",
+          amount: "Amount",
+          paid: "Paid",
+          balance: "Balance",
+          status: "Status",
+          date: "Date",
+          receipt: "Receipt",
+          appliedTo: "Applied to",
+          method: "Method",
+          reference: "Reference",
+          unit: "Unit",
+          result: "Result",
+          stage: "Stage",
+          host: "Host",
+          supervisor: "Supervisor",
+          serial: "Serial",
+          issued: "Issued",
+          expires: "Expires",
+        },
+        overdueTotal: "Overdue total",
+        settledLine: (settled: number, total: number, current: string) =>
+          `${settled} of ${total} periods settled · Current period: ${current}`,
+        noPeriod: "No period recorded",
+        nothingRecorded: "Not recorded",
+        pageBreak: "Fees and payments",
+        downloadLabel: "Print / Download PDF",
+        browserButton: "Print from browser",
+        browserHint:
+          "Prints this page directly. Untick \"Headers and footers\" in the print dialogue so the browser's URL and date stay off the paper.",
+        failed: "The PDF could not be generated. Try printing from the browser instead.",
+      },
       finance: "Fees",
       cards: "Cards",
       enrollments: "Enrollments",
@@ -726,10 +826,101 @@ export const pages = {
     },
   },
 
+  classes: {
+    title: "Classes",
+    description: "Teaching groups on this campus. A class is a grouping, not an academic stage.",
+    searchLabel: "Search by class, programme or intake",
+    officialMonthsOnly: "EAVI runs three intakes a year: January, May and September. Choose one of those.",
+    nameTaken: "A class with that name already exists for this programme.",
+    archiveWithStudents: "Move the students to another class before archiving this one.",
+    confirmRequired: "Tick the confirmation box to merge these classes.",
+    wrongProgramme: "That class belongs to a different programme.",
+    fields: {
+      program: "Programme",
+      intake: "Intake",
+      name: "Class name",
+      note: "Note",
+      stage: "Academic stage",
+      class: "Class",
+      year: "Academic year",
+    },
+    card: {
+      open: "Open class",
+      students: "students",
+      student: "student",
+      noStudents: "No students yet",
+      archived: "Archived",
+      placements: "Stages in this class",
+      merge: "Merge",
+    },
+    filter: {
+      allProgrammes: "All programmes",
+      includeArchived: "Include archived",
+    },
+    create: {
+      button: "Create a class",
+      title: "New class",
+      description:
+        "A class holds the students one office teaches together. Students keep their own academic stage, so a class can hold several.",
+      nameHint: "Suggested: ICT/JAN/2027. Temporary classes such as ICT/JAN-FEB/2027 are fine.",
+    },
+    detail: {
+      membersTitle: "Students in this class",
+      membersEmpty: "No students have been placed in this class yet.",
+      placementsNote:
+        "Students in this class sit at different academic stages. The class does not decide their stage.",
+      moveTitle: "Move a student",
+      moveHint:
+        "Moving a student between classes changes only the grouping. Their intake, admission date, academic stage, units, results and fees are left alone.",
+      historyTitle: "Class history",
+      historyEmpty: "No students have left this class.",
+      merged: "Classes merged. Students kept their stages, fees and results.",
+      auditTitle: "Recent changes",
+    },
+    merge: {
+      button: "Merge classes",
+      title: "Merge a class into another",
+      description:
+        "Students move to the destination class. Their admission dates, intakes, academic stages, unit registrations, marks, results, attachments, invoices and payments all stay exactly as they are.",
+      source: "Class to merge",
+      target: "Destination class",
+      preview: "Preview merge",
+      confirm: "I have reviewed which students will move.",
+      confirmButton: "Merge classes",
+      blockedTitle: "These classes cannot be merged",
+      alreadyInTarget: (n: number) =>
+        n === 1
+          ? "1 student is already in the destination class and will not be duplicated."
+          : `${n} students are already in the destination class and will not be duplicated.`,
+      placementsTitle: "Academic stages present",
+      historyNote: (n: number) =>
+        n === 1
+          ? "1 past membership record is retained for audit."
+          : `${n} past membership records are retained for audit.`,
+      noStudents: "This class has no students to move.",
+      done: "Merge complete",
+    },
+    empty: {
+      title: "No classes yet",
+      body: "Create a class for an intake, then place students in it.",
+    },
+  },
   enrollments: {
     title: "Enrollments",
     description: "Active and historical enrolments on this campus.",
     searchLabel: "Search by admission number or cohort",
+    card: {
+      open: "Open student",
+      enrolled: "Enrolled",
+      intake: "Intake",
+      cohort: "Cohort",
+      /** The student's own position, counted from their intake rather than the calendar. */
+      period: "Period",
+      changeStatus: "Change status",
+      promote: "Move to next period",
+      promoteButton: "Advance period",
+      promoted: "Period advanced",
+    },
     columns: [
       { key: "admissionNo", label: "Admission no." },
       { key: "student", label: "Student" },
@@ -749,7 +940,14 @@ export const pages = {
       fields: [
         { name: "studentId", label: "Student", type: "select", required: true, optionKey: "students" },
         { name: "programId", label: "Programme", type: "select", required: true, optionKey: "programs" },
-        { name: "intakeId", label: "Intake", type: "select", optionKey: "intakes" },
+        {
+          name: "intakeId",
+          label: "Intake",
+          type: "select",
+          required: true,
+          optionKey: "intakes",
+          hint: "The cohort fixes which semester the student starts in.",
+        },
         { name: "cohort", label: "Cohort label", type: "text", placeholder: "2026/1" },
       ] satisfies Field[],
       created: "Student enrolled.",
@@ -766,25 +964,40 @@ export const pages = {
     description: "Courses on offer at this campus.",
     curriculum: programmeDocuments.curriculum,
     feeStructure: programmeDocuments.feeStructure,
+    // Code, Programme, Awarding body and Level alone were ~1058px with the Actions column
+    // last, which a 1280 screen with the sidebar open cannot show. The table scrolls inside
+    // its panel rather than pushing the page sideways, and the name column wraps instead of
+    // forcing a width. Everything dropped here is on the programme's own screen.
     columns: [
       { key: "code", label: "Code" },
       { key: "name", label: "Programme" },
-      { key: "body", label: "Awarding body" },
-      { key: "type", label: "Programme type" },
-      { key: "structure", label: "Structure" },
-      { key: "department", label: "Department" },
-      { key: "duration", label: "Duration" },
-      { key: "minKcseGrade", label: "Min KCSE" },
+      { key: "body", label: "Body" },
+      { key: "level", label: "Level" },
       { key: "students", label: "Enrolled", align: "end" },
-      { key: "fees", label: "Programme fee", align: "end" },
-      { key: "curriculum", label: "Curriculum" },
-      { key: "feeStructure", label: "Fee structure" },
+      { key: "fees", label: "Fee", align: "end" },
       { key: "status", label: "Status" },
       { key: "actions", label: common.actions, interactive: true },
     ] satisfies Column[],
     empty: {
       title: "No programmes yet",
       body: "Add a programme.",
+    },
+    /**
+     * The phone card. A programme has fourteen columns; a phone gets the five an
+     * administrator actually scans for, and the rest live on the programme's own screen.
+     */
+    card: {
+      code: "Code",
+      level: "Level",
+      duration: "Duration",
+      students: "Students",
+      fee: "Fee",
+      status: "Status",
+      noFee: "Set fees",
+      curriculumMissing: "No curriculum",
+      feeStructureMissing: "No fee sheet",
+      open: "Open programme",
+      actions: "Programme actions",
     },
     create: {
       button: "Add programme",
@@ -880,6 +1093,46 @@ export const pages = {
       openUnits: "Open the unit plan",
       openAttachment: "Open attachment settings",
       back: "All programmes",
+      tabsLabel: "Programme sections",
+      tabOverview: "Overview",
+      tabUnits: "Units",
+      tabFees: "Fees",
+      tabAttachment: "Attachment",
+      /** The strip that answers "what is still missing" without opening another screen. */
+      readiness: {
+        heading: "Setup",
+        placed: "Units placed",
+        fee: "Fee structure",
+        attachment: "Attachment",
+        none: "Not set",
+        set: (value: string) => `Set · ${value}`,
+        noneHint: "Set the amounts students will be billed.",
+        noUnitsHint: "Place the units taught in each period.",
+        noAttachmentHint: "Add a stage if students leave for industry.",
+        clear: "Everything a programme needs is in place.",
+      },
+    },
+    /** Labels for the fields this page and the section tabs share. */
+    fieldLabels: {
+      code: "Code",
+      body: "Awarding body",
+      type: "Programme type",
+      department: "Department",
+      structure: "Delivery structure",
+      duration: "Duration",
+      cadence: "Fee payment type",
+      minGrade: "Minimum KCSE grade",
+      campuses: "Campuses",
+    },
+    studentsLine: (active: number, completed: number) =>
+      `${active} active ${active === 1 ? "student" : "students"}${completed ? ` · ${completed} completed` : ""}`,
+    /** One line on every programme screen, so a per-programme page is never a dead end. */
+    sectionTabs: {
+      label: "Programme sections",
+      overview: "Overview",
+      units: "Units",
+      fees: "Fees",
+      attachment: "Attachment",
     },
 
     unitPlan: {
@@ -1212,6 +1465,12 @@ export const pages = {
 
   calendar: {
     title: "Academic calendar",
+    /**
+     * The calendar is the institution's own schedule — teaching weeks, exams, holidays. It is
+     * not a statement of what semester any student is in; that depends on their intake.
+     */
+    description:
+      "The campus calendar: teaching windows, exams and events. What semester a student is in comes from their intake, not from this page.",
     year: {
       select: "Year",
       show: "Show",
@@ -1242,6 +1501,24 @@ export const pages = {
       emptyCards: "No cards issued in this window.",
       eventsHeading: "Events",
       emptyEvents: "No events on this semester.",
+      /* The timeline: one row per semester, only the current one expanded. */
+      current: "Current",
+      nowRunning: "Running now",
+      showDetails: "Show details",
+      hideDetails: "Hide details",
+      nothingScheduled: "Nothing scheduled yet — no intakes, exams or events.",
+      weekOf: "Week",
+      of: "of",
+      intakeDeadline: "Apply by",
+      intakeStarts: "Classes start",
+      summaryCount: (intakes: number, exams: number, events: number) =>
+        [
+          intakes ? `${intakes} intake${intakes === 1 ? "" : "s"}` : null,
+          exams ? `${exams} exam${exams === 1 ? "" : "s"}` : null,
+          events ? `${events} event${events === 1 ? "" : "s"}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
       create: {
         button: "Add semester",
         title: "New semester",
@@ -1278,9 +1555,15 @@ export const pages = {
         button: "Add intake",
         title: "New intake",
         fields: [
-          { name: "name", label: "Name", type: "text", required: true, placeholder: "September 2026" },
+          { name: "name", label: "Name", type: "text", required: true, placeholder: "May 2026 intake" },
           { name: "applicationDeadline", label: "Applications close", type: "date", required: true },
-          { name: "commenceAt", label: "Classes start", type: "date", required: true },
+          {
+            name: "commenceAt",
+            label: "Classes start",
+            type: "date",
+            required: true,
+            hint: "Day one of this cohort's Semester 1. Their semesters count from here.",
+          },
         ] satisfies Field[],
         created: "Intake saved.",
       },
@@ -1406,6 +1689,24 @@ export const pages = {
       { key: "balance", label: "Balance", align: "end" },
       { key: "status", label: "Status" },
     ] satisfies Column[],
+    /** One invoice, one card at every width — the same treatment as programmes and students. */
+    card: {
+      open: "Open student",
+      invoice: "Invoice",
+      issued: "Issued",
+      due: "Due",
+      billed: "Billed",
+      paid: "Paid",
+      balance: "Balance",
+      settled: "Settled",
+      lines: "Line items",
+      payments: "Payments",
+      details: "Details",
+      addLine: "Add an item",
+      void: "Void",
+      noLines: "No items on this invoice yet.",
+      noPayments: "Nothing received yet.",
+    },
     empty: {
       title: "No invoices match",
       body: "Raise an invoice or clear the filters.",
@@ -1494,9 +1795,10 @@ export const pages = {
       { key: "issuedAt", label: "Issued" },
       { key: "expiresAt", label: "Expires" },
     ] satisfies Column[],
+    openLabel: "Open card",
     empty: {
       title: "No cards recorded",
-      body: "Request a card.",
+      body: "Request a card or generate one for a class.",
     },
     create: {
       button: "Request card",
@@ -1508,11 +1810,79 @@ export const pages = {
         { name: "remarks", label: "Remarks", type: "text", wide: true },
       ] satisfies Field[],
       created: "Card requested.",
+      /** Written on every card raised by a print run, so its origin is on the record. */
+      autoRemark: "Requested from a card print run.",
     },
     move: {
       title: "Move card",
       statusField: { name: "status", label: "Status", type: "select", required: true, options: toOptions(labels.cardStatus) } satisfies Field,
       saved: "Card updated.",
+    },
+    generate: {
+      title: "Print cards",
+      hint: "Every enrolled student already holds a card, issued the day they enrolled. Choose who to print for and download the sheets.",
+      targetLegend: "Print for",
+      kinds: {
+        student: "One student",
+        class: "A class",
+        intake: "An intake",
+      },
+      studentLabel: "Student",
+      classLabel: "Class",
+      intakeLabel: "Intake",
+      previewEmpty: "Choose a target to see who will be printed.",
+      preview: (count: number) => `${count} ${count === 1 ? "card" : "cards"} will be printed.`,
+      noPhoto: "no photo",
+      button: "Create PDF",
+      sheetCaption: (page: number, total: number) => `EAVI student ID cards · sheet ${page} of ${total}`,
+      frontLabel: "FRONT",
+      backLabel: "BACK",
+      limits: {
+        empty: "Nobody matches that choice, so there is nothing to print.",
+        tooMany: "That is more than 400 cards in one run. Choose a class or an intake instead.",
+        saved: "The cards were generated. Card files are kept in the campus's own storage.",
+      history: "Recent print runs",
+      },
+    },
+    detail: {
+      title: "ID card",
+      openStudent: "Open student",
+      details: "Card record",
+      student: "Student",
+      serial: "Serial",
+      status: "Status",
+      issued: "Issued",
+      expires: "Expires",
+      requested: "Requested",
+      remarks: "Remarks",
+      face: "Card face",
+      faceHint: "Exactly what will print, front and back.",
+      missingTitle: "Missing from the record",
+      missing: (slots: string) => `No value for: ${slots}. Those fields print as a dash.`,
+      history: "History",
+      noHistory: "Nothing has happened to this card yet.",
+    },
+    history: "Recent print runs",
+    batch: {
+      title: "Card print run",
+      summary: "What this run covers",
+      target: "Target",
+      cards: "Cards",
+      sheets: "Sheets",
+      created: "Generated",
+      generatedBy: "Generated by",
+      back: "Back to cards",
+      preview: "Preview",
+      previewTitle: "Card sheets",
+      previewHint: (sheets: number) => `${sheets} ${sheets === 1 ? "sheet" : "sheets"}, fronts and backs. Check before printing.`,
+      download: "Download PDF",
+      fileName: (date: Date) => `eavi-id-cards-${date.toISOString().slice(0, 10)}.pdf`,
+      noViewer: "This browser cannot show PDFs in the page.",
+      verifyHint: "The QR on the back opens this link: it is checked against the register, so a copied card fails.",
+      noFileTitle: "The file was not kept",
+      noFileBody: "Card storage is not configured, so this run cannot be reopened. Generate the cards again to print them.",
+      emptyTitle: "No cards in this run",
+      emptyBody: "Nobody was included, so there is nothing to print.",
     },
     print: {
       heading: "Card face",
@@ -1524,6 +1894,8 @@ export const pages = {
       campusLabel: "Campus",
       open: "Print view",
       closed: "Hide print view",
+      /** Shown on a proof when the record is missing something the artwork needs. */
+      missing: (slots: string) => `The record has no value for: ${slots}.`,
     },
   },
 

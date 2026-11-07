@@ -13,7 +13,7 @@ import { DisclosureForm, RowForm, type OptionSets } from "@/components/dashboard
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { formatDate, toDateInput } from "@/lib/format";
-
+import { cn } from "@/lib/utils";
 
 const copy = pages.calendar;
 
@@ -39,9 +39,6 @@ const cardTone: Record<string, ChipTone> = {
   LOST: "danger",
   REPLACED: "neutral",
 };
-
-/** A semester normally runs one of each, but any number of sittings of either type is allowed. */
-const EXAM_TYPES = ["CAT", "END_TERM"] as const;
 
 /** The year step control: a link while the window has road left, a plain label when it does not. */
 function StepLink({
@@ -99,9 +96,47 @@ export default async function CalendarPage({
     (field) => field.name !== "campusId" || collegeAdmin,
   );
 
+  /**
+   * Order the year by date, not by slot number: an odd term 1 configuration or a missing
+   * semester 2 should still read top to bottom as a timeline.
+   */
+  const slots = [...view.slots]
+    .sort((a, b) => {
+      const aStart = a.semester?.startDate.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const bStart = b.semester?.startDate.getTime() ?? Number.MAX_SAFE_INTEGER;
+      return aStart - bStart || a.semesterNo - b.semesterNo;
+    })
+    .map((slot) => {
+      const semester = slot.semester;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const running =
+        !!semester && semester.startDate <= today && semester.endDate >= today;
+      const days = running
+        ? Math.floor((today.getTime() - semester!.startDate.getTime()) / 86_400_000) + 1
+        : null;
+
+      return {
+        slot,
+        semester,
+        days,
+        // A stored ACTIVE status is not enough: more than one semester can carry it, so
+        // the calendar trusts the dates and treats only the covering window as current.
+        phase: !semester
+          ? ("none" as const)
+          : semester.endDate < today
+            ? ("past" as const)
+            : semester.startDate > today
+              ? ("upcoming" as const)
+              : ("current" as const),
+        isCurrent: running,
+        canEdit: view.editable && slot.editable,
+      };
+    });
+
   return (
     <div className="space-y-6">
-      <PageHeader title={copy.title} />
+      <PageHeader title={copy.title} description={copy.description} />
 
       {invalid ? (
         <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} />
@@ -185,183 +220,240 @@ export default async function CalendarPage({
         />
       ) : null}
 
-      {view.slots.map((slot) => {
-        const semester = slot.semester;
-        const heading = `${copy.semesters.slot} ${slot.semesterNo} · ${view.year}`;
-        const canEdit = view.editable && slot.editable;
+      {/*
+        The year reads as a timeline: semesters in date order, the one running today open,
+        the rest folded to a single line. An empty section costs nothing instead of four
+        "no events" headings, so a quiet year is short and a busy one is readable.
+      */}
+      <ol className="max-w-4xl space-y-3">
+        {slots.map(({ slot, semester, canEdit, isCurrent, days, phase }) => {
+          const semesterCopy = copy.semesters;
+          const heading = `${semesterCopy.slot} ${slot.semesterNo} · ${view.year}`;
+          const total = semester
+            ? semester.intakes.length + semester.exams.length + semester.calendarEvents.length
+            : 0;
 
-        return (
-          <Panel key={slot.semesterNo} title={heading}>
-            {!semester ? (
-              <EmptyState body={copy.semesters.notConfigured} icon="calendar" />
-            ) : (
-              <div className="space-y-5 p-4">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <p className="text-sm font-medium">
-                    {copy.semesters.window} {formatDate(semester.startDate)} {copy.semesters.through}{" "}
-                    {formatDate(semester.endDate)}
-                  </p>
-                  <StatusChip tone={semesterTone[semester.status] ?? "neutral"}>
-                    {labels.semesterStatus[semester.status]}
-                  </StatusChip>
-                  {canEdit ? (
-                    <RowForm
-                      id={`edit-semester-${semester.id}`}
-                      button={copy.semesters.edit.button}
-                      fields={copy.semesters.edit.fields}
-                      values={{
-                        startDate: toDateInput(semester.startDate),
-                        endDate: toDateInput(semester.endDate),
-                        status: semester.status,
-                      }}
-                      hidden={{ semesterId: semester.id }}
-                      action={updateSemester}
-                      submitLabel={common.save}
-                    />
-                  ) : (
-                    <p className="text-xs text-eavi-muted-text">
-                      {copy.semesters.endedNote(formatDate(semester.endDate))}
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid gap-5 md:grid-cols-2">
-                  <section>
-                    <h3 className="text-sm font-semibold">{copy.semesters.intakesHeading}</h3>
-                    {semester.intakes.length === 0 ? (
-                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.semesters.emptyIntakes}</p>
-                    ) : (
-                      <ul className="mt-1 divide-y divide-eavi-border text-sm">
-                        {semester.intakes.map((intake) => (
-                          <li key={intake.id} className="py-2">
-                            <p className="font-medium">{intake.name}</p>
-                            <p className="text-xs text-eavi-muted-text">
-                              {formatDate(intake.applicationDeadline)} · {formatDate(intake.commenceAt)}
-                            </p>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {canEdit ? (
-                      <RowForm
-                        id={`new-intake-${semester.id}`}
-                        button={copy.semesters.intake.button}
-                        fields={copy.semesters.intake.fields}
-                        hidden={{ semesterId: semester.id }}
-                        action={createIntake}
-                        submitLabel={common.create}
-                      />
+          return (
+            <li key={slot.semesterNo}>
+              <details
+                open={isCurrent || !semester}
+                className={cn(
+                  "overflow-hidden rounded-2xl border bg-eavi-card shadow-eavi-card",
+                  isCurrent ? "border-eavi-primary-text/60" : "border-eavi-border",
+                )}
+              >
+                <summary className="flex min-h-14 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                    <span className="text-sm font-semibold text-eavi-on-bg">{heading}</span>
+                    {semester ? (
+                      <span className="text-xs text-eavi-muted-text tabular-nums">
+                        {formatDate(semester.startDate)} – {formatDate(semester.endDate)}
+                      </span>
                     ) : null}
-                  </section>
+                  </span>
 
-                  <section>
-                    <h3 className="text-sm font-semibold">{copy.semesters.examsHeading}</h3>
-                    {semester.exams.length === 0 ? (
-                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.semesters.emptyExams}</p>
+                  <span className="flex shrink-0 items-center gap-2">
+                    {phase === "current" ? (
+                      <StatusChip tone="success">{semesterCopy.current}</StatusChip>
+                    ) : phase === "none" ? (
+                      <StatusChip tone="neutral">{semesterCopy.notConfigured}</StatusChip>
+                    ) : phase === "past" ? (
+                      <StatusChip tone="neutral">{labels.semesterStatus.COMPLETED}</StatusChip>
                     ) : (
-                      <div className="mt-1 space-y-3">
-                        {EXAM_TYPES.map((type) => {
-                          const papers = semester.exams.filter((exam) => exam.type === type);
-                          if (papers.length === 0) return null;
+                      <StatusChip tone={semesterTone[semester!.status] ?? "neutral"}>
+                        {labels.semesterStatus[semester!.status]}
+                      </StatusChip>
+                    )}
+                  </span>
+                </summary>
 
-                          return (
-                            <div key={type}>
-                              <p className="text-xs font-semibold uppercase tracking-wider text-eavi-primary-text">
-                                {labels.examType[type]}
-                              </p>
-                              <ul className="divide-y divide-eavi-border text-sm">
-                                {papers.map((exam) => (
-                                  <li
-                                    key={exam.id}
-                                    className="flex items-center justify-between gap-3 py-2"
-                                  >
-                                    <span className="min-w-0 leading-tight font-medium sm:truncate">{exam.title}</span>
-                                    <span className="shrink-0 text-xs text-eavi-muted-text">
-                                      {formatDate(exam.date)} {exam.startAt}
+                {!semester ? (
+                  <EmptyState body={semesterCopy.notConfigured} icon="calendar" />
+                ) : (
+                  <div className="space-y-4 border-t border-eavi-border p-4">
+                    {/* Where we are in the term, and the one action worth taking here. */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      {days !== null ? (
+                        <p className="text-sm font-medium text-eavi-on-bg">
+                          {semesterCopy.weekOf} {Math.ceil(days / 7)} {semesterCopy.of}{" "}
+                          {Math.ceil(
+                            (semester.endDate.getTime() - semester.startDate.getTime()) /
+                              (7 * 24 * 60 * 60 * 1000),
+                          )}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-eavi-muted-text">
+                          {semesterCopy.endedNote(formatDate(semester.endDate))}
+                        </p>
+                      )}
+
+                      {canEdit ? (
+                        <RowForm
+                          id={`edit-semester-${semester.id}`}
+                          button={semesterCopy.edit.button}
+                          fields={semesterCopy.edit.fields}
+                          values={{
+                            startDate: toDateInput(semester.startDate),
+                            endDate: toDateInput(semester.endDate),
+                            status: semester.status,
+                          }}
+                          hidden={{ semesterId: semester.id }}
+                          action={updateSemester}
+                          submitLabel={common.save}
+                          className="ms-auto"
+                        />
+                      ) : null}
+                    </div>
+
+                    {total === 0 ? (
+                      <p className="text-xs text-eavi-muted-text">
+                        {semesterCopy.nothingScheduled}
+                      </p>
+                    ) : (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {semester.intakes.length > 0 ? (
+                          <section>
+                            <h3 className="text-xs font-semibold tracking-wide text-eavi-primary-text uppercase">
+                              {semesterCopy.intakesHeading}
+                            </h3>
+                            <ul className="mt-1 space-y-1.5 text-sm">
+                              {semester.intakes.map((intake) => (
+                                <li key={intake.id} className="leading-tight">
+                                  <span className="font-medium text-eavi-on-bg">{intake.name}</span>
+                                  <span className="block text-xs text-eavi-muted-text">
+                                    {semesterCopy.intakeDeadline}{" "}
+                                    {formatDate(intake.applicationDeadline)} ·{" "}
+                                    {semesterCopy.intakeStarts} {formatDate(intake.commenceAt)}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </section>
+                        ) : null}
+
+                        {semester.exams.length > 0 ? (
+                          <section>
+                            <h3 className="text-xs font-semibold tracking-wide text-eavi-primary-text uppercase">
+                              {semesterCopy.examsHeading}
+                            </h3>
+                            <ul className="mt-1 space-y-1.5 text-sm">
+                              {semester.exams.map((exam) => (
+                                <li
+                                  key={exam.id}
+                                  className="flex items-baseline justify-between gap-3 leading-tight"
+                                >
+                                  <span className="min-w-0 font-medium text-eavi-on-bg">
+                                    {exam.title}
+                                  </span>
+                                  <span className="shrink-0 text-xs text-eavi-muted-text tabular-nums">
+                                    {formatDate(exam.date)} {exam.startAt}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </section>
+                        ) : null}
+
+                        {semester.calendarEvents.length > 0 ? (
+                          <section>
+                            <h3 className="text-xs font-semibold tracking-wide text-eavi-primary-text uppercase">
+                              {semesterCopy.eventsHeading}
+                            </h3>
+                            <ul className="mt-1 space-y-1.5 text-sm">
+                              {semester.calendarEvents.map((event) => (
+                                <li
+                                  key={event.id}
+                                  className="flex items-baseline justify-between gap-3 leading-tight"
+                                >
+                                  <span className="min-w-0">
+                                    <span className="block font-medium text-eavi-on-bg">
+                                      {event.title}
                                     </span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          );
-                        })}
+                                    <span className="text-xs text-eavi-muted-text">
+                                      {formatDate(event.startsAt)}
+                                      {event.endsAt ? `–${formatDate(event.endsAt)}` : ""}
+                                    </span>
+                                  </span>
+                                  <span className="flex shrink-0 items-center gap-1">
+                                    <StatusChip tone={eventTone[event.type] ?? "neutral"}>
+                                      {labels.calendarEventType[event.type]}
+                                    </StatusChip>
+                                    {canEdit ? (
+                                      <RowForm
+                                        id={`remove-event-${event.id}`}
+                                        button={common.remove}
+                                        fields={[]}
+                                        hidden={{ eventId: event.id }}
+                                        action={deleteEvent}
+                                        submitLabel={common.remove}
+                                        tone="danger"
+                                      />
+                                    ) : null}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </section>
+                        ) : null}
+
+                        {slot.cards.length > 0 ? (
+                          <section>
+                            <h3 className="text-xs font-semibold tracking-wide text-eavi-primary-text uppercase">
+                              {semesterCopy.cardsHeading}
+                            </h3>
+                            <ul className="mt-1 space-y-1.5 text-sm">
+                              {slot.cards.map((card) => (
+                                <li
+                                  key={card.id}
+                                  className="flex items-baseline justify-between gap-3 leading-tight"
+                                >
+                                  <span className="min-w-0">
+                                    <span className="block font-medium text-eavi-on-bg">
+                                      {card.student.user.fullName}
+                                    </span>
+                                    <span className="text-xs text-eavi-muted-text tabular-nums">
+                                      {card.serial}
+                                    </span>
+                                  </span>
+                                  <StatusChip tone={cardTone[card.status] ?? "neutral"}>
+                                    {labels.cardStatus[card.status]}
+                                  </StatusChip>
+                                </li>
+                              ))}
+                            </ul>
+                          </section>
+                        ) : null}
                       </div>
                     )}
-                  </section>
 
-                  <section>
-                    <h3 className="text-sm font-semibold">{copy.semesters.cardsHeading}</h3>
-                    {slot.cards.length === 0 ? (
-                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.semesters.emptyCards}</p>
-                    ) : (
-                      <ul className="mt-1 divide-y divide-eavi-border text-sm">
-                        {slot.cards.map((card) => (
-                          <li key={card.id} className="flex items-center justify-between gap-3 py-2">
-                            <span className="min-w-0 leading-tight sm:truncate">
-                              {card.student.user.fullName}
-                              <span className="text-xs text-eavi-muted-text"> · {card.serial}</span>
-                            </span>
-                            <StatusChip tone={cardTone[card.status] ?? "neutral"}>
-                              {labels.cardStatus[card.status]}
-                            </StatusChip>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </section>
-
-                  <section>
-                    <h3 className="text-sm font-semibold">{copy.semesters.eventsHeading}</h3>
-                    {semester.calendarEvents.length === 0 ? (
-                      <p className="mt-1 text-xs text-eavi-muted-text">{copy.semesters.emptyEvents}</p>
-                    ) : (
-                      <ul className="mt-1 divide-y divide-eavi-border text-sm">
-                        {semester.calendarEvents.map((event) => (
-                          <li key={event.id} className="flex items-center justify-between gap-3 py-2">
-                            <span className="min-w-0">
-                              <span className="block leading-tight font-medium sm:truncate">{event.title}</span>
-                              <span className="text-xs text-eavi-muted-text">
-                                {formatDate(event.startsAt)}
-                                {event.endsAt ? `–${formatDate(event.endsAt)}` : ""}
-                              </span>
-                            </span>
-                            <span className="flex shrink-0 items-center gap-2">
-                              <StatusChip tone={eventTone[event.type] ?? "neutral"}>
-                                {labels.calendarEventType[event.type]}
-                              </StatusChip>
-                              {canEdit ? (
-                                <RowForm
-                                  id={`remove-event-${event.id}`}
-                                  button={common.remove}
-                                  fields={[]}
-                                  hidden={{ eventId: event.id }}
-                                  action={deleteEvent}
-                                  submitLabel={common.remove}
-                                  tone="danger"
-                                />
-                              ) : null}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    {/* Adding is only offered on a semester that can still be changed. */}
                     {canEdit ? (
-                      <RowForm
-                        id={`new-event-${semester.id}`}
-                        button={copy.events.create.button}
-                        fields={copy.events.create.fields}
-                        hidden={{ semesterId: semester.id }}
-                        action={createEvent}
-                        submitLabel={common.create}
-                      />
+                      <div className="flex flex-wrap gap-2 border-t border-eavi-border pt-3">
+                        <RowForm
+                          id={`new-intake-${semester.id}`}
+                          button={semesterCopy.intake.button}
+                          fields={semesterCopy.intake.fields}
+                          hidden={{ semesterId: semester.id }}
+                          action={createIntake}
+                          submitLabel={common.create}
+                        />
+                        <RowForm
+                          id={`new-event-${semester.id}`}
+                          button={copy.events.create.button}
+                          fields={copy.events.create.fields}
+                          hidden={{ semesterId: semester.id }}
+                          action={createEvent}
+                          submitLabel={common.create}
+                        />
+                      </div>
                     ) : null}
-                  </section>
-                </div>
-              </div>
-            )}
-          </Panel>
-        );
-      })}
+                  </div>
+                )}
+              </details>
+            </li>
+          );
+        })}
+      </ol>
 
       {collegeAdmin ? (
         <Panel title={copy.events.college.heading}>

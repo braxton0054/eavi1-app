@@ -44,12 +44,19 @@ export function Panel({
   return (
     <Card className={cn("gap-0 py-0 shadow-eavi-card ring-0", props.className)}>
       {(title || aside) && (
-        <CardHeader className="flex flex-col items-start gap-3 border-b border-eavi-border py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div className="min-w-0">
+        <CardHeader
+          className={cn(
+            "flex flex-col items-start gap-3 border-b border-eavi-border py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4",
+            // The registry header is a two-column grid; this layout is a flex row, so the
+            // grid template has to be dropped or the title and the aside become columns.
+            "grid-cols-none grid-rows-none",
+          )}
+        >
+          <div className="min-w-0 sm:flex-1">
             {title ? <CardTitle className="text-base sm:truncate">{title}</CardTitle> : null}
             {description ? <CardDescription className="mt-0.5">{description}</CardDescription> : null}
           </div>
-          <div className="flex flex-wrap items-center gap-2">{aside}</div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">{aside}</div>
         </CardHeader>
       )}
       <CardContent className="p-0">{children}</CardContent>
@@ -86,23 +93,72 @@ export function StatTile({
   value,
   icon,
   tone = "neutral",
+  compact = false,
+  hint,
 }: {
   label: string;
   value: string;
   icon: DashboardIcon;
   tone?: "neutral" | "money" | "attention";
+  /** A short reading — counts, not money — laid out in a row so four fit one screen. */
+  compact?: boolean;
+  /** One supporting line, e.g. what a count is missing. */
+  hint?: string;
 }) {
   const Icon = icons[icon];
+  const valueTone =
+    tone === "money" ? "text-eavi-secondary-text" : tone === "attention" ? "text-eavi-warn-text" : undefined;
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-eavi-border bg-eavi-card px-3 py-2.5 shadow-eavi-card">
+        <Icon
+          aria-hidden
+          className={cn(
+            "size-4 shrink-0",
+            tone === "attention" ? "text-eavi-warn-text" : tone === "money" ? "text-eavi-secondary-text" : "text-eavi-primary-text",
+          )}
+        />
+        <p className={cn("min-w-0 text-xl leading-none font-semibold tabular-nums tracking-tight", valueTone)}>{value}</p>
+        <div className="min-w-0">
+          <p className="truncate text-xs leading-tight text-eavi-muted-text">{label}</p>
+          {hint ? <p className="truncate text-[11px] leading-tight text-eavi-muted-text">{hint}</p> : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-eavi-border bg-eavi-card p-4 shadow-eavi-card">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-eavi-muted-text">{label}</span>
         <Icon aria-hidden className={cn("size-4", tone === "money" ? "text-eavi-secondary-text" : tone === "attention" ? "text-eavi-warn-text" : "text-eavi-primary-text")} />
       </div>
-      <p className={cn("text-2xl font-semibold tabular-nums tracking-tight", tone === "money" && "text-eavi-secondary-text", tone === "attention" && "text-eavi-warn-text")}>
+      <p className={cn("text-2xl font-semibold tabular-nums tracking-tight", valueTone)}>
         {value}
       </p>
+      {hint ? <p className="text-xs text-eavi-muted-text">{hint}</p> : null}
     </div>
+  );
+}
+
+/**
+ * A label/value pair that reads correctly at any width: a definition row on a phone and a
+ * two-column grid on a wide screen, instead of columns that collapse into a ragged block.
+ */
+export function DetailList({ items }: { items: { label: string; value: ReactNode }[] }) {
+  return (
+    <dl className="divide-y divide-eavi-border">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-4 py-2.5 sm:px-5"
+        >
+          <dt className="text-xs text-eavi-muted-text sm:text-sm">{item.label}</dt>
+          <dd className="min-w-0 text-sm font-medium break-words text-right">{item.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

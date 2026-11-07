@@ -10,11 +10,13 @@ import { common, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
+import { SectionTabs } from "@/components/dashboard/section-tabs";
 import { describeTrigger, triggerValue } from "@/lib/academics/structure";
 import type { Column, Field } from "@/lib/content/dashboard";
 
 const copy = pages.programs;
 const attachmentCopy = copy.attachments;
+const tabs = copy.sectionTabs;
 
 export default async function ProgramAttachmentPage({
   params,
@@ -87,19 +89,29 @@ export default async function ProgramAttachmentPage({
     <div className="space-y-6">
       <Link
         href={`/dashboard/programs/${program.id}`}
-        className="text-sm text-eavi-primary-text underline-offset-4 hover:underline"
+        className="inline-flex min-h-8 items-center gap-1 text-sm text-eavi-muted-text hover:text-eavi-primary-text"
       >
         ← {program.name}
       </Link>
 
       <PageHeader
-        title={`${attachmentCopy.title} · ${program.name}`}
+        title={attachmentCopy.title}
         description={attachmentCopy.description}
         meta={
           <p className="mt-1 text-sm text-eavi-muted-text">
-            {enrolled} active {enrolled === 1 ? "student" : "students"} tracked
+            {program.code} · {enrolled} active {enrolled === 1 ? "student" : "students"} tracked
           </p>
         }
+      />
+
+      <SectionTabs
+        label={tabs.label}
+        tabs={[
+          { href: `/dashboard/programs/${program.id}`, label: tabs.overview },
+          { href: `/dashboard/programs/${program.id}/units`, label: tabs.units },
+          { href: `/dashboard/programs/${program.id}/fees`, label: tabs.fees },
+          { href: `/dashboard/programs/${program.id}/attachment`, label: tabs.attachment, active: true },
+        ]}
       />
 
       {archived ? (

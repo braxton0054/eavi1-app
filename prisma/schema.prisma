@@ -122,6 +122,23 @@ enum UnitStatus {
   DEFERRED
 }
 
+/// The three admission windows EAVI runs each year. Admissions happen every month, but
+/// every student is placed in one of these — a February admission joins the January
+/// intake. Nothing else may be used as an intake month.
+enum OfficialIntake {
+  JANUARY
+  MAY
+  SEPTEMBER
+}
+
+/// What a class record is allowed to represent. A regular class is the default; the other
+/// two exist so offices do not have to invent ad-hoc programmes to hold unusual groups.
+/// Merging is only ever done between classes of the same programme and campus.
+enum ClassStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 /// The attachment lifecycle, from "not yet due" to an outcome.
 enum AttachmentStatus {
   NOT_ELIGIBLE
@@ -166,22 +183,23 @@ enum Audience {
 }
 
 model Campus {
-  id             Int              @id @default(autoincrement())
-  code           String           @unique
-  name           String
-  place          String
-  phone          String?
+  id              Int              @id @default(autoincrement())
+  code            String           @unique
+  name            String
+  place           String
+  phone           String?
   /// An office such as the Town Office handles paperwork but teaches no course, so it is
   /// never handed an applicant. Only the campuses that teach take students.
-  takesApplicants Boolean         @default(true)
-  users          User[]
-  programs       Program[]        @relation("ProgramCampuses")
-  students       StudentProfile[]
-  tutors         TutorProfile[]
-  applications   Application[]
-  enrollments    Enrollment[]
+  takesApplicants Boolean          @default(true)
+  users           User[]
+  programs        Program[]        @relation("ProgramCampuses")
+  students        StudentProfile[]
+  tutors          TutorProfile[]
+  applications    Application[]
+  enrollments     Enrollment[]
   calendarEvents  CalendarEvent[]
   semesters       Semester[]
+  intakes         Intake[]
   timetableSlots  TimetableSlot[]
   exams           Exam[]
   invoices        Invoice[]
@@ -189,31 +207,33 @@ model Campus {
   idCards         IdCard[]
   cardTemplates   CardTemplate[]
   reportingDates  ReportingDate[]
+  classes         AcademicClass[]
+  cardBatches     CardBatch[]
 
   @@map("campuses")
 }
 
 model User {
-  id           String         @id @default(uuid())
+  id                 String          @id @default(uuid())
   /// Stored lowercased so the unique index is effectively case-insensitive.
-  email        String         @unique
-  fullName     String
-  phone        String?
+  email              String          @unique
+  fullName           String
+  phone              String?
   /// The administrator's own picture, shown next to their name in the portal header.
-  photoUrl     String?
-  passwordHash String
-  role         Role           @default(STUDENT)
-  status             Status         @default(ACTIVE)
-  mustChangePassword Boolean        @default(false)
-  campus             Campus?        @relation(fields: [campusId], references: [id])
-  campusId     Int?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  sessions     Session[]
-  student      StudentProfile?
-  tutor        TutorProfile?
-  announcements Announcement[] @relation("AnnouncementAuthor")
-  decisions    Application[]  @relation("ApplicationDecider")
+  photoUrl           String?
+  passwordHash       String
+  role               Role            @default(STUDENT)
+  status             Status          @default(ACTIVE)
+  mustChangePassword Boolean         @default(false)
+  campus             Campus?         @relation(fields: [campusId], references: [id])
+  campusId           Int?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  sessions           Session[]
+  student            StudentProfile?
+  tutor              TutorProfile?
+  announcements      Announcement[]  @relation("AnnouncementAuthor")
+  decisions          Application[]   @relation("ApplicationDecider")
 
   @@index([role, status])
   @@index([campusId])
@@ -248,13 +268,13 @@ model Department {
 /// The body a programme is registered with and examined by: KNEC, CDAC, TVETA and
 /// the rest. Its code is the first half of every generated programme code.
 model ProgramBody {
-  id         String    @id @default(uuid())
-  name       String    @unique
+  id        String    @id @default(uuid())
+  name      String    @unique
   /// Short upper-case letters used in programme codes, e.g. KNEC.
-  code       String    @unique
-  programs   Program[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  code      String    @unique
+  programs  Program[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@map("program_bodies")
 }
@@ -277,13 +297,13 @@ model ProgramType {
 /// list is not fixed by the code. `kind` decides how the payable periods are generated:
 /// twelve monthly periods, one per calendar semester, a single payment, and so on.
 model FeeCadence {
-  id        String         @id @default(uuid())
-  name      String         @unique
-  kind      FeePeriodKind  @default(CUSTOM)
+  id        String           @id @default(uuid())
+  name      String           @unique
+  kind      FeePeriodKind    @default(CUSTOM)
   programs  Program[]
   plans     ProgramFeePlan[]
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   @@map("fee_cadences")
 }
@@ -292,43 +312,44 @@ model FeeCadence {
 /// Every programme belongs to exactly one accrediting body and one type, and its
 /// code is generated from those two: KNEC-DIP-001.
 model Program {
-  id             String        @id @default(uuid())
-  code           String        @unique
-  name           String
-  departmentId   String
-  department     Department    @relation(fields: [departmentId], references: [id])
-  bodyId         String
-  body           ProgramBody   @relation(fields: [bodyId], references: [id])
-  typeId         String
-  type           ProgramType   @relation(fields: [typeId], references: [id])
-  cadenceId      String
-  cadence        FeeCadence    @relation(fields: [cadenceId], references: [id])
-  durationMonths Int
+  id                     String                  @id @default(uuid())
+  code                   String                  @unique
+  name                   String
+  departmentId           String
+  department             Department              @relation(fields: [departmentId], references: [id])
+  bodyId                 String
+  body                   ProgramBody             @relation(fields: [bodyId], references: [id])
+  typeId                 String
+  type                   ProgramType             @relation(fields: [typeId], references: [id])
+  cadenceId              String
+  cadence                FeeCadence              @relation(fields: [cadenceId], references: [id])
+  durationMonths         Int
   /// Semesters, months or modules. Decides how the unit planner groups its rows.
-  structure      ProgramStructure @default(SEMESTER)
+  structure              ProgramStructure        @default(SEMESTER)
   /// Set when the programme stops taking new admissions; its history stays readable.
-  archivedAt     DateTime?
-  archivedReason String?
+  archivedAt             DateTime?
+  archivedReason         String?
   /// Lowest KCSE aggregate the college admits against; the same scale the
   /// application form records an applicant's grade on.
-  minKcseGrade   EntryGrade
-  description    String?
-  curriculumUrl  String?
-  feeStructureUrl String?
-  campuses       Campus[]      @relation("ProgramCampuses")
-  tutors         TutorProfile[] @relation("ProgramTutors")
-  enrollments    Enrollment[]
-  applications   Application[]
-  feeItems       FeeItem[]
-  feePlans       ProgramFeePlan[]
-  units          ProgramUnit[]
-  modules        ProgramModule[]
+  minKcseGrade           EntryGrade
+  description            String?
+  curriculumUrl          String?
+  feeStructureUrl        String?
+  campuses               Campus[]                @relation("ProgramCampuses")
+  tutors                 TutorProfile[]          @relation("ProgramTutors")
+  enrollments            Enrollment[]
+  applications           Application[]
+  feeItems               FeeItem[]
+  feePlans               ProgramFeePlan[]
+  units                  ProgramUnit[]
+  modules                ProgramModule[]
   attachmentRequirements AttachmentRequirement[]
-  exams          Exam[]
-  timetableSlots TimetableSlot[]
-  idCards        IdCard[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  exams                  Exam[]
+  timetableSlots         TimetableSlot[]
+  idCards                IdCard[]
+  classes                AcademicClass[]
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 
   @@map("programs")
 }
@@ -336,40 +357,43 @@ model Program {
 /// Academic record attached to a User with role STUDENT. Admission numbers are issued
 /// by the campus admin, not by the self-service registration form.
 model StudentProfile {
-  id                  String         @id @default(uuid())
-  userId              String         @unique
-  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  admissionNo         String         @unique
-  campusId            Int
-  campus              Campus         @relation(fields: [campusId], references: [id])
-  gender              Gender?
-  dateOfBirth         DateTime?
-  nationalId          String?
-  guardianName        String?
-  guardianPhone       String?
-  guardianEmail       String?
-  address             String?
-  applicationId       String?        @unique
-  application         Application?   @relation(fields: [applicationId], references: [id])
-  primarySchool       String?
-  secondarySchool     String?
-  primarySchoolDocUrl String?
-  secondarySchoolDocUrl String?
-  birthCertificateUrl String?
-  medicalInfo         String?
-  hasNoMedicalConditions Boolean     @default(false)
-  profilePhotoUrl     String?
-  admissionCategory   String?
-  previousInstitution String?
-  parentGuardians     ParentGuardian[]
-  emergencyContacts   EmergencyContact[]
-  enrollments         Enrollment[]
-  invoices            Invoice[]
-  payments            Payment[]
-  attachments         StudentAttachment[]
-  idCards             IdCard[]
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  id                     String              @id @default(uuid())
+  userId                 String              @unique
+  user                   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admissionNo            String              @unique
+  campusId               Int
+  campus                 Campus              @relation(fields: [campusId], references: [id])
+  gender                 Gender?
+  dateOfBirth            DateTime?
+  nationalId             String?
+  guardianName           String?
+  guardianPhone          String?
+  guardianEmail          String?
+  address                String?
+  applicationId          String?             @unique
+  application            Application?        @relation(fields: [applicationId], references: [id])
+  primarySchool          String?
+  secondarySchool        String?
+  primarySchoolDocUrl    String?
+  secondarySchoolDocUrl  String?
+  birthCertificateUrl    String?
+  medicalInfo            String?
+  hasNoMedicalConditions Boolean             @default(false)
+  profilePhotoUrl        String?
+  admissionCategory      String?
+  previousInstitution    String?
+  /// The day the student was actually admitted. Admissions run every month, so this can be
+  /// February even though their intake is January — the two are deliberately separate.
+  admissionDate          DateTime?
+  parentGuardians        ParentGuardian[]
+  emergencyContacts      EmergencyContact[]
+  enrollments            Enrollment[]
+  invoices               Invoice[]
+  payments               Payment[]
+  attachments            StudentAttachment[]
+  idCards                IdCard[]
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 
   @@index([campusId])
   @@map("student_profiles")
@@ -398,8 +422,8 @@ model TutorProfile {
 /// A prospect's application. It stays an application until enrolment turns it into a
 /// student, which is a separate step; the reference is the number the applicant keeps.
 model Application {
-  id                    String           @id @default(uuid())
-  reference             String           @unique
+  id                    String            @id @default(uuid())
+  reference             String            @unique
   fullName              String
   /// An applicant may leave this out; the office confirms one before admitting.
   email                 String?
@@ -407,26 +431,30 @@ model Application {
   gender                Gender?
   grade                 EntryGrade?
   programId             String
-  program               Program          @relation(fields: [programId], references: [id])
+  program               Program           @relation(fields: [programId], references: [id])
   campusId              Int
-  campus                Campus           @relation(fields: [campusId], references: [id])
+  campus                Campus            @relation(fields: [campusId], references: [id])
   status                ApplicationStatus @default(SUBMITTED)
   previousQualification String?
   notes                 String?
   decisionNote          String?
   decidedById           String?
-  decidedBy             User?            @relation("ApplicationDecider", fields: [decidedById], references: [id])
+  decidedBy             User?             @relation("ApplicationDecider", fields: [decidedById], references: [id])
   decidedAt             DateTime?
-  createdAt             DateTime         @default(now())
+  createdAt             DateTime          @default(now())
   studentProfile        StudentProfile?
-  updatedAt             DateTime         @updatedAt
+  updatedAt             DateTime          @updatedAt
 
   @@index([campusId, status])
   @@map("applications")
 }
 
-/// One of the three semesters a campus runs in a calendar year. Campuses never share a
+/// One of the semesters a campus runs in a calendar year. Campuses never share a
 /// semester, so the identity of a semester is (campus, year, semester number).
+///
+/// This is the INSTITUTIONAL CALENDAR: it says when the campus is open for teaching and
+/// where its holidays, exams and administrative dates fall. It does NOT say what semester
+/// any individual student is in — that comes from the student's intake (see Intake).
 model Semester {
   id             String          @id @default(uuid())
   campusId       Int
@@ -451,17 +479,33 @@ model Semester {
   @@map("semesters")
 }
 
-/// An admission window inside a term (May, September, January intakes).
+/// An admission window a student joins through: January, May, September.
+///
+/// The intake is the anchor for that student's whole academic life. Their Semester 1 starts
+/// when the intake starts, and their Semester 2, 3, … follow on from it, independent of
+/// which calendar semester the campus happens to be running. A May joiner is in their own
+/// Semester 1 in May even though the campus calendar has moved on to its second semester.
 model Intake {
-  id                    String      @id @default(uuid())
-  name                  String
-  semesterId            String
-  semester              Semester    @relation(fields: [semesterId], references: [id])
-  applicationDeadline   DateTime
-  commenceAt            DateTime
-  enrollments           Enrollment[]
+  id                  String          @id @default(uuid())
+  name                String
+  campusId            Int
+  campus              Campus          @relation(fields: [campusId], references: [id])
+  /// The calendar semester this admission window is advertised in. Informational only:
+  /// it never decides the student's own semester number.
+  semesterId          String?
+  semester            Semester?       @relation(fields: [semesterId], references: [id])
+  /// The year and month the cohort is admitted, e.g. 2026 and 5 for the May 2026 intake.
+  year                Int
+  month               Int
+  /// Day one of THIS intake's Semester 1. Every later period counts from here.
+  startsAt            DateTime
+  applicationDeadline DateTime
+  commenceAt          DateTime
+  enrollments         Enrollment[]
+  classes             AcademicClass[]
 
-  @@unique([semesterId, name])
+  @@unique([campusId, year, month, name])
+  @@index([campusId, startsAt])
   @@map("intakes")
 }
 
@@ -504,109 +548,119 @@ model CalendarEvent {
   @@map("calendar_events")
 }
 
-
 model ParentGuardian {
-  id            String         @id @default(uuid())
-  studentId     String
-  student       StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  fullName      String
-  relationship  String
-  phone         String?
-  altPhone      String?
-  email         String?
-  address       String?
-  occupation    String?
-  createdAt     DateTime       @default(now())
+  id           String         @id @default(uuid())
+  studentId    String
+  student      StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fullName     String
+  relationship String
+  phone        String?
+  altPhone     String?
+  email        String?
+  address      String?
+  occupation   String?
+  createdAt    DateTime       @default(now())
 
   @@index([studentId])
   @@map("parent_guardians")
 }
 
 model EmergencyContact {
-  id            String         @id @default(uuid())
-  studentId     String
-  student       StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  fullName      String
-  relationship  String
-  phone         String
-  altPhone      String?
-  address       String?
-  createdAt     DateTime       @default(now())
+  id           String         @id @default(uuid())
+  studentId    String
+  student      StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fullName     String
+  relationship String
+  phone        String
+  altPhone     String?
+  address      String?
+  createdAt    DateTime       @default(now())
 
   @@index([studentId])
   @@map("emergency_contacts")
 }
 
 model Enrollment {
-  id          String           @id @default(uuid())
+  id          String              @id @default(uuid())
   studentId   String
-  student     StudentProfile   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student     StudentProfile      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   programId   String
-  program     Program          @relation(fields: [programId], references: [id])
+  program     Program             @relation(fields: [programId], references: [id])
   campusId    Int
-  campus      Campus           @relation(fields: [campusId], references: [id])
-  intakeId    String?
-  intake      Intake?          @relation(fields: [intakeId], references: [id])
+  campus      Campus              @relation(fields: [campusId], references: [id])
+  /// The cohort this student joined through. Required: every student follows an intake's
+  /// progression, so there is no such thing as an enrolment without one.
+  intakeId    String
+  intake      Intake              @relation(fields: [intakeId], references: [id])
   cohort      String?
-  status      EnrollmentStatus @default(ACTIVE)
-  enrolledAt  DateTime         @default(now())
+  /// Where this student is in THEIR programme, counted from their intake's start — not the
+  /// campus calendar semester. A May joiner begins here at 1/1 whatever the campus is doing.
+  yearIndex   Int                 @default(1)
+  semesterNo  Int                 @default(1)
+  /// Moved on by a deliberate promotion, so the office can see when a cohort was advanced.
+  promotedAt  DateTime?
+  status      EnrollmentStatus    @default(ACTIVE)
+  enrolledAt  DateTime            @default(now())
   withdrawnAt DateTime?
   grades      Grade[]
   /// The fee schedule generated for this enrolment, one invoice per payable period.
   invoices    Invoice[]
   /// The student's standing on each unit of the programme.
   units       StudentUnit[]
+  /// Their current class, and every class they have belonged to before it.
+  memberships ClassMembership[]
   attachments StudentAttachment[]
 
   @@unique([studentId, programId])
   @@index([campusId, status])
+  @@index([intakeId, yearIndex, semesterNo])
   @@map("enrollments")
 }
 
 /// A recurring weekly class. Times are "HH:mm" strings validated in the action layer.
 model TimetableSlot {
-  id              String    @id @default(uuid())
+  id              String        @id @default(uuid())
   campusId        Int
-  campus          Campus    @relation(fields: [campusId], references: [id])
+  campus          Campus        @relation(fields: [campusId], references: [id])
   programId       String
-  program         Program   @relation(fields: [programId], references: [id])
+  program         Program       @relation(fields: [programId], references: [id])
   tutorId         String?
   tutor           TutorProfile? @relation(fields: [tutorId], references: [id])
   semesterId      String?
-  semester        Semester? @relation(fields: [semesterId], references: [id])
+  semester        Semester?     @relation(fields: [semesterId], references: [id])
   day             Weekday
   startAt         String
   endAt           String
   room            String?
   weekOffsetLabel String?
-  createdAt       DateTime  @default(now())
+  createdAt       DateTime      @default(now())
 
   @@index([campusId, day])
   @@map("timetable_slots")
 }
 
 model Exam {
-  id              String       @id @default(uuid())
+  id              String        @id @default(uuid())
   title           String
   programId       String
-  program         Program      @relation(fields: [programId], references: [id])
+  program         Program       @relation(fields: [programId], references: [id])
   campusId        Int
-  campus          Campus       @relation(fields: [campusId], references: [id])
+  campus          Campus        @relation(fields: [campusId], references: [id])
   semesterId      String?
-  semester        Semester?    @relation(fields: [semesterId], references: [id])
+  semester        Semester?     @relation(fields: [semesterId], references: [id])
   invigilatorId   String?
   invigilator     TutorProfile? @relation("ExamInvigilator", fields: [invigilatorId], references: [id])
   date            DateTime
   startAt         String
-  durationMinutes Int          @default(120)
+  durationMinutes Int           @default(120)
   room            String?
   /// One sitting. A term normally carries a single CAT and a single end-of-term paper,
   /// but nothing stops it running two CATs or two end-of-term papers.
-  type            ExamType     @default(CAT)
-  status          ExamStatus   @default(DRAFT)
+  type            ExamType      @default(CAT)
+  status          ExamStatus    @default(DRAFT)
   grades          Grade[]
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([campusId, date])
   @@map("exams")
@@ -614,15 +668,15 @@ model Exam {
 
 /// A mark for one enrollment in one exam; maxScore carries the denominator.
 model Grade {
-  id          String     @id @default(uuid())
-  examId      String
-  exam        Exam       @relation(fields: [examId], references: [id], onDelete: Cascade)
+  id           String     @id @default(uuid())
+  examId       String
+  exam         Exam       @relation(fields: [examId], references: [id], onDelete: Cascade)
   enrollmentId String
-  enrollment  Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-  score       Decimal?   @db.Decimal(6, 2)
-  maxScore    Decimal    @default(100) @db.Decimal(6, 2)
-  remark      String?
-  published   Boolean    @default(false)
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  score        Decimal?   @db.Decimal(6, 2)
+  maxScore     Decimal    @default(100) @db.Decimal(6, 2)
+  remark       String?
+  published    Boolean    @default(false)
 
   @@unique([examId, enrollmentId])
   @@map("grades")
@@ -646,24 +700,24 @@ model Unit {
 /// module. `periodKey` is the machine-readable identity of that period, which is what keeps
 /// the same unit reusable in two periods without duplicating the unit itself.
 model ProgramUnit {
-  id          String         @id @default(uuid())
-  programId   String
-  program     Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
-  unitId      String
-  unit        Unit           @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  moduleId    String?
-  module      ProgramModule? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  id           String         @id @default(uuid())
+  programId    String
+  program      Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  unitId       String
+  unit         Unit           @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  moduleId     String?
+  module       ProgramModule? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   /// "Y1S2", "M3", "MOD:<id>" or a slug for a custom structure.
-  periodKey   String
-  periodLabel String
-  yearIndex   Int?
-  semesterNo  Int?
-  monthIndex  Int?
+  periodKey    String
+  periodLabel  String
+  yearIndex    Int?
+  semesterNo   Int?
+  monthIndex   Int?
   /// Reading order inside its period.
-  sequence    Int            @default(0)
-  isCore      Boolean        @default(true)
+  sequence     Int            @default(0)
+  isCore       Boolean        @default(true)
   studentUnits StudentUnit[]
-  createdAt   DateTime       @default(now())
+  createdAt    DateTime       @default(now())
 
   @@unique([programId, unitId, periodKey])
   @@index([programId, periodKey])
@@ -672,19 +726,19 @@ model ProgramUnit {
 
 /// A module of a module-based programme. Its units are ProgramUnit rows that point here.
 model ProgramModule {
-  id            String        @id @default(uuid())
-  programId     String
-  program       Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
-  code          String
-  name          String
-  description   String?
+  id             String        @id @default(uuid())
+  programId      String
+  program        Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  code           String
+  name           String
+  description    String?
   durationMonths Int?
-  sequence      Int           @default(0)
+  sequence       Int           @default(0)
   assessmentNote String?
-  isActive      Boolean       @default(true)
-  units         ProgramUnit[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  isActive       Boolean       @default(true)
+  units          ProgramUnit[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@unique([programId, code])
   @@index([programId, sequence])
@@ -716,24 +770,24 @@ model StudentUnit {
 /// Where an industrial attachment falls in a programme: after a given semester or month, or
 /// after every academic period. Several requirements can be configured for one programme.
 model AttachmentRequirement {
-  id              String              @id @default(uuid())
-  programId       String
-  program         Program             @relation(fields: [programId], references: [id], onDelete: Cascade)
-  sequence        Int                 @default(1)
-  label           String
-  afterYearIndex  Int?
-  afterSemesterNo Int?
-  afterMonthIndex Int?
-  afterAllPeriods Boolean             @default(false)
-  durationWeeks   Int?
-  durationMonths  Int?
-  startsAt        DateTime?
-  endsAt          DateTime?
-  prerequisiteNote String?
-  assessmentNote  String?
-  isActive        Boolean             @default(true)
+  id                 String              @id @default(uuid())
+  programId          String
+  program            Program             @relation(fields: [programId], references: [id], onDelete: Cascade)
+  sequence           Int                 @default(1)
+  label              String
+  afterYearIndex     Int?
+  afterSemesterNo    Int?
+  afterMonthIndex    Int?
+  afterAllPeriods    Boolean             @default(false)
+  durationWeeks      Int?
+  durationMonths     Int?
+  startsAt           DateTime?
+  endsAt             DateTime?
+  prerequisiteNote   String?
+  assessmentNote     String?
+  isActive           Boolean             @default(true)
   studentAttachments StudentAttachment[]
-  createdAt       DateTime            @default(now())
+  createdAt          DateTime            @default(now())
 
   @@unique([programId, sequence])
   @@index([programId])
@@ -742,25 +796,25 @@ model AttachmentRequirement {
 
 /// One student's placement against one requirement.
 model StudentAttachment {
-  id              String                @id @default(uuid())
-  studentId       String
-  student         StudentProfile        @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  enrollmentId    String
-  enrollment      Enrollment            @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-  requirementId   String
-  requirement     AttachmentRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
-  status          AttachmentStatus      @default(NOT_ELIGIBLE)
+  id               String                @id @default(uuid())
+  studentId        String
+  student          StudentProfile        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  enrollmentId     String
+  enrollment       Enrollment            @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  requirementId    String
+  requirement      AttachmentRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  status           AttachmentStatus      @default(NOT_ELIGIBLE)
   hostOrganization String?
-  supervisorName  String?
-  supervisorPhone String?
-  supervisorEmail String?
-  startDate       DateTime?
-  expectedEndDate DateTime?
-  completedAt     DateTime?
-  assessmentNote  String?
-  grade           String?
-  remark          String?
-  updatedAt       DateTime              @updatedAt
+  supervisorName   String?
+  supervisorPhone  String?
+  supervisorEmail  String?
+  startDate        DateTime?
+  expectedEndDate  DateTime?
+  completedAt      DateTime?
+  assessmentNote   String?
+  grade            String?
+  remark           String?
+  updatedAt        DateTime              @updatedAt
 
   @@unique([enrollmentId, requirementId])
   @@index([studentId, status])
@@ -771,23 +825,23 @@ model StudentAttachment {
 /// below; a plan is never edited in place, because students already enrolled hold invoices
 /// copied from it. Saving a change writes version n+1 and retires version n.
 model ProgramFeePlan {
-  id             String       @id @default(uuid())
+  id             String     @id @default(uuid())
   programId      String
-  program        Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  program        Program    @relation(fields: [programId], references: [id], onDelete: Cascade)
   version        Int
   cadenceId      String
-  cadence        FeeCadence   @relation(fields: [cadenceId], references: [id])
+  cadence        FeeCadence @relation(fields: [cadenceId], references: [id])
   /// Copied from the programme when the version is published, so the period list stays
   /// readable even if the programme's duration is later corrected.
   durationMonths Int
-  totalAmount    Decimal      @db.Decimal(12, 2)
+  totalAmount    Decimal    @db.Decimal(12, 2)
   note           String?
   /// Exactly one plan per programme is active; the partial unique index in the migration
   /// enforces that, which a plain unique constraint cannot do.
-  isActive       Boolean      @default(true)
+  isActive       Boolean    @default(true)
   periods        FeeItem[]
   invoices       Invoice[]
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime   @default(now())
 
   @@unique([programId, version])
   @@index([programId, isActive])
@@ -827,32 +881,32 @@ model FeeItem {
 }
 
 model Invoice {
-  id        String        @id @default(uuid())
-  number    String        @unique
-  studentId String
-  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  campusId  Int
-  campus    Campus        @relation(fields: [campusId], references: [id])
-  semesterId String?
-  semester   Semester?     @relation(fields: [semesterId], references: [id])
-  programId String?
+  id             String          @id @default(uuid())
+  number         String          @unique
+  studentId      String
+  student        StudentProfile  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  campusId       Int
+  campus         Campus          @relation(fields: [campusId], references: [id])
+  semesterId     String?
+  semester       Semester?       @relation(fields: [semesterId], references: [id])
+  programId      String?
   /// Set on a bill generated from a programme's fee plan. Null on a manually raised bill.
-  enrollmentId String?
-  enrollment   Enrollment?     @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
-  feePlanId    String?
-  feePlan      ProgramFeePlan? @relation(fields: [feePlanId], references: [id], onDelete: SetNull)
-  feePeriodId  String?
-  feePeriod    FeeItem?        @relation("FeePeriodInvoices", fields: [feePeriodId], references: [id], onDelete: SetNull)
+  enrollmentId   String?
+  enrollment     Enrollment?     @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  feePlanId      String?
+  feePlan        ProgramFeePlan? @relation(fields: [feePlanId], references: [id], onDelete: SetNull)
+  feePeriodId    String?
+  feePeriod      FeeItem?        @relation("FeePeriodInvoices", fields: [feePeriodId], references: [id], onDelete: SetNull)
   /// Which academic year and semester of the student's programme this period belongs to.
   periodYear     Int?
   periodSemester Int?
-  dueAt     DateTime?
-  status    InvoiceStatus @default(OPEN)
-  note      String?
-  lines     InvoiceLine[]
-  payments  Payment[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  dueAt          DateTime?
+  status         InvoiceStatus   @default(OPEN)
+  note           String?
+  lines          InvoiceLine[]
+  payments       Payment[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   /// Retrying the same enrolment can never bill a period twice.
   @@unique([enrollmentId, feePeriodId])
@@ -874,18 +928,18 @@ model InvoiceLine {
 }
 
 model Payment {
-  id        String        @id @default(uuid())
+  id        String         @id @default(uuid())
   invoiceId String
-  invoice   Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice   Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   studentId String
   student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  amount    Decimal       @db.Decimal(12, 2)
+  amount    Decimal        @db.Decimal(12, 2)
   method    PaymentMethod
   reference String?
   /// One receipt can be split across several overdue periods; every row it created carries
   /// the same number, which is how a finance officer traces the money back to one payment.
   receiptNo String?
-  paidAt    DateTime      @default(now())
+  paidAt    DateTime       @default(now())
 
   @@index([invoiceId])
   @@index([studentId])
@@ -911,24 +965,24 @@ model Announcement {
 }
 
 model IdCard {
-  id          String       @id @default(uuid())
-  serial      String       @unique
+  id          String         @id @default(uuid())
+  serial      String         @unique
   /// The unguessable half of the verification link the card's QR encodes. The serial is
   /// issued in sequence, so it can never be the thing a stranger is given.
-  verifyToken String       @unique
+  verifyToken String         @unique
   studentId   String
   student     StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
   campusId    Int
-  campus      Campus       @relation(fields: [campusId], references: [id])
+  campus      Campus         @relation(fields: [campusId], references: [id])
   programId   String?
-  program     Program?     @relation(fields: [programId], references: [id])
+  program     Program?       @relation(fields: [programId], references: [id])
   templateId  String?
-  template    CardTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  status      CardStatus   @default(PENDING)
+  template    CardTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  status      CardStatus     @default(PENDING)
   issuedAt    DateTime?
   expiresAt   DateTime?
   remarks     String?
-  createdAt   DateTime     @default(now())
+  createdAt   DateTime       @default(now())
 
   @@index([campusId, status])
   @@map("id_cards")
@@ -959,4 +1013,109 @@ model CardTemplate {
   @@index([campusId, name, version])
   @@index([campusId, isActive])
   @@map("card_templates")
+}
+
+/// A teaching group: the students one office sits together for scheduling, marks and
+/// reporting. A class is a GROUPING, never an academic position — two students in the same
+/// class can be in different semesters, and moving a student between classes leaves their
+/// placement, units, results and fees untouched.
+///
+/// Intake is an official window (January, May or September), so admissions spread across
+/// other months all land in one of these three classes. Offices may still keep a temporary
+/// class such as ICT/JAN-FEB/2027 and merge it into the regular one later.
+model AcademicClass {
+  id          String            @id @default(uuid())
+  campusId    Int
+  campus      Campus            @relation(fields: [campusId], references: [id])
+  programId   String
+  program     Program           @relation(fields: [programId], references: [id])
+  intakeId    String
+  intake      Intake            @relation(fields: [intakeId], references: [id])
+  /// Taken from the intake so a class can never advertise a window the intake disagrees with.
+  intakeMonth OfficialIntake
+  /// The academic year the class is taught in, e.g. 2027.
+  year        Int
+  /// What the office calls it, e.g. "ICT/JAN/2027" or "ICT/JAN-FEB/2027". Free text: names
+  /// are the office's own convention, not something the system dictates.
+  name        String
+  /// Optional human note explaining a temporary class, e.g. "Late January joiners".
+  note        String?
+  status      ClassStatus       @default(ACTIVE)
+  archivedAt  DateTime?
+  ambient     String?           @default("purple")
+  memberships ClassMembership[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([programId, name])
+  @@index([campusId, year, status])
+  @@index([intakeId])
+  @@map("academic_classes")
+}
+
+/// A student's time in a class. Rows are never deleted or overwritten: a class change closes
+/// the open row and opens a new one, so the full history is available for audit and for
+/// reporting on a class as it stood on any date.
+model ClassMembership {
+  id           String        @id @default(uuid())
+  classId      String
+  class        AcademicClass @relation(fields: [classId], references: [id], onDelete: Restrict)
+  enrollmentId String
+  enrollment   Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  campusId     Int
+  joinedAt     DateTime      @default(now())
+  /// Set when the student leaves this class; the row stays as history either way.
+  leftAt       DateTime?
+  /// Why they moved, for the audit trail: admitted, moved, merged, archived.
+  reason       String?
+  /// The administrator who made the change.
+  actorId      String?
+  createdAt    DateTime      @default(now())
+
+  @@index([enrollmentId, leftAt])
+  @@index([classId, leftAt])
+  @@map("class_memberships")
+}
+
+/// A decision about study a student completed elsewhere. Recording the request and the
+/// decision separately keeps the evidence (documents, grades) even when the answer is no.
+
+/// One row per important change. Rows are append-only: nothing here is edited or deleted.
+model AuditLog {
+  id         String   @id @default(uuid())
+  campusId   Int?
+  actorId    String?
+  actorEmail String?
+  /// Dotted action name, e.g. "class.merge", "enrollment.place".
+  action     String
+  entityType String
+  entityId   String
+  /// JSON text: what changed. Never contains passwords or card details.
+  detail     String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([campusId, createdAt])
+  @@map("audit_logs")
+}
+
+/// One print run. Kept so a batch can be reopened, re-downloaded or reprinted without
+/// generating the cards again — the office prints a class, then a late joiner arrives, then
+/// the first batch is asked for again weeks later.
+model CardBatch {
+  id          String   @id @default(uuid())
+  campusId    Int?
+  campus      Campus?  @relation(fields: [campusId], references: [id])
+  /// What the run covered, for the history line: "Class KNEC-D/JAN/2026".
+  targetLabel String
+  cardCount   Int
+  sheetCount  Int
+  /// Where the generated PDF lives. The file itself is in object storage, not the database.
+  fileUrl     String?
+  actorId     String?
+  actorEmail  String?
+  createdAt   DateTime @default(now())
+
+  @@index([campusId, createdAt])
+  @@map("card_batches")
 }

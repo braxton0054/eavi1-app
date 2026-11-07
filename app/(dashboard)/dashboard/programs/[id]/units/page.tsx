@@ -14,10 +14,12 @@ import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
+import { SectionTabs } from "@/components/dashboard/section-tabs";
 import type { Column, Field } from "@/lib/content/dashboard";
 
 const copy = pages.programs;
 const unitCopy = copy.unitPlan;
+const tabs = copy.sectionTabs;
 
 export default async function ProgramUnitsPage({
   params,
@@ -162,13 +164,13 @@ export default async function ProgramUnitsPage({
     <div className="space-y-6">
       <Link
         href={`/dashboard/programs/${program.id}`}
-        className="text-sm text-eavi-primary-text underline-offset-4 hover:underline"
+        className="inline-flex min-h-8 items-center gap-1 text-sm text-eavi-muted-text hover:text-eavi-primary-text"
       >
         ← {program.name}
       </Link>
 
       <PageHeader
-        title={`${unitCopy.title} · ${program.name}`}
+        title={unitCopy.title}
         description={unitCopy.description}
         meta={
           <p className="mt-1 text-sm text-eavi-muted-text">
@@ -176,6 +178,16 @@ export default async function ProgramUnitsPage({
             {placed.length} {unitCopy.placed.toLowerCase()}
           </p>
         }
+      />
+
+      <SectionTabs
+        label={tabs.label}
+        tabs={[
+          { href: `/dashboard/programs/${program.id}`, label: tabs.overview },
+          { href: `/dashboard/programs/${program.id}/units`, label: tabs.units, active: true },
+          { href: `/dashboard/programs/${program.id}/fees`, label: tabs.fees },
+          { href: `/dashboard/programs/${program.id}/attachment`, label: tabs.attachment },
+        ]}
       />
 
       {archived ? <Notice tone="warning" title={unitCopy.title} body={unitCopy.archived} /> : null}

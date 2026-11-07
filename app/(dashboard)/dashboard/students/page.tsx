@@ -1,15 +1,14 @@
 import { getStudents } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
-import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { ListFilters, Paginator, ResultCount } from "@/components/dashboard/list-tools";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
+import { RecordCard, RecordCardGrid, type RecordCardData } from "@/components/dashboard/record-card";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { money } from "@/lib/format";
 
-
-
 const copy = pages.students;
+const cardCopy = copy.card;
 
 /** Card pipeline stages read left to right, so the chip colour follows the stage. */
 const cardTone: Record<string, ChipTone> = {
@@ -30,38 +29,38 @@ export default async function StudentsPage({
 
   const list = await getStudents({ q, page: Number(page) || 1 });
 
-  const rows: Row[] = list.rows.map((student) => {
+  const cards: RecordCardData[] = list.rows.map((student) => {
     const program = student.enrollments[0]?.program;
-    const card = student.idCards[0];
+    const idCard = student.idCards[0];
+    const owes = student.balance > 0;
 
     return {
       id: student.id,
       href: `/dashboard/students/${student.id}`,
-      cells: {
-        admissionNo: student.admissionNo,
-        fullName: student.user.fullName,
-        contact: (
-          <span className="flex flex-col">
-            <span>{student.user.email}</span>
-            {student.user.phone ? (
-              <span className="text-xs text-eavi-muted-text">{student.user.phone}</span>
-            ) : null}
-          </span>
-        ),
-        program: program ? `${program.name} (${program.code})` : common.notSet,
-        account: (
-          <span className={student.balance > 0 ? "text-eavi-destructive" : undefined}>
-            {money(student.balance)}
-          </span>
-        ),
-        card: card ? (
-          <StatusChip tone={cardTone[card.status] ?? "neutral"}>
-            {labels.cardStatus[card.status as keyof typeof labels.cardStatus]}
-          </StatusChip>
-        ) : (
-          common.none
-        ),
-      },
+      eyebrow: student.admissionNo,
+      title: student.user.fullName,
+      subtitle: program ? `${program.code} · ${program.name}` : cardCopy.noProgram,
+      avatarUrl: student.profilePhotoUrl,
+      avatarAlt: student.user.fullName,
+      // No chip at all when no card exists: "None" next to a name says nothing, and the
+      // fact line below already says the card has not been issued.
+      status: idCard ? (
+        <StatusChip tone={cardTone[idCard.status] ?? "neutral"}>
+          {labels.cardStatus[idCard.status as keyof typeof labels.cardStatus]}
+        </StatusChip>
+      ) : undefined,
+      facts: [
+        { label: "Phone", value: student.user.phone ?? cardCopy.noPhone, tone: "muted" as const },
+        {
+          label: cardCopy.idCard,
+          value: idCard?.serial ?? cardCopy.noCard,
+          tone: "muted" as const,
+        },
+      ],
+      // Only money owed is a figure worth colouring; a cleared account is stated plainly.
+      figure: owes
+        ? { label: cardCopy.balance, value: money(student.balance), danger: true }
+        : { label: cardCopy.balance, value: cardCopy.cleared },
     };
   });
 
@@ -72,27 +71,22 @@ export default async function StudentsPage({
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
       <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
-        <div className="space-y-4 p-4">
-          <ListFilters
-            basePath="/dashboard/students"
-            q={q}
-            searchLabel={copy.searchLabel}
-          />
+        <div className="space-y-4 border-b border-eavi-border p-4">
+          <ListFilters basePath="/dashboard/students" q={q} searchLabel={copy.searchLabel} />
           <ResultCount total={list.total} />
         </div>
 
-        {rows.length === 0 ? (
+        {cards.length === 0 ? (
           <EmptyState title={copy.empty.title} body={copy.empty.body} icon="students" />
         ) : (
           <>
-            <DataTable columns={copy.columns} rows={rows} caption={copy.title} />
+            <RecordCardGrid>
+              {cards.map((card) => (
+                <RecordCard key={card.id} card={card} openLabel={cardCopy.open} />
+              ))}
+            </RecordCardGrid>
             <div className="border-t border-eavi-border p-4">
-              <Paginator
-                basePath="/dashboard/students"
-                page={list.page}
-                total={list.total}
-                q={q}
-              />
+              <Paginator basePath="/dashboard/students" page={list.page} total={list.total} q={q} />
             </div>
           </>
         )}

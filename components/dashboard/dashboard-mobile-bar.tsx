@@ -34,7 +34,8 @@ export function DashboardMobileBar({ items, home }: { items: NavItem[]; home: st
   return (
     <nav
       aria-label="Portal sections"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-eavi-border bg-eavi-card pb-[env(safe-area-inset-bottom)] md:hidden"
+      // `no-print` keeps the app's navigation off paper: a sheet is not a screen.
+      className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-eavi-border bg-eavi-card pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <ul className="mx-auto flex max-w-2xl items-stretch">
         {items.map((item) => {

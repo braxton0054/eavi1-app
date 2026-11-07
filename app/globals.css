@@ -369,3 +369,472 @@ body {
     transform: translateY(0.75rem);
   }
 }
+
+/*
+ * ============================================================================
+ * Printing
+ * ============================================================================
+ *
+ * The screen and the sheet are different documents. The screen version of a record is a
+ * purple dashboard with cards, chips, disclosures and a bottom nav; none of that survives a
+ * page break. So printing shows a purpose-built `.print-doc` that only exists on paper, and
+ * everything else on the page is hidden.
+ *
+ * Every measurement is in millimetres. Paper is a physical object: a card declared as 32mm
+ * prints at 32mm on any machine that opens the PDF, whereas a pixel measurement depends on
+ * the screen that laid it out.
+ *
+ * The rules live at the very end of this file and outside `@layer`, so they beat every
+ * utility class without needing `!important` everywhere.
+ */
+
+/* On screen the paper version is not rendered at all. */
+.print-doc {
+  display: none;
+}
+
+/* Paper-only source order marker: hidden until print. */
+.print-new-page {
+  break-before: auto;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 16mm 14mm 18mm 14mm;
+  }
+
+  /* ------------------------------------------------------------------ what prints */
+
+  html,
+  body {
+    background: #fff;
+    color: #111;
+    font-size: 10.5pt;
+    line-height: 1.4;
+    margin: 0;
+  }
+
+  /* The dashboard, its chrome and anything marked no-print are not part of the document. */
+  [data-slot="sidebar"],
+  [data-slot="sidebar-inset"] > header,
+  [data-print="screen-only"],
+  .no-print,
+  nav,
+  header.app-topbar,
+  button,
+  [role="button"] {
+    display: none !important;
+  }
+
+  /* The screen record is replaced by the print document. */
+  [data-print="record"] {
+    display: none !important;
+  }
+
+  /*
+   * The app shell is a fixed-height column (`min-h-dvh`, `flex`, `h-dvh`) sized to the screen.
+   * Left alone it clips the document to one viewport, which is why an early attempt produced a
+   * single page holding almost nothing. Every wrapper above the document becomes a plain
+   * block with automatic height, so the sheet grows to the length of its content.
+   */
+  html,
+  body,
+  body > div,
+  .group\/sidebar-wrapper,
+  [data-slot="sidebar-inset"],
+  [data-slot="sidebar-inset"] > main,
+  main {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    flex: 1 1 auto !important;
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #fff !important;
+    border: 0 !important;
+  }
+
+  .print-doc {
+    display: block;
+    color: #111;
+    /*
+     * Cancel the app shell's own gutters. The paper's margin comes from `@page`, so any
+     * padding left here would push the document inwards and break the single left edge that
+     * every heading, card and table must share.
+     */
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* The container the document was rendered into loses its page padding too. */
+  main:has(> .print-doc),
+  main:has(.print-doc),
+  [data-slot="sidebar-inset"] > main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* --------------------------------------------------------------- page structure */
+
+  .print-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin: 0 0 8mm;
+  }
+
+  /*
+   * A section forced onto a new sheet.
+   *
+   * Used only where starting fresh is worth the blank space — never as a default, because a
+   * record with two invoices would push a page of nothing at the reader.
+   */
+  .print-new-page {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  /* A long section that may start wherever the previous one ended. */
+  .print-flow {
+    break-before: auto;
+  }
+
+  /* Headings never end a page on their own: the browser must keep the heading with at
+     least the first rows of whatever follows it. */
+  .print-doc h2,
+  .print-doc h3 {
+    break-after: avoid;
+    page-break-after: always-avoid;
+    break-inside: avoid;
+    margin: 4mm 0 2mm;
+    color: #111;
+  }
+
+  .print-doc h2 {
+    font-size: 13pt;
+    border-bottom: 0.5pt solid #333;
+    padding-bottom: 1.5mm;
+  }
+
+  .print-doc h3 {
+    font-size: 10.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #333;
+  }
+
+  /* ------------------------------------------------------------- the one left edge */
+
+  /*
+   * Every section, heading, table and fact list starts at exactly the same x. There is one
+   * container width and no element adds its own inset, which is what makes cards, tables and
+   * headings line up down the page.
+   */
+  .print-doc,
+  .print-section,
+  .print-masthead,
+  .print-person,
+  .print-split,
+  .print-facts,
+  .print-stats,
+  .print-table,
+  .print-doc h2,
+  .print-doc h3,
+  .print-doc p {
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+    width: 100%;
+    max-width: none;
+  }
+
+  /* ---------------------------------------------------------------- masthead */
+
+  .print-masthead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8mm;
+    border-bottom: 1pt solid #111;
+    padding-bottom: 3mm;
+    margin-bottom: 5mm;
+  }
+
+  .print-masthead-brand {
+    display: flex;
+    align-items: center;
+    gap: 4mm;
+  }
+
+  .print-logo {
+    height: 16mm;
+    width: auto;
+  }
+
+  .print-institute {
+    font-size: 11pt;
+    font-weight: 700;
+    color: #111;
+  }
+
+  .print-doctype {
+    font-size: 9pt;
+    color: #555;
+  }
+
+  .print-subject {
+    font-size: 9pt;
+    font-weight: 600;
+    color: #111;
+    text-align: right;
+  }
+
+  /* ------------------------------------------------------------ identity block */
+
+  .print-person {
+    display: flex;
+    align-items: flex-start;
+    gap: 6mm;
+    margin-bottom: 5mm;
+    break-inside: avoid;
+  }
+
+  /* A fixed box, so the layout does not shift between a student with a photo and one
+     without. `contain` keeps a portrait portrait instead of cropping it. */
+  .print-photo {
+    width: 32mm;
+    height: 40mm;
+    flex: 0 0 32mm;
+    object-fit: contain;
+    border: 0.5pt solid #999;
+    border-radius: 1.5mm;
+    background: #fff;
+  }
+
+  .print-photo-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7.5pt;
+    color: #777;
+    text-align: center;
+    border-style: dashed;
+    padding: 2mm;
+  }
+
+  /* ------------------------------------------------ facts, labels and values */
+
+  .print-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2mm 6mm;
+    break-inside: avoid;
+  }
+
+  .print-facts-identity {
+    flex: 1 1 auto;
+    /* Four facts beside a 40mm photo: let them sit at the top instead of being stretched
+       over the photo's full height, which left a pool of white space in each cell. */
+    align-content: start;
+  }
+
+  /* Labels and values are left-aligned everywhere. Only money in a table is right-aligned,
+     because figures are compared by their digits. */
+  .print-fact {
+    break-inside: avoid;
+    text-align: left;
+    min-width: 0;
+  }
+
+  .print-fact dt {
+    font-size: 8pt;
+    color: #666;
+    text-align: left;
+  }
+
+  .print-fact dd {
+    margin: 0;
+    font-size: 10pt;
+    color: #111;
+    text-align: left;
+    /* Long e-mail addresses and URLs wrap only at natural points, never mid-word. */
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+  }
+
+  /* Two columns, each starting at the document's left edge. */
+  .print-split {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6mm;
+    break-inside: avoid;
+  }
+
+  .print-empty {
+    font-size: 9pt;
+    color: #555;
+    margin: 0 0 2mm;
+    break-inside: avoid;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+  }
+
+  .print-muted {
+    color: #777;
+  }
+
+  /* ------------------------------------------------------------- fee summary */
+
+  .print-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3mm;
+    margin-bottom: 2mm;
+    break-inside: avoid;
+  }
+
+  .print-stat {
+    border: 0.5pt solid #999;
+    border-radius: 1.5mm;
+    padding: 2mm 3mm;
+    break-inside: avoid;
+  }
+
+  .print-stat-label {
+    font-size: 8pt;
+    color: #666;
+  }
+
+  .print-stat-value {
+    font-size: 11pt;
+    font-weight: 700;
+    color: #111;
+  }
+
+  .print-settled {
+    font-size: 9pt;
+    color: #333;
+    margin: 0 0 4mm;
+    break-inside: avoid;
+  }
+
+  /* -------------------------------------------------------------- tables */
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 5mm;
+    font-size: 9pt;
+    break-inside: auto;
+  }
+
+  /* The visible heading above a table already names it; the caption is for a screen reader
+     and for a PDF's structure, so it must not repeat the same words on paper. */
+  .print-table caption,
+  .print-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Repeated on every page a long table continues onto. */
+  .print-table thead {
+    display: table-header-group;
+  }
+
+  .print-table tfoot {
+    display: table-row-group;
+  }
+
+  .print-table th,
+  .print-table td {
+    border-bottom: 0.5pt solid #bbb;
+    padding: 1.6mm 2mm;
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+  }
+
+  .print-table th {
+    font-size: 8pt;
+    font-weight: 700;
+    color: #333;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  /* Only figures are right-aligned. */
+  .print-table .num,
+  .print-table th.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .print-table .foot-label {
+    text-align: right;
+    text-transform: none;
+    font-size: 9pt;
+  }
+
+  .print-table tfoot td {
+    font-weight: 700;
+    border-bottom: 0;
+    border-top: 0.5pt solid #333;
+  }
+
+  /* No row is ever split between two pages. */
+  .print-table tr,
+  .print-table td,
+  .print-table th {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* ---------------------------------------------------------------- text flow */
+
+  .print-doc p,
+  .print-doc li,
+  .print-doc dd {
+    orphans: 3;
+    widows: 3;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+  }
+
+  /* Status badges keep their outline so a printed record still distinguishes them. */
+  .print-badge {
+    display: inline-block;
+    border: 0.5pt solid #555;
+    border-radius: 1mm;
+    padding: 0 1.5mm;
+    font-size: 8pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ink is expensive and colour is not information here. */
+  .print-doc * {
+    box-shadow: none;
+    text-shadow: none;
+    background-image: none;
+  }
+
+  .print-doc img {
+    break-inside: avoid;
+  }
+}

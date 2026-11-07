@@ -102,7 +102,9 @@ export default async function OverviewPage() {
                 <li key={intake.id} className="flex items-start justify-between gap-4 px-5 py-3">
                   <div className="min-w-0">
                     <p className="text-sm leading-tight font-medium sm:truncate">{intake.name}</p>
-                    <p className="text-xs text-eavi-muted-text">{intake.semester.name}</p>
+                    <p className="text-xs text-eavi-muted-text">
+                      Classes start {formatDate(intake.startsAt)}
+                    </p>
                   </div>
                   <span className="shrink-0 text-sm tabular-nums">
                     {formatDate(intake.applicationDeadline)}

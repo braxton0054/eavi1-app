@@ -1,14 +1,20 @@
+import Link from "next/link";
+
 import { createCard, moveCard } from "@/lib/actions/college/cards";
 import { getCards, getProgramOptions, getStudentOptions } from "@/lib/dal/college";
+import { getCardCandidates } from "@/lib/dal/cards";
+import { getClassOptions, getIntakeChoices } from "@/lib/dal/classes";
+import { CardGenerator } from "@/components/dashboard/card-generator";
+import { getCardFace } from "@/lib/dal/cards";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
-import { DataTable, type Row } from "@/components/dashboard/data-table";
+import { RecordCard, RecordCardGrid, type RecordCardData } from "@/components/dashboard/record-card";
+import { prisma } from "@/lib/prisma";
 import { DisclosureForm, RowForm, type OptionSets } from "@/components/dashboard/record-form";
 import { ListFilters, Paginator, ResultCount } from "@/components/dashboard/list-tools";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { formatDate } from "@/lib/format";
-import type { Column } from "@/lib/content/dashboard";
 
 
 const copy = pages.cards;
@@ -28,25 +34,75 @@ const detail =
 export default async function CardsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string; invalid?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    page?: string;
+    invalid?: string;
+    empty?: string;
+    tooMany?: string;
+    ready?: string;
+  }>;
 }) {
-  const { q, status, page, invalid } = await searchParams;
+  const { q, status, page, invalid, empty, tooMany, ready } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  const [list, studentOptions, programOptions] = await Promise.all([
+  const [list, studentOptions, programOptions, classChoices, intakeChoices] = await Promise.all([
     getCards({ q, status, page: Number(page) || 1 }),
     getStudentOptions(scope.campusId),
     getProgramOptions(scope.campusId),
+    getClassOptions(scope.campusId),
+    getIntakeChoices(scope.campusId),
   ]);
+
+  // The picker shows who each choice would print before anything is generated. Every
+  // target's list is resolved here so changing the picker needs no round trip.
+  const targets = [
+    ...studentOptions.map((o) => ({ kind: "student", id: o.value })),
+    ...classChoices.map((o) => ({ kind: "class", id: o.value })),
+    ...intakeChoices.map((o) => ({ kind: "intake", id: o.id })),
+  ];
+  const resolved = await Promise.all(
+    targets.map((t) =>
+      getCardCandidates(
+        t.kind === "student"
+          ? { kind: "student", studentId: t.id }
+          : t.kind === "class"
+            ? { kind: "class", classId: t.id }
+            : { kind: "intake", intakeId: t.id },
+        scope.campusId,
+      ),
+    ),
+  );
+  const candidatesByTarget = Object.fromEntries(
+    targets.map((t, i) => [`${t.kind}:${t.id}`, resolved[i]]),
+  );
+
+  // Past runs, so a batch generated last week can be reopened without regenerating it.
+  const batches = await prisma.cardBatch.findMany({
+    where: scope.campusId === null ? {} : { campusId: scope.campusId },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+    select: { id: true, targetLabel: true, cardCount: true, sheetCount: true, createdAt: true },
+  });
 
   const options: OptionSets = { students: studentOptions, programs: programOptions };
 
   const statuses = Object.entries(labels.cardStatus).map(([value, label]) => ({ value, label }));
 
-  const columns: Column[] = [...copy.columns, { key: "actions", label: common.actions }];
+  // The card face is rendered from the student's own record, so it is fetched for the
+  // visible page only — one artwork merge per row, never for the whole table.
+  const faces = await Promise.all(
+    list.rows.map((card) => getCardFace(card.id, scope.campusId)),
+  );
+  const faceByCard = new Map(list.rows.map((card, index) => [card.id, faces[index]]));
 
-  const rows: Row[] = list.rows.map((card) => {
+  // One card, one record card — the same treatment as programmes, students and invoices.
+  // The whole card opens the card's own page, and the actions stay in the footer strip so a
+  // record never needs a row menu.
+  const cards: RecordCardData[] = list.rows.map((card) => {
     const programme = card.program?.name ?? card.student.enrollments[0]?.program.name ?? common.none;
+    const faceData = faceByCard.get(card.id) ?? null;
 
     const face = [
       { label: copy.print.studentLabel, value: card.student.admissionNo },
@@ -56,48 +112,79 @@ export default async function CardsPage({
       { label: copy.print.validLabel, value: card.expiresAt ? formatDate(card.expiresAt) : common.notSet },
     ];
 
+    const action = (
+      <div className="flex w-full flex-wrap items-start gap-2">
+        <RowForm
+          id={`card-${card.id}-move`}
+          button={copy.move.title}
+          fields={[copy.move.statusField]}
+          values={{ status: card.status }}
+          hidden={{ cardId: card.id }}
+          action={moveCard}
+          submitLabel={common.update}
+        />
+
+        <details className="min-w-0">
+          <summary className={detail}>{copy.print.open}</summary>
+          <div className="mt-2 w-[18rem] max-w-full rounded-xl border border-eavi-border bg-eavi-card p-3 text-xs shadow-eavi-card">
+            <p className="text-xs text-eavi-muted-text">{copy.print.heading}</p>
+            {faceData?.frontSvg ? (
+              // The artwork is the campus's own file, inlined so the browser renders the
+              // real card rather than a redesign of it.
+              <div className="mt-2 space-y-2">
+                <div
+                  className="w-full overflow-hidden rounded-md ring-1 ring-eavi-border [&>svg]:h-auto [&>svg]:w-full"
+                  dangerouslySetInnerHTML={{ __html: faceData.frontSvg }}
+                />
+                <div
+                  className="w-full overflow-hidden rounded-md ring-1 ring-eavi-border [&>svg]:h-auto [&>svg]:w-full"
+                  dangerouslySetInnerHTML={{ __html: faceData.backSvg }}
+                />
+              </div>
+            ) : null}
+            {faceData && faceData.missing.length > 0 ? (
+              <p className="mt-2 text-[11px] text-eavi-destructive">
+                {copy.print.missing(faceData.missing.join(", "))}
+              </p>
+            ) : null}
+            <dl className="mt-2 space-y-1">
+              {face.map((line) => (
+                <div key={line.label} className="flex items-baseline justify-between gap-3">
+                  <dt className="shrink-0 text-xs text-eavi-muted-text">{line.label}</dt>
+                  <dd className="min-w-0 text-xs text-right sm:truncate">{line.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </details>
+      </div>
+    );
+
     return {
       id: card.id,
-      cells: {
-        serial: card.serial,
-        student: `${card.student.admissionNo} · ${card.student.user.fullName}`,
-        program: programme,
-        status: (
-          <StatusChip tone={cardTone[card.status] ?? "neutral"}>{labels.cardStatus[card.status]}</StatusChip>
-        ),
-        issuedAt: card.issuedAt ? formatDate(card.issuedAt) : common.notSet,
-        expiresAt: card.expiresAt ? formatDate(card.expiresAt) : common.notSet,
-        actions: (
-          <div className="flex flex-wrap items-start gap-2">
-            <RowForm
-              id={`card-${card.id}-move`}
-              button={copy.move.title}
-              fields={[copy.move.statusField]}
-              values={{ status: card.status }}
-              hidden={{ cardId: card.id }}
-              action={moveCard}
-              submitLabel={common.update}
-            />
-
-            <details>
-              <summary className={detail}>{copy.print.open}</summary>
-              <div className="mt-2 w-full max-w-xs rounded-xl border border-eavi-border bg-eavi-card p-4 shadow-eavi-card">
-                <p className="text-xs text-eavi-muted-text">{copy.print.heading}</p>
-                <p className="mt-1 text-sm font-semibold tracking-tight">{copy.print.institution}</p>
-                <p className="mt-2 text-sm font-medium">{card.student.user.fullName}</p>
-                <dl className="mt-2 space-y-1">
-                  {face.map((line) => (
-                    <div key={line.label} className="flex items-baseline justify-between gap-3">
-                      <dt className="shrink-0 text-xs text-eavi-muted-text">{line.label}</dt>
-                      <dd className="min-w-0 text-xs text-right sm:truncate">{line.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            </details>
-          </div>
-        ),
-      },
+      href: `/dashboard/cards/${card.id}`,
+      eyebrow: card.serial,
+      title: card.student.user.fullName,
+      subtitle: card.student.admissionNo,
+      status: (
+        <StatusChip tone={cardTone[card.status] ?? "neutral"}>{labels.cardStatus[card.status]}</StatusChip>
+      ),
+      facts: [
+        { label: copy.print.programmeLabel, value: programme, showLabel: true },
+        {
+          label: copy.print.validLabel,
+          value: card.expiresAt ? formatDate(card.expiresAt) : common.notSet,
+          showLabel: true,
+          tone: "muted" as const,
+        },
+        {
+          label: "Issued",
+          value: card.issuedAt ? formatDate(card.issuedAt) : common.notSet,
+          showLabel: true,
+          tone: "muted" as const,
+        },
+      ],
+      action,
     };
   });
 
@@ -106,6 +193,20 @@ export default async function CardsPage({
       <PageHeader title={copy.title} description={copy.description} />
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
+      {empty ? <Notice tone="warning" title={copy.generate.title} body={copy.generate.limits.empty} /> : null}
+      {tooMany ? <Notice tone="warning" title={copy.generate.title} body={copy.generate.limits.tooMany} /> : null}
+      {ready ? <Notice tone="success" title={copy.generate.title} body={copy.generate.limits.saved} /> : null}
+
+      <Panel title={copy.generate.title} description={copy.generate.hint}>
+        <div className="p-4">
+          <CardGenerator
+            students={studentOptions}
+            classes={classChoices.map((c) => ({ value: c.value, label: c.label }))}
+            intakes={intakeChoices.map((i) => ({ value: i.id, label: i.label }))}
+            candidatesByTarget={candidatesByTarget}
+          />
+        </div>
+      </Panel>
 
       <DisclosureForm
         id="new-card"
@@ -116,6 +217,27 @@ export default async function CardsPage({
         action={createCard}
         submitLabel={common.create}
       />
+
+      {batches.length > 0 ? (
+        <Panel title={copy.history}>
+          <ul className="divide-y divide-eavi-border">
+            {batches.map((batch) => (
+              <li key={batch.id}>
+                <Link
+                  href={`/dashboard/cards/batches/${batch.id}`}
+                  className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 p-3 text-sm hover:bg-eavi-muted"
+                >
+                  <span className="font-medium">{batch.targetLabel}</span>
+                  <span className="text-eavi-muted-text">{copy.generate.preview(batch.cardCount)}</span>
+                  <span className="ms-auto text-xs text-eavi-muted-text tabular-nums">
+                    {formatDate(batch.createdAt)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : null}
 
       <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
         <div className="space-y-4 p-4">
@@ -129,11 +251,15 @@ export default async function CardsPage({
           <ResultCount total={list.total} />
         </div>
 
-        {rows.length === 0 ? (
+        {cards.length === 0 ? (
           <EmptyState title={copy.empty.title} body={copy.empty.body} icon="cards" />
         ) : (
           <>
-            <DataTable columns={columns} rows={rows} caption={copy.title} />
+            <RecordCardGrid>
+              {cards.map((card) => (
+                <RecordCard key={card.id} card={card} openLabel={copy.openLabel} />
+              ))}
+            </RecordCardGrid>
             <div className="border-t border-eavi-border p-4">
               <Paginator
                 basePath="/dashboard/cards"

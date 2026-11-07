@@ -18,21 +18,49 @@ const adminAccounts = [
   { code: "west", email: "admin-west@eavi.ac.ke", fullName: "EAVI West Campus Office" },
 ];
 
-function campusAdminPassword() {
-  const fromEnv = process.env.SEED_CAMPUS_ADMIN_PASSWORD?.trim();
-  return fromEnv || randomBytes(12).toString("base64url");
+/**
+ * LOCAL TESTING ONLY.
+ *
+ * The seed fills a developer's database with the campuses and logins needed to click through
+ * the portal. A production database is loaded with the college's real data — campuses,
+ * programmes, staff and students as the school records them — so this must never run there.
+ *
+ * Two things keep it out of production: the guard below refuses to run against a hosted
+ * database, and no password is ever invented, so an unset value stops the seed rather than
+ * creating an account somebody can guess.
+ */
+function assertLocalDatabase() {
+  const url = process.env.DATABASE_URL ?? "";
+  const hosted = /neon\.tech|supabase|amazonaws|azure|render\.com|railway|vercel/i.test(url);
+  if (hosted || process.env.NODE_ENV === "production") {
+    throw new Error(
+      "This seed is for local testing only. Point DATABASE_URL at a local database, or load real data instead.",
+    );
+  }
+}
+
+function campusAdminPassword(): string {
+  const value = process.env.SEED_CAMPUS_ADMIN_PASSWORD?.trim() ?? "";
+  if (value.length < 10) {
+    throw new Error("Set SEED_CAMPUS_ADMIN_PASSWORD (at least 10 characters) before seeding.");
+  }
+  return value;
 }
 
 async function seedCampuses() {
   for (const campus of campuses) {
+    // The Town Office handles paperwork rather than teaching, so it is never handed students.
+    const takesApplicants = !/office/i.test(campus.name);
+
     await prisma.campus.upsert({
       where: { code: campusCode(campus.name) },
-      update: { name: campus.name, place: campus.place, phone: campus.phone },
+      update: { name: campus.name, place: campus.place, phone: campus.phone, takesApplicants },
       create: {
         code: campusCode(campus.name),
         name: campus.name,
         place: campus.place,
         phone: campus.phone,
+        takesApplicants,
       },
     });
   }
@@ -105,6 +133,8 @@ async function ensureCampusAdmins() {
 }
 
 async function main() {
+  assertLocalDatabase();
+
   await seedCampuses();
   await ensureSuperadmin();
   await ensureCampusAdmins();

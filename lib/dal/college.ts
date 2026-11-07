@@ -10,6 +10,7 @@ import { campusWhere, requireCollegeAdmin, type AdminScope } from "@/lib/session
 import { pagination } from "@/lib/content/dashboard";
 import { generatedPeriods, type Structure } from "@/lib/academics/structure";
 import { planningSemesters } from "@/lib/academics/planning";
+import { syncProgression } from "@/lib/academics/progression-sync";
 
 export type ListQuery = { q?: string; status?: string; page?: number };
 
@@ -282,7 +283,17 @@ export async function getStudents(query: ListQuery) {
 
 async function studentsFor(campusId: number | null, query: ListQuery) {
   const page = clampPage(query.page);
-  const where = { AND: [campusWhere(campusId), studentSearch(query.q)] };
+
+  // Only students who are actually enrolled on a programme are listed. A profile that has
+  // no enrolment is an unfinished admission, not a student of the college, and showing it
+  // here makes the register say something that is not true.
+  const where: Prisma.StudentProfileWhereInput = {
+    AND: [
+      campusWhere(campusId),
+      { enrollments: { some: { status: "ACTIVE" } } },
+      studentSearch(query.q),
+    ],
+  };
 
   const [rows, total] = await Promise.all([
     prisma.studentProfile.findMany({
@@ -396,7 +407,9 @@ export async function getStudent(id: string) {
           payments: { orderBy: { paidAt: "desc" } },
           // A generated bill carries the period it came from and, where the plan was tied
           // to the calendar, the actual semester it falls in.
-          feePeriod: { select: { sequence: true, label: true } },
+          // The plan row a bill came from, including where it sits in the programme, so a
+          // record can leave out periods the student has not reached.
+          feePeriod: { select: { sequence: true, label: true, yearIndex: true, semesterNo: true } },
           feePlan: { select: { version: true } },
           semester: { select: { name: true, startDate: true, endDate: true } },
         },
@@ -522,6 +535,12 @@ export async function getReportingDates(yearParam?: string, campusParam?: string
 
 export async function getEnrollments(query: ListQuery) {
   const scope = await requireCollegeAdmin();
+
+  // A student's period follows their intake, so time alone can move it. Reconciling before
+  // the read means the list never shows a stale semester; it writes nothing when nothing
+  // has changed.
+  await syncProgression(scope.campusId);
+
   const page = clampPage(query.page);
   const status = pick(ENROLLABLE, query.status);
   const semester = trimmed(query.q);
@@ -542,7 +561,7 @@ export async function getEnrollments(query: ListQuery) {
       include: {
         student: { select: { id: true, admissionNo: true, user: { select: { fullName: true } } } },
         program: { select: { name: true, code: true } },
-        intake: { select: { name: true, semester: { select: { name: true } } } },
+        intake: { select: { id: true, name: true, startsAt: true } },
       },
     }),
     prisma.enrollment.count({ where }),
@@ -637,16 +656,18 @@ export async function getFeeCadences() {
 
 export async function getProgramRegistryOptions() {
   await requireCollegeAdmin();
-  const [bodies, types, cadences] = await Promise.all([
+  const [bodies, types, cadences, departments] = await Promise.all([
     prisma.programBody.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.programType.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.feeCadence.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.department.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   return {
     bodies: bodies.map((row) => ({ value: row.id, label: row.name })),
     programTypes: types.map((row) => ({ value: row.id, label: row.name })),
     feeCadences: cadences.map((row) => ({ value: row.id, label: row.name })),
+    departments: departments.map((row) => ({ value: row.id, label: row.name })),
   };
 }
 
@@ -1438,12 +1459,27 @@ export async function getSemesterOptions() {
 
 export async function getIntakeOptions() {
   const scope = await requireCollegeAdmin();
+  // An intake is open for joining until its application deadline passes. It is no longer
+  // selected by which calendar semester it sits in, because intakes run independently of
+  // the calendar's own term numbering.
   const rows = await prisma.intake.findMany({
-    where: { semester: { status: { in: ["ACTIVE", "PLANNED"] }, ...campusWhere(scope.campusId) } },
-    orderBy: { applicationDeadline: "desc" },
-    include: { semester: { select: { name: true } } },
+    where: { ...campusWhere(scope.campusId), applicationDeadline: { gte: new Date() } },
+    orderBy: { startsAt: "desc" },
   });
-  return rows.map((row) => ({ value: row.id, label: `${row.name} · ${row.semester.name}` }));
+  return rows.map((row) => ({
+    value: row.id,
+    // Say the month and year, which is how staff refer to a cohort.
+    label: `${row.name} · ${monthName(row.month)} ${row.year}`,
+  }));
+}
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+] as const;
+
+export function monthName(month: number): string {
+  return MONTH_NAMES[month - 1] ?? `Month ${month}`;
 }
 
 export async function getInvoiceOptions(campusId: number | null) {

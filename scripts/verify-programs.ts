@@ -57,6 +57,20 @@ async function main() {
     });
   }
 
+  // The cohort the test student joins; their Semester 1 begins on this date.
+  const intake = await prisma.intake.create({
+    data: {
+      name: `${tag} January intake`,
+      campusId: campus.id,
+      year: 2027,
+      month: 1,
+      startsAt: day("2027-01-12"),
+      applicationDeadline: day("2026-12-20"),
+      commenceAt: day("2027-01-12"),
+    },
+    select: { id: true },
+  });
+
   const department = await prisma.department.create({ data: { name: `${tag} dept` }, select: { id: true } });
   const body = await prisma.programBody.create({ data: { name: `${tag} body`, code: `PB${Date.now() % 10000}` }, select: { id: true } });
   const type = await prisma.programType.create({ data: { name: `${tag} type`, code: `PT${Date.now() % 10000}` }, select: { id: true } });
@@ -162,7 +176,7 @@ async function main() {
     select: { id: true },
   });
   const enrollment = await prisma.enrollment.create({
-    data: { studentId: student.id, programId: semesterProgram.id, campusId: campus.id, status: "ACTIVE" },
+    data: { studentId: student.id, programId: semesterProgram.id, campusId: campus.id, intakeId: intake.id, status: "ACTIVE" },
     select: { id: true },
   });
 
@@ -378,6 +392,10 @@ async function main() {
     where: { id: { in: [semesterProgram.id, monthly.id, modular.id] } },
   });
   await prisma.unit.deleteMany({ where: { code: { startsWith: tag } } });
+  await prisma.invoice.deleteMany({ where: { campusId: campus.id } });
+  await prisma.studentUnit.deleteMany({ where: { enrollment: { campusId: campus.id } } });
+  await prisma.enrollment.deleteMany({ where: { campusId: campus.id } });
+  await prisma.intake.deleteMany({ where: { campusId: campus.id } });
   await prisma.semester.deleteMany({ where: { campusId: campus.id } });
   await prisma.campus.delete({ where: { id: campus.id } });
   await prisma.department.delete({ where: { id: department.id } });

@@ -110,16 +110,30 @@ export function EnrolmentForm({
   applications = [],
   programs,
   intakes,
+  classes = [],
+  placementsByProgram = {},
 }: {
   application?: Application | null;
   applications?: Application[];
   programs: Option[];
   intakes: Option[];
+  /** Classes already created on this campus, tagged with their programme. */
+  classes?: (Option & { programId?: string })[];
+  /** Each programme's own academic stages, keyed by programme id. */
+  placementsByProgram?: Record<string, Option[]>;
 }) {
   const [selectedId, setSelectedId] = useState<string>(initialApplication?.id ?? "");
   const selectedApp = applications.find((a) => a.id === selectedId) ?? initialApplication ?? null;
 
   const [step, setStep] = useState(1);
+  // The student's stage depends on the programme, so the list follows the programme picker
+  // instead of being fixed to whichever programme was listed first.
+  const [programId, setProgramId] = useState<string>(
+    initialApplication?.program.id ?? programs[0]?.value ?? "",
+  );
+  const stages = placementsByProgram?.[programId] ?? [];
+  // Only classes of the chosen programme can hold this student.
+  const classChoices = classes.filter((option) => !option.programId || option.programId === programId);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [guardians, setGuardians] = useState<Guardian[]>([{ ...emptyGuardian }]);
   const [emergencies, setEmergencies] = useState<Emergency[]>([{ ...emptyEmergency }]);
@@ -294,7 +308,13 @@ export function EnrolmentForm({
             <input value={selectedApp?.campus?.name ?? ""} readOnly placeholder="Applicant's campus" className={inputCls + " bg-eavi-muted"} />
           </Field>
           <Field label="Programme">
-            <select name="programId" defaultValue={selectedApp?.program.id ?? (programs[0]?.value ?? "")} required className={inputCls}>
+            <select
+              name="programId"
+              value={programId}
+              onChange={(event) => setProgramId(event.target.value)}
+              required
+              className={inputCls}
+            >
               {programs.map((p) => (
                 <option key={p.value} value={p.value}>
                   {p.label}
@@ -305,8 +325,16 @@ export function EnrolmentForm({
           <Field label="Admission number (blank = auto)">
             <input name="admissionNo" className={inputCls} />
           </Field>
-          <Field label="Intake">
-            <select name="intakeId" className={inputCls}>
+          <Field label="Admission date">
+            <input
+              type="date"
+              name="admissionDate"
+              defaultValue={new Date().toISOString().slice(0, 10)}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Official intake">
+            <select name="intakeId" required className={inputCls}>
               <option value="">—</option>
               {intakes.map((i) => (
                 <option key={i.value} value={i.value}>
@@ -315,6 +343,38 @@ export function EnrolmentForm({
               ))}
             </select>
           </Field>
+          <p className="text-xs text-eavi-muted-text sm:col-span-2">
+            Admissions run every month; intakes are only January, May and September. A student admitted
+            in February joins the January intake — their admission date is kept separately.
+          </p>
+
+          <Field label="Class">
+            <select name="classId" key={`cls-${programId}`} className={inputCls}>
+              <option value="">No class yet</option>
+              {classChoices.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Or create a class now">
+            <input name="newClassName" placeholder="ICT/JAN/2027" className={inputCls} />
+          </Field>
+
+          <Field label="Academic stage on joining" wide>
+            <select name="stage" defaultValue={stages[0]?.value ?? ""} key={programId} className={inputCls}>
+              {stages.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <p className="text-xs text-eavi-muted-text sm:col-span-2">
+            A student who completed Semester 1 elsewhere, or who has approved prior credit, can start
+            part-way in. The class does not decide this.
+          </p>
           <Field label="Temporary password (min 10 chars)" wide>
             <input name="password" type="text" required minLength={10} placeholder="Student changes this on first login" className={inputCls} />
           </Field>

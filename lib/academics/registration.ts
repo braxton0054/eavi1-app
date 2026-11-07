@@ -55,6 +55,9 @@ export async function registerEnrolmentUnits(
     const ordered = [...units].sort(
       (a, b) => periodSortKey(a) - periodSortKey(b) || a.sequence - b.sequence,
     );
+    // A new student always starts at the programme's FIRST period, whatever month they
+    // joined and whichever campus semester is running then. A May joiner begins at Year 1 ·
+    // Semester 1, so unit registration, fees and attachment all agree on where they are.
     const first = ordered[0];
     if (first) {
       await tx.studentUnit.updateMany({

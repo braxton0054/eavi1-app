@@ -165,30 +165,40 @@ export function ProgramFeeEditor({
           {copy.noPeriods}
         </p>
       ) : (
+        // The period name is a sentence ("Year 2 · Semester 3"), so on a phone it gets the
+        // whole row and the amount sits under it; above `sm` the three of them share one row.
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-eavi-border text-left text-xs uppercase tracking-wide text-eavi-muted-text">
                 <th scope="col" className="py-2 pr-3 font-medium">{copy.periodHeader}</th>
-                <th scope="col" className="py-2 pr-3 font-medium">{copy.amount} (KES)</th>
+                <th scope="col" className="py-2 pr-3 text-right font-medium">{copy.amount} (KES)</th>
                 {kind === "CUSTOM" ? (
                   <th scope="col" className="py-2 pr-3 font-medium">{copy.offsetHeader}</th>
                 ) : null}
-                <th scope="col" className="py-2 text-right font-medium">
+                <th scope="col" className="w-0 py-2 text-right font-medium">
                   <span className="sr-only">{copy.customRemove}</span>
                 </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, index) => (
-                <tr key={`${row.label}-${index}`} className="border-b border-eavi-border/60 align-top">
-                  <td className="py-2 pr-3">
+                <tr
+                  key={`${row.label}-${index}`}
+                  className="border-b border-eavi-border/60 align-top max-sm:flex max-sm:flex-col max-sm:gap-2 max-sm:py-3"
+                >
+                  <td className="py-2 pr-3 max-sm:flex max-sm:items-center max-sm:gap-2 max-sm:py-0 max-sm:pr-0">
+                    <span className="hidden shrink-0 text-xs text-eavi-muted-text max-sm:inline">
+                      {index + 1}.
+                    </span>
                     <Input
                       aria-label={`${copy.periodHeader} ${index + 1}`}
                       name="periodLabel"
                       value={row.label}
                       readOnly={kind !== "CUSTOM"}
                       onChange={(event) => updateRow(index, { label: event.target.value })}
+                      // Read-only periods are a label, not an editable box: no clipping, no caret.
+                      className={kind === "CUSTOM" ? undefined : "border-transparent bg-transparent px-1 shadow-none"}
                     />
                     <input type="hidden" name="periodYear" value={row.yearIndex ?? ""} />
                     <input type="hidden" name="periodSemester" value={row.semesterNo ?? ""} />
@@ -197,7 +207,10 @@ export function ProgramFeeEditor({
                     ) : null}
                   </td>
 
-                  <td className="py-2 pr-3">
+                  <td className="py-2 pr-3 max-sm:py-0 max-sm:pr-0">
+                    <span className="mb-1 hidden text-xs text-eavi-muted-text max-sm:block">
+                      {copy.amount} (KES)
+                    </span>
                     <Input
                       aria-label={`${copy.amount} ${index + 1}`}
                       name="periodAmount"
@@ -207,11 +220,15 @@ export function ProgramFeeEditor({
                       required
                       value={row.amount}
                       onChange={(event) => updateRow(index, { amount: event.target.value })}
+                      className="sm:text-right"
                     />
                   </td>
 
                   {kind === "CUSTOM" ? (
-                    <td className="py-2 pr-3">
+                    <td className="py-2 pr-3 max-sm:py-0 max-sm:pr-0">
+                      <span className="mb-1 hidden text-xs text-eavi-muted-text max-sm:block">
+                        {copy.offsetHeader}
+                      </span>
                       <Input
                         aria-label={`${copy.offsetHeader} ${index + 1}`}
                         name="periodOffset"

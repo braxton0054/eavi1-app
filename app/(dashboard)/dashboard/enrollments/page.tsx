@@ -1,19 +1,20 @@
 import Link from "next/link";
 
-import { setEnrollmentStatus } from "@/lib/actions/college/enrollments";
+import { promoteEnrollment, setEnrollmentStatus } from "@/lib/actions/college/enrollments";
 import { getApplications, getEnrollments } from "@/lib/dal/college";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
-import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { RowForm } from "@/components/dashboard/record-form";
 import { ListFilters, Paginator, ResultCount } from "@/components/dashboard/list-tools";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
+import { RecordCard, RecordCardGrid, type RecordCardData } from "@/components/dashboard/record-card";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { formatDate } from "@/lib/format";
-import type { Column } from "@/lib/content/dashboard";
+import { periodLabel } from "@/lib/academics/progression";
 
 const copy = pages.enrollments;
+const cardCopy = copy.card;
 
 const enrollmentTone: Record<string, ChipTone> = {
   ACTIVE: "success",
@@ -46,23 +47,41 @@ export default async function EnrollmentsPage({
     label,
   }));
 
-  const columns: Column[] = [...copy.columns, { key: "actions", label: common.actions }];
-
-  const rows: Row[] = list.rows.map((enrollment) => ({
+  // One enrolment, one card. The status form stays on the card so suspending a student is
+  // still one tap from the list; the rest of the record is behind the card's link.
+  const cards: RecordCardData[] = list.rows.map((enrollment) => ({
     id: enrollment.id,
-    cells: {
-      admissionNo: enrollment.student.admissionNo,
-      student: enrollment.student.user.fullName,
-      program: `${enrollment.program.name} (${enrollment.program.code})`,
-      intake: enrollment.intake ? `${enrollment.intake.name} · ${enrollment.intake.semester.name}` : common.notSet,
-      cohort: enrollment.cohort ?? common.notSet,
-      status: (
-        <StatusChip tone={enrollmentTone[enrollment.status] ?? "neutral"}>
-          {labels.enrollmentStatus[enrollment.status]}
-        </StatusChip>
-      ),
-      enrolledAt: formatDate(enrollment.enrolledAt),
-      actions: (
+    href: `/dashboard/students/${enrollment.student.id}`,
+    eyebrow: enrollment.student.admissionNo,
+    title: enrollment.student.user.fullName,
+    subtitle: `${enrollment.program.code} · ${enrollment.program.name}`,
+    status: (
+      <StatusChip tone={enrollmentTone[enrollment.status] ?? "neutral"}>
+        {labels.enrollmentStatus[enrollment.status]}
+      </StatusChip>
+    ),
+    facts: [
+      {
+        label: cardCopy.intake,
+        // The cohort names the month the student joined, which is what staff go by.
+        value: enrollment.intake.name,
+        tone: "muted" as const,
+        showLabel: true,
+      },
+      {
+        // The student's own period, counted from their intake — not the campus semester.
+        label: cardCopy.period,
+        value: periodLabel({
+          yearIndex: enrollment.yearIndex,
+          semesterNo: enrollment.semesterNo,
+        }),
+        tone: "default" as const,
+        showLabel: true,
+      },
+    ],
+    figure: { label: cardCopy.enrolled, value: formatDate(enrollment.enrolledAt) },
+    action: (
+      <span className="flex flex-wrap items-center gap-2">
         <RowForm
           id={`enrollment-${enrollment.id}-status`}
           button={copy.update.title}
@@ -72,8 +91,17 @@ export default async function EnrollmentsPage({
           action={setEnrollmentStatus}
           submitLabel={common.update}
         />
-      ),
-    },
+        {/* Progression normally advances on its own; this is for the deliberate case. */}
+        <RowForm
+          id={`enrollment-${enrollment.id}-promote`}
+          button={cardCopy.promoteButton}
+          fields={[]}
+          hidden={{ enrollmentId: enrollment.id }}
+          action={promoteEnrollment}
+          submitLabel={cardCopy.promote}
+        />
+      </span>
+    ),
   }));
 
   return (
@@ -154,11 +182,15 @@ export default async function EnrollmentsPage({
           <ResultCount total={list.total} />
         </div>
 
-        {rows.length === 0 ? (
+        {cards.length === 0 ? (
           <EmptyState title={copy.empty.title} body={copy.empty.body} icon="enrollments" />
         ) : (
           <>
-            <DataTable columns={columns} rows={rows} caption={copy.title} />
+            <RecordCardGrid>
+              {cards.map((card) => (
+                <RecordCard key={card.id} card={card} openLabel={cardCopy.open} />
+              ))}
+            </RecordCardGrid>
             <div className="border-t border-eavi-border p-4">
               <Paginator
                 basePath="/dashboard/enrollments"

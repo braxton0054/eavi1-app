@@ -15,6 +15,7 @@ import {
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages, shell } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
+import { RecordCard, RecordCardGrid, type RecordCardData } from "@/components/dashboard/record-card";
 import { DisclosureForm, RowForm, type OptionSets } from "@/components/dashboard/record-form";
 import { ListFilters, Paginator, ResultCount } from "@/components/dashboard/list-tools";
 import { EmptyState, Notice, PageHeader, Panel, StatTile } from "@/components/dashboard/panel";
@@ -69,91 +70,100 @@ export default async function AccountsPage({
     { label: copy.summary.paidCount, value: String(list.summary.paidCount), tone: "neutral" as const },
   ];
 
-  const columns: Column[] = [...copy.invoiceColumns, { key: "actions", label: common.actions }];
+  // One invoice, one card. The card opens the student, because a bill is read against the
+  // person and their whole schedule — there is no separate invoice screen to land on.
+  const cards: RecordCardData[] = list.rows.map((invoice) => {
+    const owing = invoice.balance > 0;
 
-  const rows: Row[] = list.rows.map((invoice) => ({
-    id: invoice.id,
-    cells: {
-      number: invoice.number,
-      student: `${invoice.student.admissionNo} · ${invoice.student.user.fullName}`,
-      issued: formatDate(invoice.createdAt),
-      dueAt: invoice.dueAt ? formatDate(invoice.dueAt) : common.notSet,
-      total: money(invoice.billed),
-      paid: money(invoice.paid),
-      balance: (
-        <span className={invoice.balance > 0 ? "text-eavi-destructive" : undefined}>
-          {money(invoice.balance)}
-        </span>
-      ),
+    const action = (
+      <div className="flex w-full flex-wrap items-center gap-2">
+        <details className="min-w-0">
+          <summary className={detail}>
+            {copy.card.details}
+          </summary>
+          <div className="mt-2 w-[18rem] max-w-full rounded-xl border border-eavi-border bg-eavi-card p-3 text-xs">
+            <p className="font-semibold text-eavi-muted-text">{copy.card.lines}</p>
+            {invoice.lines.length === 0 ? (
+              <p className="mt-1 text-eavi-muted-text">{copy.card.noLines}</p>
+            ) : (
+              <ul className="mt-1 space-y-1">
+                {invoice.lines.map((line) => (
+                  <li key={line.id} className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 leading-tight">{line.label}</span>
+                    <span className="shrink-0 tabular-nums">{money(line.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <p className="mt-3 font-semibold text-eavi-muted-text">{copy.card.payments}</p>
+            {invoice.payments.length === 0 ? (
+              <p className="mt-1 text-eavi-muted-text">{copy.card.noPayments}</p>
+            ) : (
+              <ul className="mt-1 space-y-1">
+                {invoice.payments.map((payment) => (
+                  <li key={payment.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <span>{labels.paymentMethod[payment.method]}</span>
+                    <span className="tabular-nums">{money(payment.amount)}</span>
+                    {payment.reference ? (
+                      <span className="text-eavi-muted-text">{payment.reference}</span>
+                    ) : null}
+                    <span className="text-eavi-muted-text tabular-nums">{formatDate(payment.paidAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </details>
+
+        <RowForm
+          id={`invoice-${invoice.id}-line`}
+          button={copy.card.addLine}
+          fields={copy.create.lineFields}
+          hidden={{ invoiceId: invoice.id }}
+          action={addInvoiceLine}
+          submitLabel={common.create}
+        />
+
+        {invoice.status === "VOID" ? null : (
+          <RowForm
+            id={`invoice-${invoice.id}-void`}
+            button={copy.card.void}
+            fields={[]}
+            hidden={{ invoiceId: invoice.id }}
+            action={voidInvoice}
+            submitLabel={copy.card.void}
+            tone="danger"
+          />
+        )}
+      </div>
+    );
+
+    return {
+      id: invoice.id,
+      href: `/dashboard/students/${invoice.student.id}`,
+      eyebrow: invoice.number,
+      title: invoice.student.user.fullName,
+      subtitle: invoice.student.admissionNo,
       status: (
         <StatusChip tone={invoiceTone[invoice.status] ?? "neutral"}>
           {labels.invoiceStatus[invoice.status]}
         </StatusChip>
       ),
-      actions: (
-        <div className="flex flex-wrap items-start gap-2">
-          <details>
-            <summary className={detail}>{copy.create.linesHeading}</summary>
-            <div className="mt-2 w-72 max-w-full rounded-xl border border-eavi-border bg-eavi-card p-3 text-xs shadow-eavi-card">
-              {invoice.lines.length === 0 ? (
-                <p className="text-eavi-muted-text">{common.none}</p>
-              ) : (
-                <ul className="space-y-1">
-                  {invoice.lines.map((line) => (
-                    <li key={line.id} className="flex items-baseline justify-between gap-3">
-                      <span className="min-w-0 leading-tight sm:truncate">{line.label}</span>
-                      <span className="shrink-0 tabular-nums">{money(line.amount)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <p className="mt-3 font-semibold text-eavi-muted-text">{copy.summary.collected}</p>
-              {invoice.payments.length === 0 ? (
-                <p className="mt-1 text-eavi-muted-text">{common.none}</p>
-              ) : (
-                <ul className="mt-1 space-y-1">
-                  {invoice.payments.map((payment) => (
-                    <li key={payment.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                      <span>{labels.paymentMethod[payment.method]}</span>
-                      <span className="tabular-nums">{money(payment.amount)}</span>
-                      {payment.reference ? (
-                        <span className="text-eavi-muted-text">{payment.reference}</span>
-                      ) : null}
-                      <span className="text-eavi-muted-text tabular-nums">
-                        {formatDate(payment.paidAt)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </details>
-
-          <RowForm
-            id={`invoice-${invoice.id}-line`}
-            button={copy.create.lineAdd.label}
-            fields={copy.create.lineFields}
-            hidden={{ invoiceId: invoice.id }}
-            action={addInvoiceLine}
-            submitLabel={common.create}
-          />
-
-          {invoice.status === "VOID" ? null : (
-            <RowForm
-              id={`invoice-${invoice.id}-void`}
-              button={copy.void.button}
-              fields={[]}
-              hidden={{ invoiceId: invoice.id }}
-              action={voidInvoice}
-              submitLabel={copy.void.button}
-              tone="danger"
-            />
-          )}
-        </div>
-      ),
-    },
-  }));
+      facts: [
+        { label: copy.card.issued, value: formatDate(invoice.createdAt), showLabel: true },
+        { label: copy.card.due, value: invoice.dueAt ? formatDate(invoice.dueAt) : common.notSet, showLabel: true },
+        { label: copy.card.billed, value: money(invoice.billed), showLabel: true },
+        { label: copy.card.paid, value: money(invoice.paid), showLabel: true, tone: "muted" },
+      ],
+      figure: {
+        label: copy.card.balance,
+        value: owing ? money(invoice.balance) : copy.card.settled,
+        danger: owing,
+      },
+      action,
+    };
+  });
 
   // Revenue split the two ways the finance desk is asked for it: by programme, and by the
   // academic period the fee fell in.
@@ -294,11 +304,15 @@ export default async function AccountsPage({
           <ResultCount total={list.total} />
         </div>
 
-        {rows.length === 0 ? (
+        {cards.length === 0 ? (
           <EmptyState title={copy.empty.title} body={copy.empty.body} icon="accounts" />
         ) : (
           <>
-            <DataTable columns={columns} rows={rows} caption={copy.title} />
+            <RecordCardGrid>
+              {cards.map((card) => (
+                <RecordCard key={card.id} card={card} openLabel={copy.card.open} />
+              ))}
+            </RecordCardGrid>
             <div className="border-t border-eavi-border p-4">
               <Paginator
                 basePath="/dashboard/accounts"

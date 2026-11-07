@@ -5,6 +5,7 @@ import { getProgramFees } from "@/lib/dal/college";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { PageHeader, Panel } from "@/components/dashboard/panel";
+import { SectionTabs } from "@/components/dashboard/section-tabs";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { ProgramFeeEditor } from "@/components/dashboard/program-fee-editor";
 import { formatDate, money } from "@/lib/format";
@@ -13,6 +14,7 @@ import type { PeriodDraft } from "@/lib/fees/periods";
 
 const copy = pages.programs;
 const feeCopy = copy.feePlan;
+const tabs = copy.sectionTabs;
 
 const semesterTone: Record<string, ChipTone> = {
   PLANNED: "info",
@@ -72,22 +74,40 @@ export default async function ProgramFeesPage({
   return (
     <div className="space-y-6">
       <Link
-        href="/dashboard/programs"
-        className="text-sm text-eavi-primary-text underline-offset-4 hover:underline"
+        href={`/dashboard/programs/${program.id}`}
+        className="inline-flex min-h-8 items-center gap-1 text-sm text-eavi-muted-text hover:text-eavi-primary-text"
       >
-        ← {copy.title}
+        ← {program.name}
       </Link>
 
       <PageHeader
-        title={`${feeCopy.title} · ${program.name}`}
+        title={feeCopy.title}
         description={feeCopy.description}
         meta={
-          <p className="mt-1 text-sm text-eavi-muted-text">
-            {program.code}
-            {plan ? ` · ${feeCopy.current(plan.version)} · ${money(plan.totalAmount)}` : ` · ${common.notSet}`}
-            {campusId === null ? "" : ` · ${program.campuses.find((campus) => campus.id === campusId)?.name ?? ""}`}
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-eavi-muted-text">
+            <span className="tabular-nums">{program.code}</span>
+            <span aria-hidden>·</span>
+            <span>{program.name}</span>
+            <span aria-hidden>·</span>
+            <span>{plan ? `${feeCopy.current(plan.version)} · ${money(plan.totalAmount)}` : common.notSet}</span>
+            {campusId === null ? null : (
+              <>
+                <span aria-hidden>·</span>
+                <span>{program.campuses.find((campus) => campus.id === campusId)?.name ?? ""}</span>
+              </>
+            )}
           </p>
         }
+      />
+
+      <SectionTabs
+        label={tabs.label}
+        tabs={[
+          { href: `/dashboard/programs/${program.id}`, label: tabs.overview },
+          { href: `/dashboard/programs/${program.id}/units`, label: tabs.units },
+          { href: `/dashboard/programs/${program.id}/fees`, label: tabs.fees, active: true },
+          { href: `/dashboard/programs/${program.id}/attachment`, label: tabs.attachment },
+        ]}
       />
 
       <Panel title={feeCopy.periodsHeading} description={feeCopy.amountsHint}>

@@ -31,6 +31,10 @@ function check(label: string, condition: boolean, detail?: string) {
 
 const day = (value: string) => new Date(`${value}T00:00:00`);
 
+/** Two dates on the same calendar day, ignoring the time of day. */
+const sameDay = (a: Date | null | undefined, b: Date) =>
+  !!a && a.toDateString() === b.toDateString();
+
 type PeriodSeed = {
   label: string;
   amount: number;
@@ -122,6 +126,20 @@ async function main() {
     });
   }
 
+  // Every enrolment belongs to an intake, which is what anchors the student's own Semester 1.
+  const intake = await prisma.intake.create({
+    data: {
+      name: `${tag} January intake`,
+      campusId: campus.id,
+      year: 2027,
+      month: 1,
+      startsAt: day("2027-01-05"),
+      applicationDeadline: day("2026-12-15"),
+      commenceAt: day("2027-01-05"),
+    },
+    select: { id: true },
+  });
+
   const department = await prisma.department.create({ data: { name: `${tag} dept` }, select: { id: true } });
   const body = await prisma.programBody.create({
     data: { name: `${tag} body`, code: `B${Date.now() % 10000}` },
@@ -199,7 +217,7 @@ async function main() {
       select: { id: true },
     });
     const enrollment = await prisma.enrollment.create({
-      data: { studentId: student.id, programId, campusId: campus.id, status: "ACTIVE" },
+      data: { studentId: student.id, programId, campusId: campus.id, intakeId: intake.id, status: "ACTIVE" },
       select: { id: true },
     });
     return { studentId: student.id, enrollmentId: enrollment.id };
@@ -311,7 +329,7 @@ async function main() {
     (await prisma.invoice.count({ where: { enrollmentId: a.enrollmentId } })) === 6,
   );
 
-  console.log("\n7. Semester bills take their dates from the academic calendar");
+  console.log("\n7. Semester bills follow the student's own intake, not the calendar");
   const b = await enrol("b", semesterProgram.id, `FB/${tag}`);
   const bStart = day("2027-01-10");
   const bGenerated = await prisma.$transaction((tx) =>
@@ -331,23 +349,64 @@ async function main() {
     orderBy: { feePeriod: { sequence: "asc" } },
     include: { semester: true, lines: true },
   });
-  check("every bill points at a calendar semester", bInvoices.every((invoice) => invoice.semesterId !== null));
+  // A semester plan is dated from the student's intake. Period 1 opens on day one of their
+  // intake and every later period follows it, whatever the campus calendar is doing then.
+  check("six bills were written", bInvoices.length === 6, `got ${bInvoices.length}`);
   check(
-    "the first bill opens with the January semester",
-    bInvoices[0]?.semester?.year === 2027 && bInvoices[0]?.semester?.semesterNo === 1,
+    "the first bill opens on the student's intake date",
+    sameDay(bInvoices[0]?.dueAt, bStart),
+    bInvoices[0]?.dueAt?.toDateString(),
   );
   check(
-    "the fourth bill moves into the next academic year",
-    bInvoices[3]?.semester?.year === 2028 && bInvoices[3]?.semester?.semesterNo === 1,
+    "each bill is one academic period after the last",
+    bInvoices.every((invoice, index) => {
+      const expected = addMonths(bStart, Math.round((index / 3) * 12));
+      return sameDay(invoice.dueAt, expected);
+    }),
   );
   check(
-    "the due date is the semester's own start date",
-    bInvoices.every((invoice) => invoice.dueAt?.getTime() === invoice.semester?.startDate.getTime()),
+    "the academic period is the student's own, counted from their intake",
+    bInvoices[0]?.periodYear === 1 &&
+      bInvoices[0]?.periodSemester === 1 &&
+      bInvoices[3]?.periodYear === 2 &&
+      bInvoices[3]?.periodSemester === 1 &&
+      bInvoices[5]?.periodYear === 2 &&
+      bInvoices[5]?.periodSemester === 3,
   );
+
+  console.log("\n7b. Fees start at the level the student joined, not at Year 1");
+  // A student placed at Year 2 of a three-semester-year programme: the earlier periods were
+  // studied (and paid for) elsewhere, so this college bills only from Year 2 onward.
+  const later = await enrol("d", semesterProgram.id, `FD/${tag}`);
+  const laterGenerated = await prisma.$transaction((tx) =>
+    generateFeeSchedule(tx, {
+      studentId: later.studentId,
+      enrollmentId: later.enrollmentId,
+      campusId: campus.id,
+      programId: semesterProgram.id,
+      startDate: day("2027-01-10"),
+      from: { yearIndex: 2, semesterNo: 1 },
+      numbers: numbersFor("D", 6),
+    }),
+  );
+  const laterInvoices = await prisma.invoice.findMany({
+    where: { enrollmentId: later.enrollmentId },
+    orderBy: { feePeriod: { sequence: "asc" } },
+    include: { lines: true },
+  });
   check(
-    "the academic period is recorded on the bill",
-    bInvoices[5]?.periodYear === 2028 && bInvoices[5]?.periodSemester === 3,
+    "no bill is raised for periods before the student joined",
+    laterInvoices.every((invoice) => (invoice.periodYear ?? 1) >= 2),
+    laterInvoices.map((i) => `Y${i.periodYear}S${i.periodSemester}`).join(","),
   );
+  check("billing begins at the placement, not at Year 1", laterGenerated.created === 3, `created ${laterGenerated.created}`);
+  check(
+    "the first bill is for the level they joined at",
+    laterInvoices[0]?.periodYear === 2 && laterInvoices[0]?.periodSemester === 1,
+  );
+
+  // These bills belong to a scenario, not to the running totals section 9 reconciles.
+  await prisma.invoice.deleteMany({ where: { enrollmentId: later.enrollmentId } });
 
   console.log("\n8. Repricing leaves enrolled students' agreed fees alone");
   await publishPlan(monthlyProgram.id, monthlyCadence.id, 6, draft("MONTHLY", 6, 4000));
@@ -405,6 +464,10 @@ async function main() {
     where: { programId: { in: [monthlyProgram.id, semesterProgram.id] } },
   });
   await prisma.program.deleteMany({ where: { id: { in: [monthlyProgram.id, semesterProgram.id] } } });
+  await prisma.invoice.deleteMany({ where: { campusId: campus.id } });
+  await prisma.studentUnit.deleteMany({ where: { enrollment: { campusId: campus.id } } });
+  await prisma.enrollment.deleteMany({ where: { campusId: campus.id } });
+  await prisma.intake.deleteMany({ where: { campusId: campus.id } });
   await prisma.semester.deleteMany({ where: { campusId: campus.id } });
   await prisma.campus.delete({ where: { id: campus.id } });
   await prisma.department.delete({ where: { id: department.id } });

@@ -1,17 +1,20 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { EnrollmentStatus, Role, Status } from "@/generated/prisma/enums";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { storageConfigured, uploadFile } from "@/lib/storage";
 import { genderValues } from "@/lib/content/apply";
-import { fieldErrors } from "@/lib/content/dashboard";
+import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
   dateField,
   enumField,
   nextAdmissionNo,
+  nextCardSerial,
   nextInvoiceNumbers,
   onSave,
   passwordField,
@@ -21,7 +24,10 @@ import {
   unique,
 } from "@/lib/actions/college/_shared";
 import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
+import { intakeValueForMonth, normaliseClassName } from "@/lib/academics/classes";
+import { recordAudit } from "@/lib/academics/audit";
 import { registerEnrolmentUnits } from "@/lib/academics/registration";
+import { expiryForProgram } from "@/lib/cards/validity";
 
 async function maybeUpload(file: FormDataEntryValue | null, folder: string, keySeed: string) {
   if (!file || !(file instanceof File) || file.size === 0) return null;
@@ -65,9 +71,10 @@ export async function enrolStudent(formData: FormData) {
     const programId = requiredText(formData, "programId", "Programme");
     const program = await prisma.program.findFirst({
       where: { id: programId, archivedAt: null, campuses: { some: { id: campusId } } },
-      select: { id: true },
+      select: { id: true, durationMonths: true },
     });
     if (!program) throw new FieldError(fieldErrors.notOnCampus);
+    const programDurationMonths = program.durationMonths;
 
     const intakeId = text(formData, "intakeId");
     const admissionNoInput = text(formData, "admissionNo");
@@ -83,6 +90,25 @@ export async function enrolStudent(formData: FormData) {
     const admissionCategory = text(formData, "admissionCategory");
     const previousInstitution = text(formData, "previousInstitution");
 
+    // Admissions run every month while intakes are only January, May and September, so the
+    // date the student actually reported is recorded separately from the intake they join.
+    const admissionDate = dateField(formData, "admissionDate") ?? new Date();
+
+    // A class is a grouping. The placement below is the academic position, and the two are
+    // recorded independently: a February joiner can sit in a January class at Semester 2.
+    const classId = text(formData, "classId");
+    const newClassNameRaw = text(formData, "newClassName");
+    let stage = { yearIndex: 1, semesterNo: 1 };
+    const stageValue = text(formData, "stage");
+    if (stageValue) {
+      const [yearRaw, semesterRaw] = stageValue.split(":");
+      const yearIndex = Number(yearRaw);
+      const semesterNo = Number(semesterRaw);
+      if (Number.isInteger(yearIndex) && Number.isInteger(semesterNo) && yearIndex >= 1 && semesterNo >= 1) {
+        stage = { yearIndex, semesterNo };
+      }
+    }
+
     const issuedAdmissionNo = admissionNoInput ?? (await nextAdmissionNo());
     const passwordHash = await hashPassword(password);
 
@@ -90,10 +116,67 @@ export async function enrolStudent(formData: FormData) {
     // whole programme can be reserved without one query per period inside the transaction.
     const plan = await activePlanFor(programId);
     const invoiceNumbers = await nextInvoiceNumbers(plan?.periods.length ?? 0);
+
+    // The card serial is reserved outside the transaction for the same reason the invoice
+    // numbers are: it counts rows globally rather than inside the transaction's view.
+    const cardSerial = await nextCardSerial();
     const intake = intakeId
-      ? await prisma.intake.findUnique({ where: { id: intakeId }, select: { commenceAt: true } })
+      ? await prisma.intake.findUnique({
+          where: { id: intakeId },
+          select: { id: true, campusId: true, startsAt: true, month: true, year: true },
+        })
       : null;
-    const startDate = intake?.commenceAt ?? new Date();
+    // The intake decides which semester the student is in and when their fees begin, so it
+    // is required rather than guessed at: silently picking a cohort would put a student on
+    // the wrong schedule.
+    if (!intake) throw new FieldError(fieldErrors.required("Intake"));
+    if (intake.campusId !== campusId) throw new FieldError(fieldErrors.notOnCampus);
+
+    const startDate = intake.startsAt;
+
+    // A class may be created inline during admission, so the office never has to leave the
+    // form to set one up. It always belongs to this programme, campus and intake.
+    const className = newClassNameRaw ? normaliseClassName(newClassNameRaw) : null;
+    let classRecord = classId
+      ? await prisma.academicClass.findFirst({
+          where: { id: classId, campusId, programId, status: "ACTIVE" },
+          select: { id: true, name: true, campusId: true },
+        })
+      : null;
+    if (classId && !classRecord) throw new FieldError(fieldErrors.choice(pages.classes.fields.class));
+    if (className) {
+      const clash = await prisma.academicClass.findFirst({
+        where: { programId, name: className },
+        select: { id: true, campusId: true, name: true, status: true },
+      });
+      if (clash) {
+        // An existing class of that name is reused rather than duplicated.
+        if (clash.status !== "ACTIVE") throw new FieldError(pages.classes.nameTaken);
+        classRecord = { id: clash.id, name: clash.name, campusId: clash.campusId };
+      } else {
+        const created = await prisma.academicClass.create({
+          data: {
+            campusId,
+            programId,
+            intakeId: intake.id,
+            intakeMonth: intakeValueForMonth(intake.month),
+            year: intake.year,
+            name: className,
+          },
+          select: { id: true, name: true, campusId: true },
+        });
+        classRecord = created;
+        await recordAudit({
+          campusId,
+          actorId: scope.userId,
+          actorEmail: scope.email,
+          action: "class.create",
+          entityType: "class",
+          entityId: created.id,
+          detail: { name: className, duringAdmission: true },
+        });
+      }
+    }
 
     const profilePhotoUrl = await maybeUpload(formData.get("profilePhoto"), "profile-photos", applicationId);
     const birthCertificateUrl = await maybeUpload(formData.get("birthCertificate"), "birth-certificates", applicationId);
@@ -123,6 +206,7 @@ export async function enrolStudent(formData: FormData) {
             userId: user.id,
             admissionNo: issuedAdmissionNo,
             campusId,
+            admissionDate,
             gender,
             dateOfBirth,
             nationalId,
@@ -147,12 +231,40 @@ export async function enrolStudent(formData: FormData) {
         data: {
           studentId: profile.id,
           programId,
-          intakeId: intakeId ?? null,
+          intakeId: intake.id,
           campusId,
+          // The student's own starting stage, which they may have earned elsewhere. It is
+          // never derived from the class they were put in.
+          yearIndex: stage.yearIndex,
+          semesterNo: stage.semesterNo,
           status: EnrollmentStatus.ACTIVE,
+          /*
+           * The day the student actually joined their cohort — their admission date, or the
+           * intake's own start when no admission date was given.
+           *
+           * Leaving this to the column default stamped TODAY on a student who joined in
+           * January, which made every bill anchored to their real intake look months overdue
+           * on the day they registered. The intake decides where a student stands in their
+           * studies, so it also decides when their first period fell due.
+           */
+          enrolledAt: admissionDate ?? startDate,
         },
         select: { id: true },
       });
+
+      // Class membership is history, not a field: it is opened here and closed when the
+      // student later moves, so the register can be read as it stood on any date.
+      if (classRecord) {
+        await tx.classMembership.create({
+          data: {
+            classId: classRecord.id,
+            enrollmentId: enrollment.id,
+            campusId,
+            reason: "admitted",
+            actorId: scope.userId,
+          },
+        });
+      }
 
       // The student's fee obligations are written in the same transaction as the enrolment,
       // so an admitted student never exists without the bills their programme implies.
@@ -162,6 +274,10 @@ export async function enrolStudent(formData: FormData) {
         campusId,
         programId,
         startDate,
+        intakeId: intake.id,
+        // Fees begin at the level the student was placed at, not at Year 1. Someone who
+        // joins at Semester 3 studied the earlier periods elsewhere, at their own cost.
+        from: stage,
         numbers: invoiceNumbers,
       });
 
@@ -171,6 +287,23 @@ export async function enrolStudent(formData: FormData) {
         enrollmentId: enrollment.id,
         studentId: profile.id,
         programId,
+      });
+
+      // The card is issued in the same transaction, so an enrolled student always has one.
+      // Its expiry follows the programme's duration from the intake, not a figure chosen
+      // here, so the card is valid exactly as long as the student is enrolled.
+      await tx.idCard.create({
+        data: {
+          serial: cardSerial,
+          verifyToken: randomUUID(),
+          studentId: profile.id,
+          campusId,
+          programId,
+          status: "PENDING",
+          expiresAt: expiryForProgram(startDate, programDurationMonths),
+          remarks: pages.cards.create.autoRemark,
+        },
+        select: { id: true },
       });
 
       // Parent/guardians (multiple)

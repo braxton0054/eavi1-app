@@ -19,6 +19,8 @@ import {
   unique,
 } from "@/lib/actions/college/_shared";
 
+import { startOfDay } from "@/lib/academics/progression";
+
 const SEMESTER_STATUSES = Object.keys(SemesterStatus) as (keyof typeof SemesterStatus)[];
 const EVENT_TYPES = Object.keys(CalendarEventType) as (keyof typeof CalendarEventType)[];
 
@@ -72,6 +74,21 @@ async function assertNoOverlap(campusId: number, from: Date, to: Date, exceptId?
     select: { name: true },
   });
   if (clash) throw new FieldError(fieldErrors.windowOverlap(clash.name));
+}
+
+/**
+ * Only one semester per campus may be active. Windows need not overlap for this to go wrong:
+ * a term that ran and finished keeps its ACTIVE status until somebody closes it, and the
+ * calendar then has two current semesters. The window that has already closed is the one to
+ * ask about, so the message names it.
+ */
+async function assertOnlyActive(campusId: number, exceptId?: string) {
+  const other = await prisma.semester.findFirst({
+    where: { campusId, status: "ACTIVE", ...(exceptId ? { id: { not: exceptId } } : {}) },
+    orderBy: { endDate: "asc" },
+    select: { name: true },
+  });
+  if (other) throw new FieldError(fieldErrors.semesterAlreadyActive(other.name));
 }
 
 export async function createSemester(formData: FormData) {
@@ -140,6 +157,9 @@ export async function updateSemester(formData: FormData) {
     orderedDates(startDate, endDate);
     const status = enumField(formData, "status", SEMESTER_STATUSES, fieldLabel("status"));
 
+    // Marking this one active has to leave the campus with exactly one active semester.
+    if (status === "ACTIVE") await assertOnlyActive(semester.campusId, semester.id);
+
     // An ended semester keeps its dates; the office can still record how it finished.
     const sameWindow =
       startDate.getTime() === semester.startDate.getTime() &&
@@ -172,9 +192,23 @@ export async function createIntake(formData: FormData) {
     const commenceAt = requiredDate(formData, "commenceAt", fieldLabel("commenceAt"));
     orderedDates(applicationDeadline, commenceAt);
 
+    // The intake anchors its cohort's own Semester 1, so it carries its own campus, year and
+    // month. The semester it was advertised in is recorded for the calendar but decides
+    // nothing about where the joining students start.
+    const startsAt = startOfDay(commenceAt);
+
     await unique(fieldLabel("name"), () =>
       prisma.intake.create({
-        data: { semesterId: semester.id, name, applicationDeadline, commenceAt },
+        data: {
+          semesterId: semester.id,
+          campusId: semester.campusId,
+          year: startsAt.getFullYear(),
+          month: startsAt.getMonth() + 1,
+          startsAt,
+          name,
+          applicationDeadline,
+          commenceAt,
+        },
       }),
     );
   });

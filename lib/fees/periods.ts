@@ -25,12 +25,15 @@ export type CalendarPeriod = {
   endDate: Date;
 };
 
-/** A period with the date and calendar row it was resolved against. */
+/** A period with the date and the calendar row it falls inside. */
 export type ResolvedPeriod = PeriodDraft & {
   sequence: number;
   dueDate: Date;
   semesterId: string | null;
-  /** The calendar's own year/number, which may differ from the plan's relative indices. */
+  /**
+   * The student's OWN year and semester for this period, counted from their intake. This is
+   * what the bill is read against — not whichever calendar semester the due date happens in.
+   */
   periodYear: number | null;
   periodSemester: number | null;
   periodLabel: string;
@@ -175,10 +178,16 @@ function semesterHolding(calendar: readonly CalendarPeriod[], date: Date): Calen
 }
 
 /**
- * Puts each period on a real date. A semester or term plan takes its dates from the campus
- * academic calendar, starting at the semester the student actually joins; that is what lets
- * a January intake and a September intake run the same plan on different dates. Anything the
- * calendar cannot place falls back to the offset stored on the row.
+ * Puts each period of a fee plan on a real date.
+ *
+ * Semester plans are dated from the STUDENT'S INTAKE, not from the campus calendar. A student
+ * who joins in May is billed Semester 1 fees from May, and their Semester 2 follows four
+ * months later — even though the campus calendar is running its own second semester then.
+ * The calendar row is still recorded so a bill can be looked up against the term it falls
+ * in, but it never decides where in their studies the student is.
+ *
+ * Anything that is not tied to a semester (monthly, yearly, one-off, custom) uses its own
+ * offset from the intake date.
  */
 export function resolvePeriods(
   kind: FeeKind,
@@ -191,43 +200,31 @@ export function resolvePeriods(
   const ordered = [...calendar].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
   const start = startOfDay(startDate);
 
-  // The first semester a student meets is the one they join; if they join between semesters,
-  // it is the next one to open.
-  let baseIndex = ordered.findIndex(
-    (period) => startOfDay(period.startDate).getTime() >= start.getTime(),
-  );
-  if (baseIndex < 0) baseIndex = semesterHolding(ordered, start) ? 0 : ordered.length;
-  const holding = semesterHolding(ordered, start);
-  if (holding) baseIndex = ordered.indexOf(holding);
-
   const calendarLinked = kind === "SEMESTER";
 
   return periods.map((period, index) => {
-    const semester = calendarLinked ? ordered[baseIndex + index] ?? null : null;
-
-    const dueDate = semester
-      ? startOfDay(semester.startDate)
+    const dueDate = calendarLinked
+      ? // The student's own period N begins N periods after their intake's first day.
+        addMonths(start, Math.round((index / perYear) * 12))
       : kind === "MONTHLY"
         ? addMonths(start, index)
         : kind === "ACADEMIC_YEAR"
           ? addMonths(start, index * 12)
-          : kind === "SEMESTER"
-            ? addMonths(start, Math.round((index / perYear) * 12))
-            : kind === "ONE_TIME"
-              ? start
-              : addDays(start, period.dueOffsetDays);
+          : kind === "ONE_TIME"
+            ? start
+            : addDays(start, period.dueOffsetDays);
 
-    // A monthly plan still belongs to whichever semester is running when it falls due, so
-    // the bill can be read against the calendar even where it was not scheduled by it.
-    const covered = semester ?? semesterHolding(ordered, dueDate);
+    // Record which campus term the bill falls inside, for reading against the calendar.
+    const covered = semesterHolding(ordered, dueDate);
 
     return {
       ...period,
       sequence: index + 1,
       dueDate,
       semesterId: covered?.id ?? null,
-      periodYear: covered?.year ?? period.yearIndex,
-      periodSemester: covered?.semesterNo ?? period.semesterNo,
+      // The student's own position, straight off the plan.
+      periodYear: period.yearIndex,
+      periodSemester: period.semesterNo,
       periodLabel: period.label,
     };
   });

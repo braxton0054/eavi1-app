@@ -82,8 +82,22 @@ export async function generateFeeSchedule(
     enrollmentId: string;
     campusId: number;
     programId: string;
-    /** When the student starts: their intake date, or the day they were enrolled. */
+    /** Day one of the student's own Semester 1 — their intake's start, not the term date. */
     startDate: Date;
+    /** The cohort the student joined, recorded on every bill it produces. */
+    intakeId?: string;
+    /**
+     * Bill no further than this period of the plan. Enrolment bills the whole programme up
+     * front; a student who has since advanced bills only what they have reached, so nobody
+     * is charged for a semester they have not started.
+     */
+    upTo?: { yearIndex: number; semesterNo: number };
+    /**
+     * Where billing STARTS. A student who joins at a later level — having studied elsewhere,
+     * at their own cost — is not billed for the periods before they arrived. Fees run from
+     * the moment they joined and from the level they were placed at.
+     */
+    from?: { yearIndex: number; semesterNo: number };
     /** Invoice numbers reserved before the transaction opened, one per period. */
     numbers: string[];
   },
@@ -121,6 +135,29 @@ export async function generateFeeSchedule(
     if (billed.has(feePeriodId)) {
       skipped += 1;
       continue;
+    }
+
+    // Never bill for a period before the student joined the college. They studied it
+    // elsewhere and paid for it there; only the levels they actually sit here are ours.
+    if (input.from) {
+      const planPeriod = plan.periods[period.sequence - 1];
+      const covered =
+        (planPeriod.yearIndex ?? period.periodYear ?? 1) * 100 +
+        (planPeriod.semesterNo ?? period.periodSemester ?? 1);
+      if (covered < input.from.yearIndex * 100 + input.from.semesterNo) {
+        skipped += 1;
+        continue;
+      }
+    }
+
+    // Stop at the period the student has actually reached.
+    if (input.upTo) {
+      const planPeriod = plan.periods[period.sequence - 1];
+      const position =
+        (planPeriod.yearIndex ?? period.periodYear ?? 1) * 100 +
+        (planPeriod.semesterNo ?? period.periodSemester ?? 1);
+      const limit = input.upTo.yearIndex * 100 + input.upTo.semesterNo;
+      if (position > limit) continue;
     }
 
     const number = input.numbers[created];

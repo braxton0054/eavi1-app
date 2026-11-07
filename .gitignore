@@ -42,3 +42,9 @@ next-env.d.ts
 
 # prisma generated client (rebuild with `npm run db:generate`)
 /generated
+
+# Test photos for local ID card checks. Real photos live in Contabo storage.
+test-data/
+
+# Local screenshot / PDF output from layout checks.
+.shots/

@@ -34,11 +34,33 @@ export function percent(numerator: Numeric, denominator: Numeric): string {
   return `${Math.round((toNumber(numerator) / total) * 100)}%`;
 }
 
-const dateLong = new Intl.DateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
+/*
+ * "05 Sep 2026", never "05 Sept 2026".
+ *
+ * en-GB renders September as "Sept" while every other month is three letters, so a column of
+ * dates came out ragged and two pages of the same record disagreed with each other. The
+ * parts are formatted separately and joined, which pins the abbreviation to three letters in
+ * every browser regardless of the ICU data it ships with.
+ */
+const dayPart = new Intl.DateTimeFormat("en-GB", { day: "2-digit" });
+const monthPart = new Intl.DateTimeFormat("en-GB", { month: "short" });
+const yearPart = new Intl.DateTimeFormat("en-GB", { year: "numeric" });
+
+const MONTH_ABBREVIATIONS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+] as const;
+
+/** The one date format used everywhere: `DD Mon YYYY`. */
+export function formatDayMonthYear(date: Date): string {
+  const day = dayPart.format(date);
+  const month = MONTH_ABBREVIATIONS[date.getMonth()] ?? monthPart.format(date);
+  return `${day} ${month} ${yearPart.format(date)}`;
+}
+
+const dateLong = {
+  format: (date: Date) => formatDayMonthYear(date),
+};
 
 const dateWithWeekday = new Intl.DateTimeFormat("en-GB", {
   weekday: "short",

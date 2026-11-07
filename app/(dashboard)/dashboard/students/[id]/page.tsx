@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 
 import { generateEnrollmentFees, recordStudentPayment } from "@/lib/actions/college/accounts";
 import { registerUnitPeriod, saveUnitResult } from "@/lib/actions/college/program-units";
@@ -9,6 +8,8 @@ import { genderLabel } from "@/lib/content/apply";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
+import { PrintButton } from "@/components/dashboard/print-button";
+import { StudentPrintDocument, type PrintFact } from "@/components/dashboard/student-print-document";
 import { EmptyState, PageHeader, Panel, StatTile } from "@/components/dashboard/panel";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
@@ -107,23 +108,50 @@ export default async function StudentProfilePage({
 
   const activeEnrollment = student.enrollments.find((enrollment) => enrollment.status === "ACTIVE");
 
-  // One entry per create-form field name; the descriptor's label doubles as the display label.
-  const profileValues: Record<string, ReactNode> = {
-    fullName: student.user.fullName,
-    email: student.user.email,
-    phone: student.user.phone ?? common.notSet,
-    programId: activeEnrollment ? `${activeEnrollment.program.name} (${activeEnrollment.program.code})` : common.notSet,
-    intakeId: activeEnrollment?.intake?.name ?? common.notSet,
-    admissionNo: student.admissionNo,
-    password: common.none,
-    gender: genderLabel(student.gender) ?? common.notSet,
-    dateOfBirth: formatDate(student.dateOfBirth),
-    nationalId: student.nationalId ?? common.notSet,
-    guardianName: student.guardianName ?? common.notSet,
-    guardianPhone: student.guardianPhone ?? common.notSet,
-    guardianEmail: student.guardianEmail ?? common.notSet,
-    address: student.address ?? common.notSet,
-  };
+  /*
+   * Details grouped by meaning, with empty values left out.
+   *
+   * The old page printed every field in one list, so five "Not recorded" lines took as much
+   * room as the name and the programme. A reader looking for a guardian's phone number now
+   * finds it under Guardian, and a missing value is stated once per group instead of
+   * repeated down the page.
+   */
+  const field = (name: string) =>
+    copy.create.fields.find((f) => f.name === name)?.label ?? name;
+
+  const known = (value: string | null | undefined) =>
+    value && value !== common.notSet ? value : null;
+
+  const detailGroups = [
+    {
+      title: copy.profile.groups.contact,
+      empty: copy.profile.missingHint,
+      rows: [
+        { label: field("email"), value: known(student.user.email) },
+        { label: field("phone"), value: known(student.user.phone) },
+        { label: field("address"), value: known(student.address) },
+      ].filter((row): row is { label: string; value: string } => row.value !== null),
+    },
+    {
+      title: copy.profile.groups.personal,
+      empty: copy.profile.missingHint,
+      rows: [
+        { label: field("gender"), value: known(genderLabel(student.gender)) },
+        { label: field("dateOfBirth"), value: known(formatDate(student.dateOfBirth)) },
+        { label: field("nationalId"), value: known(student.nationalId) },
+        { label: field("previousInstitution"), value: known(student.previousInstitution) },
+      ].filter((row): row is { label: string; value: string } => row.value !== null),
+    },
+    {
+      title: copy.profile.groups.guardian,
+      empty: copy.profile.missingHint,
+      rows: [
+        { label: field("guardianName"), value: known(student.guardianName) },
+        { label: field("guardianPhone"), value: known(student.guardianPhone) },
+        { label: field("guardianEmail"), value: known(student.guardianEmail) },
+      ].filter((row): row is { label: string; value: string } => row.value !== null),
+    },
+  ];
 
   const enrollmentRows: Row[] = student.enrollments.map((enrollment) => ({
     id: enrollment.id,
@@ -141,6 +169,7 @@ export default async function StudentProfilePage({
   }));
 
   const feeCopy = copy.profile.fees;
+  const printCopy = copy.profile.print;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -170,7 +199,29 @@ export default async function StudentProfilePage({
     return { invoice, billed, paid, balance, status };
   });
 
-  const payable = feeRows.filter((row) => row.status !== "VOID");
+  /*
+   * A record shows the student as they stand: the period they are in and the ones behind
+   * them, never periods they have not reached.
+   *
+   * The progression history of a student can leave bills for periods ahead of them — an
+   * older enrolment that billed the whole programme up front, or a stage that was corrected
+   * downwards. Printing those says the student owes for a semester they have not started, so
+   * anything past their current position is left off the record and out of its totals.
+   */
+  const reachedYear = activeEnrollment?.yearIndex ?? null;
+  const reachedSemester = activeEnrollment?.semesterNo ?? null;
+
+  const isReached = (yearIndex: number | null, semesterNo: number | null) => {
+    if (reachedYear === null || reachedSemester === null) return true;
+    if (yearIndex === null || semesterNo === null) return true;
+    return yearIndex * 100 + semesterNo <= reachedYear * 100 + reachedSemester;
+  };
+
+  const payable = feeRows.filter(
+    (row) =>
+      row.status !== "VOID" &&
+      isReached(row.invoice.feePeriod?.yearIndex ?? null, row.invoice.feePeriod?.semesterNo ?? null),
+  );
   const billed = payable.reduce((total, row) => total + row.billed, 0);
   const collected = payable.reduce((total, row) => total + row.paid, 0);
   const outstanding = Math.max(0, billed - collected);
@@ -195,10 +246,19 @@ export default async function StudentProfilePage({
           (b.invoice.dueAt?.getTime() ?? 0) - (a.invoice.dueAt?.getTime() ?? 0),
       )[0] ?? null;
 
+  /*
+   * A bill's period comes from the plan row it was raised against. The invoice number is a
+   * document reference, not a period, so it is never used as the fallback — an invoice with
+   * no period (a manually raised charge) says so and shows its number in its own column.
+   */
+  type StudentInvoice = (typeof student.invoices)[number];
+  const periodLabel = (invoice: StudentInvoice) =>
+    invoice.feePeriod?.label ?? invoice.note ?? copy.profile.print.noPeriod;
+
   const feeTableRows: Row[] = payable.map((row) => ({
     id: row.invoice.id,
     cells: {
-      period: row.invoice.feePeriod?.label ?? row.invoice.note ?? row.invoice.number,
+      period: periodLabel(row.invoice),
       calendar: row.invoice.semester?.name ?? common.notSet,
       dueAt: formatDate(row.invoice.dueAt),
       amount: money(row.billed),
@@ -216,11 +276,15 @@ export default async function StudentProfilePage({
     },
   }));
 
+  // Money received is counted against the bills the record shows, so a receipt for a period
+  // ahead of the student never appears as history for a semester they have not reached.
+  const shownInvoiceIds = new Set(payable.map((row) => row.invoice.id));
   const payments = student.invoices
+    .filter((invoice) => shownInvoiceIds.has(invoice.id))
     .flatMap((invoice) =>
       invoice.payments.map((payment) => ({
         payment,
-        period: invoice.feePeriod?.label ?? invoice.number,
+        period: periodLabel(invoice),
       })),
     )
     .sort((a, b) => b.payment.paidAt.getTime() - a.payment.paidAt.getTime());
@@ -356,33 +420,228 @@ export default async function StudentProfilePage({
     },
   }));
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title={student.user.fullName}
-        meta={
-          <p className="mt-1 text-sm tabular-nums text-eavi-muted-text">{student.admissionNo}</p>
-        }
-        action={
-          <Link
-            href="/dashboard/students"
-            className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-3 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
-          >
-            {common.back}
-          </Link>
-        }
-      />
+  /* ------------------------------------------------------------------ print model */
 
-      <Panel title={copy.profile.personal}>
-        <dl className="grid gap-x-6 gap-y-3 p-4 sm:grid-cols-2">
-          {copy.create.fields.map((field) => (
-            <div key={field.name} className={field.wide ? "sm:col-span-2" : undefined}>
-              <dt className="text-xs text-eavi-muted-text">{field.label}</dt>
-              <dd className="min-w-0 text-sm break-words">{profileValues[field.name] ?? common.notSet}</dd>
+  /*
+   * The sheet is built from the same numbers the screen shows, so the two can never
+   * disagree. Dates arrive already formatted as `DD Mon YYYY` and money as KES, because the
+   * print document only lays out what it is given.
+   */
+  const asFacts = (rows: { label: string; value: string }[]): PrintFact[] =>
+    rows.map((row) => ({ label: row.label, value: row.value }));
+
+  /** One printed cell; a gap prints as a dash rather than as nothing. */
+  const cell = (value: string | null | undefined): string =>
+    value && value.trim().length > 0 ? value : "—";
+
+  const printStudent = {
+    fullName: student.user.fullName,
+    admissionNo: student.admissionNo,
+    status: activeEnrollment
+      ? (labels.enrollmentStatus[activeEnrollment.status] ?? copy.profile.notEnrolled)
+      : copy.profile.notEnrolled,
+    programme: activeEnrollment
+      ? `${activeEnrollment.program.name} (${activeEnrollment.program.code})`
+      : common.notSet,
+    enrolled: activeEnrollment
+      ? [formatDate(activeEnrollment.enrolledAt), activeEnrollment.intake?.name]
+          .filter(Boolean)
+          .join(" · ")
+      : common.notSet,
+    photoUrl: student.profilePhotoUrl,
+    contact: asFacts(detailGroups[0].rows),
+    personal: asFacts(detailGroups[1].rows),
+    guardian: asFacts(detailGroups[2].rows),
+    enrollments: student.enrollments.map((enrollment) => [
+      cell(`${enrollment.program.name} (${enrollment.program.code})`),
+      cell(enrollment.intake?.name),
+      cell(enrollment.cohort),
+      cell(labels.enrollmentStatus[enrollment.status]),
+      cell(formatDate(enrollment.enrolledAt)),
+    ]),
+    totals: {
+      billed: money(billed),
+      paid: money(collected),
+      outstanding: money(outstanding),
+      nextDue: nextDue ? money(nextDue.balance) : feeCopy.settled,
+    },
+    settledLine: printCopy.settledLine(
+      settled,
+      payable.length,
+      current?.invoice.feePeriod?.label ?? feeCopy.notStarted,
+    ),
+    // Oldest first: a schedule is read forwards, like a calendar.
+    invoices: [...payable]
+      .sort(
+        (a, b) =>
+          (a.invoice.dueAt?.getTime() ?? 0) - (b.invoice.dueAt?.getTime() ?? 0),
+      )
+      .map((row) => ({
+        id: row.invoice.id,
+        period: periodLabel(row.invoice),
+        invoice: row.invoice.number,
+        due: formatDate(row.invoice.dueAt),
+        amount: money(row.billed),
+        paid: money(row.paid),
+        balance: money(row.balance),
+        status: labels.periodStatus[row.status],
+        owed: row.balance > 0.005,
+      })),
+    overdueTotal: overdueRows.length > 0 ? money(overdueAmount) : null,
+    // Oldest first here too, so receipts read in the order they were written.
+    payments: [...payments]
+      .sort((a, b) => a.payment.paidAt.getTime() - b.payment.paidAt.getTime())
+      .map(({ payment, period }) => ({
+        id: payment.id,
+        date: formatDate(payment.paidAt),
+        receipt: payment.receiptNo ?? common.notSet,
+        appliedTo: period,
+        method: labels.paymentMethod[payment.method],
+        reference: payment.reference ?? common.notSet,
+        amount: money(payment.amount),
+      })),
+    units: units.map((unit) => [
+      cell(`${unit.programUnit.unit.code} · ${unit.programUnit.unit.name}`),
+      cell(unit.programUnit.periodLabel),
+      cell(labels.unitStatus[unit.status]),
+      cell(
+        unit.score !== null
+          ? `${Number(String(unit.score))}${unit.maxScore !== null ? `/${Number(String(unit.maxScore))}` : ""}${unit.grade ? ` · ${unit.grade}` : ""}`
+          : (unit.grade ?? common.notSet),
+      ),
+    ]),
+    attachments: attachments.map((attachment) => [
+      cell(attachment.requirement.label),
+      cell(labels.attachmentStatus[attachment.status]),
+      cell(attachment.hostOrganization),
+      cell(
+        [
+          attachment.startDate ? `From ${formatDate(attachment.startDate)}` : null,
+          attachment.expectedEndDate ? `to ${formatDate(attachment.expectedEndDate)}` : null,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      ),
+      cell(
+        [attachment.grade, attachment.completedAt ? formatDate(attachment.completedAt) : null]
+          .filter(Boolean)
+          .join(" · "),
+      ),
+    ]),
+    cards: student.idCards.map((card) => [
+      cell(card.serial),
+      cell(labels.cardStatus[card.status]),
+      cell(formatDate(card.issuedAt)),
+      cell(formatDate(card.expiresAt)),
+    ]),
+  };
+
+  return (
+    <>
+      <div className="space-y-6" data-print="record">
+      {/* The paper version of this record is its own document, rendered below this block
+          and hidden on screen. Nothing here needs a print variant of its own. */}
+      <div data-print="screen-only">
+        <PageHeader
+          title={student.user.fullName}
+          meta={
+            <p className="mt-1 text-sm tabular-nums text-eavi-muted-text">{student.admissionNo}</p>
+          }
+          action={
+            <div className="flex items-center gap-2">
+              <PrintButton pdfHref={`/api/students/${student.id}/print`} />
+              <Link
+                href="/dashboard/students"
+                className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-3 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
+              >
+                {common.back}
+              </Link>
             </div>
-          ))}
-        </dl>
+          }
+        />
+      </div>
+
+      {/* A student's page opens with who they are, not with a list of fields. The photograph
+          and the three facts a reader asks for first — programme, intake, when they joined —
+          sit together, so the page answers "who is this?" before it answers anything else. */}
+      <Panel>
+        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:gap-5">
+          {student.profilePhotoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={student.profilePhotoUrl}
+              alt={copy.profile.photoAlt(student.user.fullName)}
+              className="h-36 w-27 shrink-0 self-start rounded-xl border border-eavi-border bg-eavi-primary-soft object-contain sm:h-40 sm:w-30"
+            />
+          ) : (
+            <div className="flex h-36 w-27 shrink-0 items-center justify-center self-start rounded-xl border border-dashed border-eavi-border bg-eavi-primary-soft px-2 text-center text-[11px] leading-tight text-eavi-muted-text sm:h-40 sm:w-30">
+              {copy.profile.noPhoto}
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1 space-y-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm tabular-nums text-eavi-muted-text">{student.admissionNo}</p>
+                {activeEnrollment ? (
+                  <StatusChip tone={enrollmentTone[activeEnrollment.status] ?? "neutral"}>
+                    {labels.enrollmentStatus[activeEnrollment.status]}
+                  </StatusChip>
+                ) : (
+                  <StatusChip tone="neutral">{copy.profile.notEnrolled}</StatusChip>
+                )}
+              </div>
+            </div>
+
+            {/* The three facts that answer "who is this?" at a glance. */}
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div className="min-w-0">
+                <dt className="text-xs text-eavi-muted-text">{copy.profile.groups.academic}</dt>
+                <dd className="min-w-0 text-sm font-medium break-words">
+                  {activeEnrollment
+                    ? `${activeEnrollment.program.name} (${activeEnrollment.program.code})`
+                    : common.notSet}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-xs text-eavi-muted-text">{copy.profile.enrolled}</dt>
+                <dd className="text-sm font-medium">
+                  {activeEnrollment ? formatDate(activeEnrollment.enrolledAt) : common.notSet}
+                  {activeEnrollment?.intake?.name ? (
+                    <span className="ml-1.5 text-eavi-muted-text">· {activeEnrollment.intake.name}</span>
+                  ) : null}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
       </Panel>
+
+      {/* Details grouped by what they are about. A field with nothing in it is dropped
+          rather than printed as "Not recorded" ten times, and the count of what is missing
+          is stated once so the gap is still visible without filling the page with dashes. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {detailGroups.map((group) => (
+          <Panel key={group.title} title={group.title}>
+            <div className="p-4">
+              {group.rows.length === 0 ? (
+                <p className="text-sm text-eavi-muted-text">
+                  {group.empty}
+                </p>
+              ) : (
+                <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                  {group.rows.map((row) => (
+                    <div key={row.label} className="min-w-0">
+                      <dt className="text-xs text-eavi-muted-text">{row.label}</dt>
+                      <dd className="min-w-0 text-sm break-words">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </div>
+          </Panel>
+        ))}
+      </div>
 
       <Panel title={copy.profile.enrollments}>
         {enrollmentRows.length === 0 ? (
@@ -535,5 +794,12 @@ export default async function StudentProfilePage({
         )}
       </Panel>
     </div>
+
+      {/* The paper record. It sits OUTSIDE the screen container, because that container is
+          hidden in print — nesting the document inside it is what previously left the sheet
+          blank. Hidden on screen, shown by the print stylesheet, and also what the server
+          renders into a PDF at /api/students/[id]/print. */}
+      <StudentPrintDocument student={printStudent} />
+    </>
   );
 }

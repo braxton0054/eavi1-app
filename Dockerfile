@@ -40,8 +40,23 @@ FROM node:24-slim AS runner
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    CHROMIUM_PATH=/usr/bin/chromium
 WORKDIR /app
+
+# Chromium for the student-record PDF.
+#
+# Printing a record renders the page in a real browser; without one the print route can only
+# return 503. `chromium` plus the small font set it needs is added here rather than at build
+# time, because it is a runtime dependency of one route and has no place in the build image.
+# The fonts matter: a container with no fonts renders a PDF of empty boxes.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    chromium \
+    fonts-liberation \
+    fonts-dejavu-core \
+  && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system --gid 1001 nodejs \
   && useradd --system --uid 1001 --gid nodejs --shell /usr/sbin/nologin nextjs
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
