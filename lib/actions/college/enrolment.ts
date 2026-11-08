@@ -6,11 +6,11 @@ import { EnrollmentStatus, Role, Status } from "@/generated/prisma/enums";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
-import { storageConfigured, uploadFile } from "@/lib/storage";
 import { genderValues } from "@/lib/content/apply";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
+  assertStorageFor,
   dateField,
   enumField,
   nextAdmissionNo,
@@ -19,6 +19,7 @@ import {
   onSave,
   passwordField,
   phoneField,
+  putFile,
   requiredText,
   text,
   unique,
@@ -29,13 +30,21 @@ import { recordAudit } from "@/lib/academics/audit";
 import { registerEnrolmentUnits } from "@/lib/academics/registration";
 import { expiryForProgram } from "@/lib/cards/validity";
 
-async function maybeUpload(file: FormDataEntryValue | null, folder: string, keySeed: string) {
-  if (!file || !(file instanceof File) || file.size === 0) return null;
-  if (!storageConfigured()) return null;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const key = `${folder}/${keySeed}/${Date.now()}-${safeName}`;
-  return uploadFile(key, buffer, file.type || "application/octet-stream");
+/**
+ * One of the enrolment's optional attachments.
+ *
+ * Returns null only when the applicant did not attach a file. A file that WAS attached is
+ * uploaded or the whole enrolment fails: returning null on a storage error used to create a
+ * student with a silently missing photograph, and the clerk had no way to know. The folder
+ * and key seed place every attachment under one student's prefix in the bucket.
+ */
+async function maybeUpload(
+  value: FormDataEntryValue | null,
+  folder: string,
+  keySeed: string,
+): Promise<string | null> {
+  if (!(value instanceof File) || value.size === 0) return null;
+  return putFile(value, folder, keySeed);
 }
 
 function all(formData: FormData, name: string): string[] {
@@ -54,6 +63,17 @@ export async function enrolStudent(formData: FormData) {
       include: { program: { select: { id: true } } },
     });
     if (!application) throw new FieldError("Application not found.");
+
+    /*
+     * Checked before anything is created. A form carrying a photograph with nowhere to put
+     * it must change nothing at all, rather than enrol a student whose picture quietly failed
+     * to upload — the clerk would have no reason to look again.
+     */
+    assertStorageFor(
+      ["profilePhoto", "birthCertificate", "primarySchoolDoc", "secondarySchoolDoc"]
+        .map((name) => formData.get(name))
+        .filter((value): value is File => value instanceof File && value.size > 0),
+    );
 
     const existing = await prisma.studentProfile.findUnique({ where: { applicationId } });
     if (existing) throw new FieldError("This application has already been enrolled.");
