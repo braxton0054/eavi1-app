@@ -417,6 +417,8 @@ model TutorProfile {
   userId         String          @unique
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   staffNo        String          @unique
+  /// Classes this tutor is responsible for. Drives class group-chat membership.
+  classes        ClassTutor[]
   campusId       Int
   campus         Campus          @relation(fields: [campusId], references: [id])
   title          String?
@@ -1056,6 +1058,9 @@ model AcademicClass {
   archivedAt  DateTime?
   ambient     String?           @default("purple")
   memberships ClassMembership[]
+  /// The tutors who teach this class. They run its group chat and can post when the room is
+  /// set to staff-only; students see the room but cannot rename or remove anyone.
+  tutors      ClassTutor[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -1230,6 +1235,7 @@ model Message {
 
   receipts       MessageReceipt[]
   messageReports MessageReport[]
+  attachments    ChatAttachment[]
 
   @@unique([senderId, clientMessageId])
   @@index([conversationId, createdAt])
@@ -1291,4 +1297,50 @@ model ChatRestriction {
 
   @@index([userId, restrictedUntil])
   @@map("chat_restrictions")
+}
+
+/// A file shared in a message.
+///
+/// Files are private: the bucket URL is never handed to a browser, and downloads go through an
+/// authenticated route that re-checks conversation membership. A public object URL would outlive
+/// every deletion we make, which would make the seven-day rule a fiction.
+model ChatAttachment {
+  id          String    @id @default(uuid())
+  messageId   String
+  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  /// The object key in the bucket. Never the URL: the key is what deletion needs.
+  storageKey  String
+  /// What the recipient called it, shown in the bubble. Not a path and never trusted blindly.
+  fileName    String
+  contentType String
+  sizeBytes   Int
+  /// When the object, the row and the message all disappear. Seven days after upload.
+  expiresAt   DateTime
+  /// Set once the cleanup job has removed the object, so a stuck row is visible rather than silently leaking.
+  deletedAt   DateTime?
+
+  @@index([expiresAt])
+  @@index([messageId])
+  @@map("chat_attachments")
+}
+
+/// A tutor assigned to a class.
+///
+/// This is the only definition of "responsible for the class", and therefore the only thing that
+/// decides who belongs in the class group chat. Keeping it a table of its own means a tutor can
+/// be moved between classes without touching the conversation's members by hand.
+model ClassTutor {
+  id         String        @id @default(uuid())
+  classId    String
+  class      AcademicClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  tutorId    String
+  tutor      TutorProfile  @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  /// True for the tutor who owns the class day to day.
+  isLead     Boolean       @default(false)
+  assignedAt DateTime      @default(now())
+  actorId    String?
+
+  @@unique([classId, tutorId])
+  @@index([tutorId])
+  @@map("class_tutors")
 }

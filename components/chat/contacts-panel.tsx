@@ -21,6 +21,10 @@ type Contact = {
   role: string;
   tick: TickRole;
   campusHint?: string;
+  /** True while they are using the portal at all, not only the chat screen. */
+  online?: boolean;
+  /** "Online" or "Last seen 12 min ago". Absent when they have hidden their presence. */
+  statusText?: string;
 };
 
 const TABS = [
@@ -177,7 +181,22 @@ export function ContactsPanel({ onOpenPerson }: { onOpenPerson: (userId: string)
                   <span className="truncate text-sm font-medium text-[var(--eavi-on-bg)]">{contact.name}</span>
                   <VerifiedBadge role={contact.tick} size="sm" />
                 </span>
-                {contact.campusHint ? (
+                {/*
+                  * Presence wins over the campus hint. The hint exists only to tell two people
+                  * with the same name apart; whether someone is around is more useful day to day.
+                */}
+                {contact.statusText ? (
+                  <span
+                    className={cn(
+                      "block truncate text-xs",
+                      contact.online
+                        ? "font-medium text-[var(--eavi-tick-student)]"
+                        : "text-[var(--eavi-muted-text)]",
+                    )}
+                  >
+                    {contact.statusText}
+                  </span>
+                ) : contact.campusHint ? (
                   <span className="block truncate text-xs text-[var(--eavi-muted-text)]">{contact.campusHint}</span>
                 ) : null}
               </span>

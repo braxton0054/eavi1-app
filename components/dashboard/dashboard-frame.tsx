@@ -46,6 +46,7 @@ export function DashboardFrame({
   profileHref,
   nav,
   mobile,
+  fill = false,
 }: {
   children: React.ReactNode;
   scope: FrameScope;
@@ -54,11 +55,19 @@ export function DashboardFrame({
   profileHref: string;
   nav: NavGroup[];
   mobile: NavItem[];
+  /**
+   * Locks the page to the viewport and lets the content scroll inside itself.
+   *
+   * Chat needs this: a message list that grows the document makes the whole page scroll, so the
+   * composer drifts off screen and the browser bar eats a row of messages on a phone. Record
+   * pages keep the default, because they are documents and should scroll.
+   */
+  fill?: boolean;
 }) {
   // Collapsed menu buttons render a Radix tooltip and this registry's SidebarProvider
   // ships without the matching provider, which fails every portal navigation.
   return (
-    <SidebarProvider className="min-h-dvh bg-eavi-bg">
+    <SidebarProvider className={fill ? "h-dvh overflow-hidden bg-eavi-bg" : "min-h-dvh bg-eavi-bg"}>
       <TooltipProvider delayDuration={0}>
         <Sidebar collapsible="offcanvas" className="border-eavi-border">
           <SidebarHeader className="border-b border-eavi-border">
@@ -132,7 +141,14 @@ export function DashboardFrame({
             </form>
           </header>
 
-          <main id="main" className="flex-1 px-4 py-6 pb-24 sm:px-6 md:pb-6 lg:px-8">
+          <main
+            id="main"
+            className={
+              fill
+                ? "flex min-h-0 flex-1 flex-col px-3 pb-20 pt-3 sm:px-6 sm:pb-6 sm:pt-4 md:pb-6 lg:px-8"
+                : "flex-1 px-4 py-6 pb-24 sm:px-6 md:pb-6 lg:px-8"
+            }
+          >
             {children}
           </main>
 

@@ -89,3 +89,63 @@ the Prisma client reads `DATABASE_URL` at module load time.
   broadcast-to-a-campus composer is phase 2.
 - **Deleting a message is soft** and the row stays for moderation, so a reported message can
   still be reviewed after the author removed it.
+
+## Documents in chat
+
+Files are shared from the paperclip beside the composer, and they delete themselves after **7 days**.
+
+**Files are private.** They are uploaded with `ACL: private` and never given a public URL. Downloads
+go through `/api/chat/attachments/[id]`, which re-checks conversation membership on every request.
+A copied link therefore stops working when the file expires or the person leaves the conversation —
+a public bucket URL would have outlived both.
+
+**What can be shared:** PDF, JPEG, PNG, WebP, plain text, Word and Excel — 10 MB maximum. The
+declared type must agree with the file extension, so a renamed file is refused. Everything is
+served with `Content-Disposition: attachment` and `nosniff`, so a shared file can never render as a
+page on our own origin; images preview inline through the same authenticated route.
+
+**Deletion** is done by a sweep, not by a timer on the row:
+
+```bash
+npm run chat:sweep          # hourly cron on the host
+```
+
+or, where cron cannot reach the container, a scheduler calls:
+
+```bash
+curl -X POST https://<host>/api/internal/sweep-attachments \
+  -H "Authorization: Bearer $CHAT_SWEEP_TOKEN"
+```
+
+`CHAT_SWEEP_TOKEN` unset means the endpoint refuses everything (503) rather than defaulting open.
+The sweep deletes the object first and marks the row second, so a crash leaves a retryable row
+rather than an unreachable file. A message whose only content was the file is removed; one that
+still has text stays, with the document gone.
+
+## Class groups
+
+A class is a grouping, so its group chat is derived from the class rather than created by hand.
+`lib/chat/class-rooms.ts` recomputes membership from the roster:
+
+- **Students** come from open `ClassMembership` rows.
+- **Tutors** come from `ClassTutor` — the only definition of "responsible for this class".
+
+The sync runs on enrolment, class creation, student moves, class merges, and archiving.
+`maySeeClassRoom` is the visibility rule: a student must be enrolled, a tutor must be assigned, an
+administrator must be at the campus. **A class group is not visible to anyone outside the class.**
+
+A new class default to `ALL_MEMBERS` posting: a class group exists so students can ask questions.
+`PostingMode.STAFF_ONLY` remains available for a room the office wants to use as a noticeboard.
+
+Verified by `npm run verify:class-rooms` (18 checks) — one room per class, roster-exact membership,
+outsiders refused by both membership and by guessing the id, and leave/rejoin preserving access.
+
+## Presence
+
+Being online means **using the portal**, not having the chat screen open. Someone reading a
+student's fees is reachable, and showing them offline because they closed one tab is misleading.
+
+Presence is read from `Session.lastSeenAt`, which `resolveSession` already writes on every
+authenticated request to any page, plus live sockets so the dot appears immediately. A session
+counts as online for 90 seconds after its last request. `showLastSeen` hides a person's status from
+everyone else; they still see other people's — the asymmetry is what makes the setting meaningful.

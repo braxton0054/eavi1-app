@@ -143,6 +143,22 @@ export function ChatWorkspace({ viewerId, viewerName }: { viewerId: string; view
     [activeId, socket, viewerId],
   );
 
+  /**
+   * Shares a document. The message goes through the same permissions as text, so a student who
+   * cannot post in a staff-only room cannot post a file there either.
+   */
+  const shareFile = async (file: File, note: string): Promise<string | null> => {
+    if (!activeId) return "Open a conversation first.";
+    const clientMessageId = crypto.randomUUID();
+    const result = await socket.sendAttachment({
+      conversationId: activeId,
+      file,
+      body: note,
+      clientMessageId,
+    });
+    return result.ok ? null : result.error;
+  };
+
   const messages = (activeId ? socket.messages[activeId] ?? [] : []).map((message) => ({
     ...message,
     mine: message.senderId === viewerId,
@@ -155,13 +171,12 @@ export function ChatWorkspace({ viewerId, viewerName }: { viewerId: string; view
 
   return (
     /*
-     * Sized against the real chrome rather than a guessed number of rems: the header, the page
-     * heading above, and the fixed mobile navigation below all take space out of the viewport.
-     * `dvh` (not `vh`) so a phone's collapsing browser toolbar cannot push the composer behind
-     * the nav bar. The subtracting values are the measured header (56px), heading block (~116px)
-     * and mobile bar (57px + safe-area).
+     * The page shell is locked to the viewport (see the frame's `fill` mode), so the pane simply
+     * takes the space it is given. No arithmetic against header and nav heights: those numbers
+     * were a guess that went stale, and every one of them was a way for the composer to end up
+     * behind the mobile bar.
      */
-    <div className="flex h-[calc(100dvh-15.5rem)] min-h-0 overflow-hidden rounded-xl border border-[var(--eavi-border)] bg-[var(--eavi-card)] max-lg:mb-2 lg:h-[calc(100dvh-9rem)]">
+    <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--eavi-border)] bg-[var(--eavi-card)]">
       {/* List pane: full width on a phone, fixed column on desktop. */}
       <div
         className={cn(
@@ -219,6 +234,7 @@ export function ChatWorkspace({ viewerId, viewerName }: { viewerId: string; view
             onLoadOlder={() => history(active.id)}
             hasOlder={Boolean(older[active.id])}
             canSend
+            onShareFile={shareFile}
           />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">

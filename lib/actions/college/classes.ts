@@ -8,6 +8,7 @@ import { intakeValueForMonth, mergeBlockages, normaliseClassName } from "@/lib/a
 import { recordAudit } from "@/lib/academics/audit";
 import { redirect } from "next/navigation";
 import { refresh } from "@/lib/actions/college/_shared";
+import { syncClassConversation } from "@/lib/chat/class-rooms";
 
 const AFFECTED = ["/dashboard/classes", "/dashboard/students", "/dashboard/enrollments", "/dashboard"];
 
@@ -77,6 +78,12 @@ export async function createClass(formData: FormData) {
       detail: { name, program: program.code, intakeMonth, year: intake.year },
     });
 
+    /*
+     * The class group is not a separate thing to make: a class is a grouping, so its room is
+     * derived from the roster. Creating the class creates the room.
+     */
+    await syncClassConversation(created.id).catch(() => null);
+
     refresh(...AFFECTED);
     redirect(`/dashboard/classes/${created.id}`);
   });
@@ -141,6 +148,12 @@ export async function archiveClass(formData: FormData) {
       where: { id },
       data: { status: "ARCHIVED", archivedAt: new Date() },
     });
+
+    /*
+     * An archived class has no open members, so the sync closes the room's membership too: the
+     * group stops appearing in everyone's chat list, while its history stays in the database.
+     */
+    await syncClassConversation(id).catch(() => null);
     await recordAudit({
       campusId: existing.campusId,
       actorId: scope.userId,
@@ -276,6 +289,10 @@ export async function mergeClasses(formData: FormData) {
       );
     });
 
+    // Students moved, so both rooms are recomputed: one gains, the other loses.
+    await syncClassConversation(target.id).catch(() => null);
+    await syncClassConversation(source.id).catch(() => null);
+
     refresh(...AFFECTED);
     redirect(`/dashboard/classes/${target.id}?merged=1`);
   });
@@ -351,6 +368,13 @@ export async function moveStudent(formData: FormData) {
             tx as never,
           );
         });
+
+        /*
+         * The student left one class and joined another, so both group chats change hands.
+         * Syncing here keeps the rooms honest without anyone editing chat by hand.
+         */
+        await syncClassConversation(target.id).catch(() => null);
+        if (current?.classId) await syncClassConversation(current.classId).catch(() => null);
       }
     }
 

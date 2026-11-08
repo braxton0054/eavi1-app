@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 function client() {
   return new S3Client({
@@ -10,6 +10,15 @@ function client() {
     },
     forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
   });
+}
+
+/** Identifies an object without exposing how to reach it. */
+function keyFromUrl(url: string): string {
+  const endpoint = process.env.S3_ENDPOINT?.replace(/\/$/, "") ?? "";
+  const accountId = process.env.S3_ACCOUNT_ID;
+  const bucket = process.env.S3_BUCKET ?? "";
+  const prefix = accountId ? `${endpoint}/${accountId}:${bucket}/` : `${endpoint}/${bucket}/`;
+  return url.startsWith(prefix) ? url.slice(prefix.length) : url.slice(url.lastIndexOf("/") + 1);
 }
 
 export function storageConfigured() {
@@ -42,4 +51,53 @@ export async function uploadFile(key: string, body: Buffer, contentType: string)
     return `${endpoint}/${bucket}/${key}`;
   }
   return `${endpoint}/${key}`;
+}
+/**
+ * Uploads an object that is NOT publicly readable.
+ *
+ * Used for anything with a lifetime — chat documents especially. A public-read object keeps
+ * working from a copied URL long after the row is gone, so private-by-default is the only way
+ * "deleted after seven days" can mean what it says.
+ */
+export async function uploadPrivateFile(key: string, body: Buffer, contentType: string) {
+  await client().send(
+    new PutObjectCommand({
+      Bucket: process.env.S3_BUCKET!,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      ACL: "private",
+    }),
+  );
+  return key;
+}
+
+/** Streams an object back for a server-side download. The browser never sees the bucket URL. */
+export async function readFile(key: string) {
+  const response = await client().send(
+    new GetObjectCommand({ Bucket: process.env.S3_BUCKET!, Key: key }),
+  );
+  if (!response.Body) return null;
+  const bytes = await response.Body.transformToByteArray();
+  return { bytes: Buffer.from(bytes), contentType: response.ContentType ?? "application/octet-stream" };
+}
+
+/**
+ * Removes an object. Reports whether the object is gone, counting "already absent" as success:
+ * the caller is deleting, and a missing file is the state it wanted.
+ */
+export async function deleteFile(key: string): Promise<boolean> {
+  try {
+    await client().send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET!, Key: key }));
+    return true;
+  } catch (error) {
+    const name = (error as { name?: string }).name ?? "";
+    if (name === "NoSuchKey" || name === "NotFound") return true;
+    throw error;
+  }
+}
+
+/** Removes an object that was stored under a full public URL (older uploads). */
+export async function deleteFileByUrl(url: string): Promise<boolean> {
+  return deleteFile(keyFromUrl(url));
 }

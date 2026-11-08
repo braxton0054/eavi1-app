@@ -10,6 +10,7 @@ import {
 import { MAX_BODY } from "@/lib/chat/conversations";
 import { limitMessages } from "@/lib/chat/rate-limit";
 import { chatProfiles } from "@/lib/chat/profile";
+import { storeAttachment } from "@/lib/chat/attachments";
 
 /**
  * Sending is one function, called by the socket and by the HTTP fallback, so both paths agree
@@ -18,24 +19,33 @@ import { chatProfiles } from "@/lib/chat/profile";
 
 export const sendSchema = z.object({
   conversationId: z.string().min(1).max(64),
-  body: z
-    .string()
-    .trim()
-    .min(1, "A message cannot be empty.")
-    .max(MAX_BODY, `A message cannot be longer than ${MAX_BODY} characters.`),
+  /*
+   * Optional because a message may be an attachment on its own. Whether it is allowed to be
+   * empty is decided after permissions are checked: empty with a file is fine, empty on its own
+   * is not.
+   */
+  body: z.string().trim().max(MAX_BODY, `A message cannot be longer than ${MAX_BODY} characters.`).default(""),
   clientMessageId: z.string().min(1).max(64).optional(),
   replyToId: z.string().max(64).optional(),
 });
 
 export type SendInput = z.infer<typeof sendSchema>;
 
-export async function sendMessage(user: ChatUser, raw: unknown) {
+export async function sendMessage(
+  user: ChatUser,
+  raw: unknown,
+  options?: { attachment?: File | null },
+) {
   const input = sendSchema.parse(raw);
 
   const member = await requireMembership(input.conversationId, user.id);
 
   const allowed = await canPost(member, user);
   if (!allowed.ok) throw new ChatError(allowed.reason, 403);
+
+  if (!input.body && !options?.attachment) {
+    throw new ChatError("A message cannot be empty.", 400);
+  }
 
   limitMessages(user.id);
 
@@ -61,6 +71,12 @@ export async function sendMessage(user: ChatUser, raw: unknown) {
     if (!target) throw new ChatError("That message is not in this conversation.", 400);
   }
 
+  /*
+   * The file is stored before the transaction so a rejected upload never leaves a message behind.
+   * Permissions have already passed at this point, so nothing is written for a non-member.
+   */
+  const stored = options?.attachment ? await storeAttachment(options.attachment, input.conversationId) : null;
+
   const created = await prisma.$transaction(async (tx) => {
     const message = await tx.message.create({
       data: {
@@ -69,6 +85,7 @@ export async function sendMessage(user: ChatUser, raw: unknown) {
         body: input.body,
         clientMessageId: input.clientMessageId,
         replyToId: input.replyToId,
+        ...(stored ? { attachments: { create: stored } } : {}),
       },
       select: { id: true },
     });
@@ -103,6 +120,10 @@ export async function serialize(user: ChatUser, messageId: string) {
       clientMessageId: true,
       replyToId: true,
       deletedAt: true,
+      attachments: {
+        where: { deletedAt: null },
+        select: { id: true, fileName: true, contentType: true, sizeBytes: true, expiresAt: true },
+      },
     },
   });
   if (!message) throw new ChatError("Message not found.", 404);
@@ -119,6 +140,8 @@ export async function serialize(user: ChatUser, messageId: string) {
     createdAt: message.createdAt,
     clientMessageId: message.clientMessageId,
     replyToId: message.replyToId,
+    // The id only; the file itself is fetched through an authenticated route.
+    attachments: message.attachments,
     receipts: [] as Array<{ userId: string; readAt: Date | null; deliveredAt: Date | null }>,
     _self: user.id,
   };

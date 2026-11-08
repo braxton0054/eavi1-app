@@ -10,6 +10,13 @@ import {
   type ChatUser,
 } from "@/lib/chat/access";
 import { recipientsOf } from "@/lib/chat/conversations";
+import {
+  ONLINE_WINDOW_MS,
+  hasLiveSocket,
+  lastActivityFor,
+  socketConnected,
+  socketDisconnected,
+} from "@/lib/chat/presence";
 import { markRead, sendMessage } from "@/lib/chat/messages";
 import { prisma } from "@/lib/prisma";
 
@@ -30,25 +37,8 @@ type AuthedSocket = Socket & {
   };
 };
 
-/** Online users and how many tabs they have open, so one tab closing is not "offline". */
-const presence = new Map<string, number>();
-
 /** A user's live sockets, so a message can be delivered to every device they are using. */
 const socketsByUser = new Map<string, Set<string>>();
-
-function markOnline(userId: string) {
-  presence.set(userId, (presence.get(userId) ?? 0) + 1);
-}
-
-function markOffline(userId: string): boolean {
-  const count = (presence.get(userId) ?? 1) - 1;
-  if (count <= 0) {
-    presence.delete(userId);
-    return true;
-  }
-  presence.set(userId, count);
-  return false;
-}
 
 function parseCookies(header: string | undefined): Record<string, string> {
   if (!header) return {};
@@ -95,11 +85,16 @@ export function attachChat(io: Server) {
     // Every signed-in person has a room of their own, used to reach all their devices.
     socket.join(`user:${user.id}`);
 
-    markOnline(user.id);
+    socketConnected(user.id);
     const owned = socketsByUser.get(user.id) ?? new Set<string>();
     owned.add(socket.id);
     socketsByUser.set(user.id, owned);
 
+    /*
+     * A socket makes presence immediate, but going offline is not the mirror of it: the person may
+     * still have the fees page open in another tab. The database decides, and the client re-reads
+     * presence when this event arrives.
+     */
     io.emit("presence:update", { userId: user.id, online: true });
 
     /**
@@ -224,12 +219,21 @@ export function attachChat(io: Server) {
     );
 
     socket.on("disconnect", async () => {
-      const wasLast = markOffline(user.id);
+      socketDisconnected(user.id);
       const owned = socketsByUser.get(user.id);
       owned?.delete(socket.id);
       if (owned && owned.size === 0) socketsByUser.delete(user.id);
 
-      if (!wasLast) return;
+      /*
+       * Closing the chat tab does not mean leaving the portal. The person is still signed in and
+       * may be reading another page, so presence is read back from the database rather than
+       * declared offline here. Only if they have gone quiet does this report them away.
+       */
+      const stillHere = hasLiveSocket(user.id);
+      const lastSeen = (await lastActivityFor([user.id]).catch(() => new Map())).get(user.id) ?? null;
+
+      if (stillHere) return;
+      if (lastSeen && Date.now() - lastSeen.getTime() < ONLINE_WINDOW_MS) return;
 
       const visible = await sharesPresence(user.id).catch(() => true);
       if (!visible) return;
@@ -237,15 +241,15 @@ export function attachChat(io: Server) {
       io.emit("presence:update", {
         userId: user.id,
         online: false,
-        lastSeenAt: new Date().toISOString(),
+        lastSeenAt: (lastSeen ?? new Date()).toISOString(),
       });
     });
   });
 }
 
-/** Who is online right now, for the presence dots. */
+/** Who has a live socket right now. Used by the verification script, not for display. */
 export function onlineUserIds(): string[] {
-  return [...presence.keys()];
+  return [...socketsByUser.keys()];
 }
 
 export { isStaff, canPost };

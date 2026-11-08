@@ -125,10 +125,24 @@ async function main() {
   const rows = (contacts.json as { rows?: unknown[] } | null)?.rows ?? [];
   check("contacts: rows are returned", rows.length > 0);
   /*
-   * The allow-list is exact: a row may carry these keys and no others. campusHint is the one
-   * documented exception, shown only where two people share a name.
+   * The allow-list is exact: a row may carry these keys and no others.
+   *
+   *   campusHint — shown only where two people share a name, so a contact can be told apart.
+   *   online, statusText — presence. Both describe a person's activity, never a credential.
+   *
+   * Adding to this set is a decision about what the chat API is allowed to say about a person, so
+   * it should be argued for here rather than quietly widened.
    */
-  const ALLOWED_ROW_KEYS = new Set(["userId", "name", "photoThumbUrl", "role", "tick", "campusHint"]);
+  const ALLOWED_ROW_KEYS = new Set([
+    "userId",
+    "name",
+    "photoThumbUrl",
+    "role",
+    "tick",
+    "campusHint",
+    "online",
+    "statusText",
+  ]);
   const strayKeys = [...new Set(rows.flatMap((row) => Object.keys(row as object)))].filter(
     (key) => !ALLOWED_ROW_KEYS.has(key),
   );

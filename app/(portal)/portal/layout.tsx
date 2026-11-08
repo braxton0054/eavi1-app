@@ -34,6 +34,7 @@ export default async function PortalLayout({ children }: { children: React.React
       profileHref={isAdmin ? "/dashboard/profile" : isTutor ? "/tutor/profile" : "/portal/chat"}
       nav={isAdmin ? navGroups : isTutor ? tutorNavGroups : navGroups}
       mobile={isTutor ? mobileNav.tutor : isAdmin ? mobileNav.admin : mobileNav.portal}
+      fill
     >
       {children}
     </DashboardFrame>

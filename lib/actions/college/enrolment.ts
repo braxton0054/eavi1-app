@@ -28,6 +28,7 @@ import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
 import { intakeValueForMonth, normaliseClassName } from "@/lib/academics/classes";
 import { recordAudit } from "@/lib/academics/audit";
 import { registerEnrolmentUnits } from "@/lib/academics/registration";
+import { syncClassConversation } from "@/lib/chat/class-rooms";
 import { expiryForProgram } from "@/lib/cards/validity";
 
 /**
@@ -378,5 +379,14 @@ export async function enrolStudent(formData: FormData) {
         });
       }
     });
+
+    /*
+     * A newly admitted student joins their class's group chat straight away. The sync is outside
+     * the transaction because it touches the conversation tables, and failing to add someone to a
+     * chat must never roll back the enrolment that got them in.
+     */
+    if (classRecord) {
+      await syncClassConversation(classRecord.id).catch(() => null);
+    }
   });
 }

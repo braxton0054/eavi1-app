@@ -4,8 +4,79 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { ChatAvatar } from "@/components/chat/chat-avatar";
 import { VerifiedBadge } from "@/components/chat/verified-badge";
-import type { ChatMessage } from "@/hooks/use-chat-socket";
+import type { ChatAttachment, ChatMessage } from "@/hooks/use-chat-socket";
 import { cn } from "@/lib/utils";
+
+/**
+ * One shared document, as it appears in a bubble.
+ *
+ * The link goes to our own route, never to the bucket: the download is re-authorised on every
+ * click, so a link that is copied keeps working only while the recipient is still in the
+ * conversation and the file has not reached its seven days.
+ */
+function AttachmentCard({ file, mine }: { file: ChatAttachment; mine: boolean }) {
+  const isImage = /^image\/(png|jpeg|webp)$/.test(file.contentType);
+  const href = `/api/chat/attachments/${file.id}`;
+  /*
+   * The deadline is shown as a date rather than a countdown. A countdown would need the current
+   * time, which makes the render impure and the text subtly different on every keystroke; the date
+   * is stable and still tells the reader exactly when the file goes.
+   */
+  const expires = new Date(file.expiresAt).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+  return (
+    <a
+      href={href}
+      download={file.fileName}
+      className={cn(
+        "flex min-h-11 items-center gap-2 rounded-xl px-2 py-1.5",
+        mine ? "bg-black/15" : "bg-black/10",
+      )}
+    >
+      {isImage ? (
+        /*
+         * Images preview, but through the authenticated route: a plain <img src> to storage would
+         * put the bucket URL in the DOM and the browser's history, outliving the deletion.
+         */
+        <img
+          src={`${href}?inline=1`}
+          alt=""
+          className="size-9 shrink-0 rounded-lg object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/15 text-[10px] font-bold uppercase">
+          {(file.fileName.split(".").pop() ?? "file").slice(0, 4)}
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs font-semibold">{file.fileName}</span>
+        <span className="block text-[10px] opacity-80">
+          {formatSize(file.sizeBytes)} · deletes {expires}
+        </span>
+      </span>
+    </a>
+  );
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** A paperclip, drawn inline so the composer has no icon dependency. */
+function PaperclipIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.18 5.18l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48" />
+    </svg>
+  );
+}
 
 /**
  * One conversation.
@@ -56,6 +127,7 @@ export function ThreadPanel({
   hasOlder,
   disabledReason,
   canSend,
+  onShareFile,
 }: {
   conversationId: string;
   title: string;
@@ -72,8 +144,13 @@ export function ThreadPanel({
   hasOlder: boolean;
   disabledReason?: string | null;
   canSend: boolean;
+  /** Uploads a document. Resolves with an error message to show, or null on success. */
+  onShareFile?: (file: File, note: string) => Promise<string | null>;
 }) {
   const [draft, setDraft] = useState("");
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,6 +195,26 @@ export function ThreadPanel({
         onTyping(false);
       }
     }, 1800);
+  };
+
+  const pickFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Cleared immediately so choosing the same file twice still fires a change event.
+    event.target.value = "";
+    if (!file || !onShareFile) return;
+
+    setFileError(null);
+    setUploading(true);
+    const note = draft.trim();
+    const error = await onShareFile(file, note);
+    setUploading(false);
+
+    if (error) {
+      setFileError(error);
+      return;
+    }
+    setDraft("");
+    setAtBottom(true);
   };
 
   const submit = async () => {
@@ -227,9 +324,21 @@ export function ThreadPanel({
                     </div>
                   ) : null}
 
-                  <p className={cn("whitespace-pre-wrap break-words", message.deleted && "italic opacity-70")}>
-                    {message.deleted ? "This message was deleted." : message.body}
-                  </p>
+                  {message.attachments?.length ? (
+                    <div className="mb-1 space-y-1">
+                      {message.attachments.map((file) => (
+                        <AttachmentCard key={file.id} file={file} mine={mine} />
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {message.body ? (
+                    <p className={cn("whitespace-pre-wrap break-words", message.deleted && "italic opacity-70")}>
+                      {message.deleted ? "This message was deleted." : message.body}
+                    </p>
+                  ) : message.deleted ? (
+                    <p className="italic opacity-70">This message was deleted.</p>
+                  ) : null}
 
                   <div className={cn("mt-0.5 flex items-center gap-1 text-[10px]", mine ? "justify-end" : "")}>
                     <span className="opacity-80">{timeLabel(message.createdAt)}</span>
@@ -280,17 +389,45 @@ export function ThreadPanel({
             aria-label="Message"
             className="max-h-32 min-h-11 flex-1 resize-none rounded-xl border border-[var(--eavi-border)] bg-[var(--eavi-muted)] px-3 py-2.5 text-sm text-[var(--eavi-on-bg)] placeholder:text-[var(--eavi-muted-text)] disabled:opacity-60"
           />
+          {onShareFile ? (
+            <>
+              <input
+                ref={fileInput}
+                type="file"
+                className="sr-only"
+                onChange={pickFile}
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.xls,.xlsx"
+                aria-label="Attach a document"
+              />
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                disabled={!canSend || uploading}
+                aria-label="Attach a document"
+                title="Attach a document (deleted after 7 days)"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[var(--eavi-border)] text-[var(--eavi-primary-text)] disabled:opacity-50"
+              >
+                {uploading ? "…" : <PaperclipIcon />}
+              </button>
+            </>
+          ) : null}
           <button
             type="submit"
-            disabled={!canSend || draft.trim().length === 0}
-            className="min-h-11 min-w-11 rounded-xl bg-[var(--eavi-primary)] px-4 text-sm font-semibold text-[var(--eavi-on-bg)] disabled:opacity-50"
+            disabled={!canSend || draft.trim().length === 0 || uploading}
+            className="min-h-11 min-w-11 rounded-xl bg-[var(--eavi-primary)] px-4 text-sm font-bold text-[var(--eavi-on-bg)] shadow-sm disabled:opacity-50"
           >
             Send
           </button>
         </div>
-        <p className="mt-1 text-[11px] text-[var(--eavi-muted-text)]">
-          Be respectful. Admins can review reported messages.
-        </p>
+        {fileError ? (
+          <p role="alert" className="mt-1 text-[11px] font-semibold text-[var(--eavi-danger-text,var(--eavi-on-bg))]">
+            {fileError}
+          </p>
+        ) : (
+          <p className="mt-1 text-[11px] text-[var(--eavi-muted-text)]">
+            Be respectful. Admins can review reported messages. Documents are deleted after 7 days.
+          </p>
+        )}
       </form>
     </div>
   );

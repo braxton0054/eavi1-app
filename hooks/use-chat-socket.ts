@@ -21,6 +21,14 @@ export type ChatPerson = {
   tick: TickRole;
 };
 
+export type ChatAttachment = {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  expiresAt: string;
+};
+
 export type ChatMessage = {
   id: string;
   conversationId: string;
@@ -37,6 +45,7 @@ export type ChatMessage = {
   pending?: boolean;
   failed?: boolean;
   receipts?: Array<{ userId: string; readAt: string | null; deliveredAt: string | null }>;
+  attachments?: ChatAttachment[];
 };
 
 export type Presence = { online: boolean; lastSeenAt?: string };
@@ -159,6 +168,31 @@ export function useChatSocket(enabled: boolean) {
     [merge],
   );
 
+  /**
+   * Shares a document. Multipart over HTTP rather than the socket: a socket payload would have
+   * to carry the file's bytes, and the size and type limits belong on the server anyway.
+   */
+  const sendAttachment = useCallback(
+    async (input: { conversationId: string; file: File; body: string; clientMessageId: string }) => {
+      const form = new FormData();
+      form.set("conversationId", input.conversationId);
+      form.set("file", input.file);
+      form.set("body", input.body);
+      form.set("clientMessageId", input.clientMessageId);
+
+      const pending = fetch("/api/chat/attachments", { method: "POST", body: form });
+      const response = await pending;
+      const data = await response.json().catch(() => null);
+
+      if (data?.ok && data.message) {
+        merge(data.message);
+        return { ok: true as const };
+      }
+      return { ok: false as const, error: data?.error ?? "Could not share that file." };
+    },
+    [merge],
+  );
+
   const addOptimistic = useCallback((message: ChatMessage) => {
     setMessages((current) => ({
       ...current,
@@ -192,7 +226,8 @@ export function useChatSocket(enabled: boolean) {
       markFailed,
       setUnreadTotal,
       merge,
+      sendAttachment,
     }),
-    [connected, messages, typing, presence, unreadTotal, lastEvent, join, leave, send, markRead, setTypingState, addOptimistic, markFailed, merge],
+    [connected, messages, typing, presence, unreadTotal, lastEvent, join, leave, send, markRead, setTypingState, addOptimistic, markFailed, merge, sendAttachment],
   );
 }

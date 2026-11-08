@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { chatProfiles, directKeyFor, type ChatProfile } from "@/lib/chat/profile";
 import { blockSetsFor, ChatError, isStaff, type ChatUser } from "@/lib/chat/access";
 import { limitNewDirectChats } from "@/lib/chat/rate-limit";
+import { describePresence, isOnline, lastActivityFor } from "@/lib/chat/presence";
 
 /**
  * Contacts and conversations.
@@ -108,10 +109,23 @@ export async function listContacts(
 
   const profiles = await chatProfiles(page.map((row) => row.id));
 
+  /*
+   * Presence is read here as well as pushed over the socket. Without this the list paints
+   * everybody as offline until the first socket event arrives, which reads as an empty school
+   * on first load and makes the dots look broken.
+   */
+  const activity = await lastActivityFor(page.map((row) => row.id));
+  const hidden = await hiddenPresenceAmong(page.map((row) => row.id));
+
   const contacts = page.map((row) => {
     const profile = profiles.get(row.id)!;
+    const seen = activity.get(row.id) ?? null;
+    const maySee = !hidden.has(row.id);
+    const online = isOnline(row.id, seen, maySee);
     return {
       ...profile,
+      online,
+      ...(maySee ? { statusText: describePresence(online, seen, false) } : {}),
       ...(ambiguous.has(row.fullName) && row.campusName
         ? { campusHint: row.campusName }
         : {}),
@@ -119,6 +133,21 @@ export async function listContacts(
   });
 
   return { rows: contacts, nextCursor: hasMore ? cursor + limit : null };
+}
+
+/**
+ * Which of these people have hidden their presence.
+ *
+ * Someone who has switched "show last seen" off is reported offline to everyone else. They still
+ * see other people's dots — the asymmetry is what makes switching it on mean anything.
+ */
+export async function hiddenPresenceAmong(userIds: string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const rows = await prisma.user.findMany({
+    where: { id: { in: userIds }, showLastSeen: false },
+    select: { id: true },
+  });
+  return new Set(rows.map((row) => row.id));
 }
 
 /** The size of the phonebook, for the contacts header. */
@@ -330,6 +359,10 @@ export async function listMessages(
       clientMessageId: true,
       replyToId: true,
       receipts: { select: { userId: true, readAt: true, deliveredAt: true } },
+      attachments: {
+        where: { deletedAt: null },
+        select: { id: true, fileName: true, contentType: true, sizeBytes: true, expiresAt: true },
+      },
     },
   });
 
@@ -355,6 +388,7 @@ export async function listMessages(
       editedAt: row.editedAt,
       clientMessageId: row.clientMessageId,
       replyToId: row.replyToId,
+      attachments: row.attachments,
       receipts: row.receipts,
     })),
     nextCursor: hasMore ? page[0].id : null,
