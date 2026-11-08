@@ -92,7 +92,11 @@ export async function enrolStudent(formData: FormData) {
 
     // Admissions run every month while intakes are only January, May and September, so the
     // date the student actually reported is recorded separately from the intake they join.
-    const admissionDate = dateField(formData, "admissionDate") ?? new Date();
+    //
+    // No `?? new Date()` here: an omitted date is genuinely unknown, and defaulting it to
+    // today is what stamped a January intake with a November date. The intake's own start is
+    // the truthful fallback, applied once where the date is actually used.
+    const admissionDate = dateField(formData, "admissionDate");
 
     // A class is a grouping. The placement below is the academic position, and the two are
     // recorded independently: a February joiner can sit in a January class at Semester 2.

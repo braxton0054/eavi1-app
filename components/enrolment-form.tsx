@@ -325,13 +325,11 @@ export function EnrolmentForm({
           <Field label="Admission number (blank = auto)">
             <input name="admissionNo" className={inputCls} />
           </Field>
-          <Field label="Admission date">
-            <input
-              type="date"
-              name="admissionDate"
-              defaultValue={new Date().toISOString().slice(0, 10)}
-              className={inputCls}
-            />
+          {/* No default. Pre-filling today silently stamped a January intake with the
+              day the clerk happened to type the form, which then made every bill for that
+              student look months overdue. Blank means "use the intake's own start". */}
+          <Field label="Admission date (blank = intake start)">
+            <input type="date" name="admissionDate" className={inputCls} />
           </Field>
           <Field label="Official intake">
             <select name="intakeId" required className={inputCls}>
