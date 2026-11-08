@@ -397,7 +397,70 @@ async function main() {
   }
   check("the same name twice in ONE intake is refused", duplicateRejected);
 
-  console.log("\n8. A class letter splits one intake into teaching groups");
+  console.log("\n8. A closed intake is still joinable by a transfer or returning student");
+
+  /*
+   * The admission form once listed only intakes whose application deadline had not passed. That is
+   * right for new applications and wrong for the two students who legitimately join a cohort that
+   * is already running or over: a transfer placed into the intake matching what they have already
+   * studied, and a returning student resuming with the group they began in.
+   */
+  const closedIntake = await prisma.intake.create({
+    data: {
+      name: "Closed January intake",
+      campusId: campus.id,
+      year: 2025,
+      month: 1,
+      startsAt: new Date(Date.UTC(2025, 0, 6)),
+      // Deliberately in the past: this cohort has already started and its applications closed.
+      applicationDeadline: new Date(Date.UTC(2024, 11, 20)),
+      commenceAt: new Date(Date.UTC(2025, 0, 6)),
+    },
+  });
+  check(
+    "a past-deadline intake still exists to be joined",
+    closedIntake.applicationDeadline < new Date(),
+  );
+
+  // The picker must now return it. Mirrors getIntakeOptions without needing a request scope.
+  const listed = await prisma.intake.findMany({
+    where: { campusId: campus.id },
+    orderBy: [{ year: "desc" }, { month: "desc" }],
+    select: { id: true, month: true, year: true, applicationDeadline: true },
+  });
+  check(
+    "the intake picker lists an intake whose deadline has passed",
+    listed.some((row) => row.id === closedIntake.id),
+    "filtering on applicationDeadline hides it and leaves a transfer unplaceable",
+  );
+  check(
+    "intakes are listed newest first",
+    listed[0].year >= listed[listed.length - 1].year,
+  );
+
+  // An old intake is a valid placement: progression simply reads further along.
+  const { currentPeriod } = await import("@/lib/academics/progression");
+  const early = currentPeriod(
+    { startsAt: closedIntake.startsAt },
+    new Date(Date.UTC(2025, 0, 6)),
+    { totalPeriods: 6, semestersPerYear: 3 },
+  );
+  check(
+    "a student who started in that intake begins at year 1, semester 1",
+    early.yearIndex === 1 && early.semesterNo === 1,
+  );
+  const later = currentPeriod(
+    { startsAt: closedIntake.startsAt },
+    new Date(Date.UTC(2025, 7, 6)),
+    { totalPeriods: 6, semestersPerYear: 3 },
+  );
+  check(
+    "the same intake now reads as a later period, so a transfer can be placed forward",
+    later.yearIndex > 1 || later.semesterNo > 1,
+    `${later.yearIndex}.${later.semesterNo}`,
+  );
+
+  console.log("\n9. A class letter splits one intake into teaching groups");
   check(
     "a lettered name is suggested when a letter is given",
     suggestClassName("ICT", "JANUARY", 2027, "B") === "ICT/JAN/B/2027",
@@ -416,7 +479,7 @@ async function main() {
   );
   check("a name with no letter does not consume one", nextClassLetter(["ICT/JAN/2027"]) === "A");
 
-  console.log("\n9. The class a student is placed in must be of their own intake");
+  console.log("\n10. The class a student is placed in must be of their own intake");
   // This is the query the admission action runs. A January intake must not resolve the May class.
   const resolvesMayForJanuary = await prisma.academicClass.findFirst({
     where: {

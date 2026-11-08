@@ -1459,13 +1459,24 @@ export async function getSemesterOptions() {
 
 export async function getIntakeOptions() {
   const scope = await requireCollegeAdmin();
-  // An intake is open for joining until its application deadline passes. It is no longer
-  // selected by which calendar semester it sits in, because intakes run independently of
-  // the calendar's own term numbering.
+
+  /*
+   * Every intake on the campus, including ones whose application deadline has passed.
+   *
+   * The deadline governs new applications, not whether an existing cohort can still be joined.
+   * Filtering on it hid every earlier intake from the admission form, which broke the two kinds of
+   * student who legitimately join an intake that is already running or already over: a transfer
+   * from another college who is placed into the cohort that matches what they have already
+   * studied, and a returning student who left and is resuming with the group they began with.
+   * For both, the correct intake is behind them, and refusing to list it leaves the clerk unable
+   * to record the truth — the student then gets filed against the current intake and their
+   * progression, fees and class all start in the wrong place.
+   */
   const rows = await prisma.intake.findMany({
-    where: { ...campusWhere(scope.campusId), applicationDeadline: { gte: new Date() } },
-    orderBy: { startsAt: "desc" },
+    where: campusWhere(scope.campusId),
+    orderBy: [{ year: "desc" }, { month: "desc" }],
   });
+
   return rows.map((row) => ({
     value: row.id,
     // Say the month and year, which is how staff refer to a cohort.
