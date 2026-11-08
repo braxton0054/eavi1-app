@@ -162,20 +162,41 @@ export async function enrolStudent(formData: FormData) {
     // A class may be created inline during admission, so the office never has to leave the
     // form to set one up. It always belongs to this programme, campus and intake.
     const className = newClassNameRaw ? normaliseClassName(newClassNameRaw) : null;
+
+    /*
+     * A class is a cohort of ONE programme in ONE intake of ONE year, so all three are part of
+     * what makes a class the right one. Filtering on the programme alone let a January student be
+     * placed in the May class of the same programme by submitting that class's id, which is
+     * exactly the kind of mix-up the intake exists to prevent — and it arrives silently, because
+     * a January student sitting in a May class looks fine on every screen until the marks are
+     * due. The intake and year are checked here, not only in the form that offered the choice.
+     */
     let classRecord = classId
       ? await prisma.academicClass.findFirst({
-          where: { id: classId, campusId, programId, status: "ACTIVE" },
+          where: {
+            id: classId,
+            campusId,
+            programId,
+            intakeId: intake.id,
+            year: intake.year,
+            status: "ACTIVE",
+          },
           select: { id: true, name: true, campusId: true },
         })
       : null;
     if (classId && !classRecord) throw new FieldError(fieldErrors.choice(pages.classes.fields.class));
     if (className) {
+      /*
+       * Scoped to this campus, programme and intake. Scoping to the programme alone meant a name
+       * that already existed in a *different* intake was reused, so typing "ICT/JAN/2026" for a
+       * May joiner could quietly enrol them into the January class.
+       */
       const clash = await prisma.academicClass.findFirst({
-        where: { programId, name: className },
+        where: { programId, campusId, intakeId: intake.id, name: className },
         select: { id: true, campusId: true, name: true, status: true },
       });
       if (clash) {
-        // An existing class of that name is reused rather than duplicated.
+        // An existing class of that name in this same intake is reused rather than duplicated.
         if (clash.status !== "ACTIVE") throw new FieldError(pages.classes.nameTaken);
         classRecord = { id: clash.id, name: clash.name, campusId: clash.campusId };
       } else {

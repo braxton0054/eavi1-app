@@ -66,9 +66,47 @@ export function intakeValueForMonth(month: number): OfficialIntakeValue {
  * A suggested class name following the college convention, e.g. "ICT/JAN/2027". The office
  * may use any name it likes — this only fills the field in for them.
  */
-export function suggestClassName(programCode: string, intake: OfficialIntakeValue, year: number): string {
+export function suggestClassName(
+  programCode: string,
+  intake: OfficialIntakeValue,
+  year: number,
+  letter?: string,
+): string {
   const code = programCode.trim().toUpperCase().slice(0, 6);
-  return `${code}/${intakeShort(intake)}/${year}`;
+  const base = `${code}/${intakeShort(intake)}`;
+  // The letter splits one intake of one programme into several teaching groups: A is the main
+  // class, B takes the late joiners. Omitting it gives the name a single-group intake uses.
+  return letter ? `${base}/${letter.toUpperCase()}/${year}` : `${base}/${year}`;
+}
+
+/**
+ * The class letters, in the order a college adds them.
+ *
+ * A is the main class; B onwards are opened when more students arrive under the same intake than
+ * one group can hold, or when they join after teaching has started. I and O are left out because
+ * they read as one and zero on a register.
+ */
+export const CLASS_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ".split("");
+
+/**
+ * The next free class letter for an intake, so the office is offered "C" when A and B are taken
+ * rather than being left to invent one.
+ *
+ * Letters already used are read from the class names, which is the only place the letter exists —
+ * a class's name is the office's own convention and the letter is part of that name. Returns null
+ * when the alphabet runs out, which means somebody should look at the intake rather than that the
+ * system should pick a fourth character scheme on its own.
+ */
+export function nextClassLetter(existingNames: string[]): string | null {
+  const used = new Set<string>();
+  for (const name of existingNames) {
+    // Matches the letter segment of ICT/JAN/A/2026 style names, in any position.
+    for (const part of name.split("/")) {
+      const cleaned = part.trim().toUpperCase();
+      if (cleaned.length === 1 && CLASS_LETTERS.includes(cleaned)) used.add(cleaned);
+    }
+  }
+  return CLASS_LETTERS.find((letter) => !used.has(letter)) ?? null;
 }
 
 /**

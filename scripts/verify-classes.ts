@@ -5,6 +5,10 @@
  * the grouping and nothing else, a class must never decide a student's stage, and an intake
  * must never be anything but January, May or September.
  *
+ * Sections 7-9 cover the scoping rules: a class belongs to one campus, programme and intake, so
+ * a January student can never be placed in the May class of the same programme, and the same
+ * name may legitimately exist once per intake.
+ *
  * Run with: npx tsx scripts/verify-classes.ts
  */
 
@@ -42,9 +46,13 @@ let campusIdForCleanup: number | null = null;
 
 async function main() {
   const { prisma } = await import("@/lib/prisma");
-  const { mergeBlockages, OFFICIAL_INTAKES, officialIntakeForDate, suggestClassName } = await import(
-    "@/lib/academics/classes"
-  );
+  const {
+    mergeBlockages,
+    OFFICIAL_INTAKES,
+    officialIntakeForDate,
+    suggestClassName,
+    nextClassLetter,
+  } = await import("@/lib/academics/classes");
 
   const tag = `clsflow-${Date.now()}`;
 
@@ -349,10 +357,12 @@ async function main() {
   }
   check("the database refuses a second open membership", secondRejected);
 
-  console.log("\n7. Classes are per programme, campus, intake and year");
-  let duplicateRejected = false;
-  try {
-    await prisma.academicClass.create({
+  console.log("\n7. A class name is scoped to its campus, programme and intake");
+
+  // The same name in a DIFFERENT intake is a different class and must be allowed: an intake per
+  // year is the norm, and blocking it would stop May 2027 from having its own ICT/A class.
+  const maySameName = await prisma.academicClass
+    .create({
       data: {
         campusId: campus.id,
         programId: program.id,
@@ -361,11 +371,104 @@ async function main() {
         year: 2027,
         name: janClass.name,
       },
+    })
+    .catch(() => null);
+  check(
+    "the same name in another intake is allowed",
+    maySameName !== null,
+    maySameName === null ? "the unique index is still scoped to the programme alone" : "",
+  );
+
+  // ...but a duplicate within one intake is still refused.
+  let duplicateRejected = false;
+  try {
+    await prisma.academicClass.create({
+      data: {
+        campusId: campus.id,
+        programId: program.id,
+        intakeId: januaryIntake.id,
+        intakeMonth: "JANUARY",
+        year: 2027,
+        name: janClass.name,
+      },
     });
   } catch {
     duplicateRejected = true;
   }
-  check("the same class name cannot exist twice in one programme", duplicateRejected);
+  check("the same name twice in ONE intake is refused", duplicateRejected);
+
+  console.log("\n8. A class letter splits one intake into teaching groups");
+  check(
+    "a lettered name is suggested when a letter is given",
+    suggestClassName("ICT", "JANUARY", 2027, "B") === "ICT/JAN/B/2027",
+    suggestClassName("ICT", "JANUARY", 2027, "B"),
+  );
+  check(
+    "without a letter the plain name is kept",
+    suggestClassName("ICT", "JANUARY", 2027) === "ICT/JAN/2027",
+  );
+  check("the first free letter with nothing used is A", nextClassLetter([]) === "A");
+  check("A taken gives B", nextClassLetter(["ICT/JAN/A/2027"]) === "B");
+  check("A and B taken gives C", nextClassLetter(["ICT/JAN/A/2027", "ICT/JAN/B/2027"]) === "C");
+  check(
+    "letters are read in any position and casing",
+    nextClassLetter(["ict/jan/b/2027", "ICT/JAN/A/2027"]) === "C",
+  );
+  check("a name with no letter does not consume one", nextClassLetter(["ICT/JAN/2027"]) === "A");
+
+  console.log("\n9. The class a student is placed in must be of their own intake");
+  // This is the query the admission action runs. A January intake must not resolve the May class.
+  const resolvesMayForJanuary = await prisma.academicClass.findFirst({
+    where: {
+      id: maySameName?.id ?? "none",
+      campusId: campus.id,
+      programId: program.id,
+      intakeId: januaryIntake.id,
+      year: januaryIntake.year,
+      status: "ACTIVE",
+    },
+    select: { id: true },
+  });
+  check(
+    "a May class does not resolve for a January student",
+    resolvesMayForJanuary === null,
+    "scoping the lookup to the programme alone would accept it",
+  );
+
+  const resolvesOwn = await prisma.academicClass.findFirst({
+    where: {
+      id: janClass.id,
+      campusId: campus.id,
+      programId: program.id,
+      intakeId: januaryIntake.id,
+      year: januaryIntake.year,
+      status: "ACTIVE",
+    },
+    select: { id: true },
+  });
+  check("a January class does resolve for a January student", resolvesOwn !== null);
+
+  // A class of a different programme must never resolve, whatever the intake.
+  const foreignProgram = await prisma.program.findFirst({
+    where: { archivedAt: null, id: { not: program.id } },
+    select: { id: true },
+  });
+  if (foreignProgram) {
+    const crossProgram = await prisma.academicClass.findFirst({
+      where: {
+        id: janClass.id,
+        campusId: campus.id,
+        programId: foreignProgram.id,
+        intakeId: januaryIntake.id,
+        year: januaryIntake.year,
+        status: "ACTIVE",
+      },
+      select: { id: true },
+    });
+    check("another programme's class never resolves", crossProgram === null);
+  } else {
+    console.log("  skip only one programme in this database, so the cross-programme check is moot");
+  }
 
   console.log(`\n${failures === 0 ? "All checks passed." : `${failures} check(s) failed.`}`);
   await prisma.$disconnect();

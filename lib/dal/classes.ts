@@ -96,9 +96,17 @@ export async function getClasses(filters: {
 }
 
 /** Options for the class picker, including the intake each class belongs to. */
-export async function getClassOptions(campusId: number | null, programId?: string): Promise<
-  { value: string; label: string; programId: string }[]
-> {
+export type ClassOption = {
+  value: string;
+  label: string;
+  programId: string;
+  /** The intake the class belongs to. The admission form needs it to narrow the list, because
+   *  a class is only valid for the intake its students are joining. */
+  intakeId: string;
+  year: number;
+};
+
+export async function getClassOptions(campusId: number | null, programId?: string): Promise<ClassOption[]> {
   const rows = await prisma.academicClass.findMany({
     where: {
       ...campusWhere(campusId),
@@ -106,14 +114,16 @@ export async function getClassOptions(campusId: number | null, programId?: strin
       ...(programId ? { programId } : {}),
     },
     orderBy: [{ year: "desc" }, { name: "asc" }],
-    select: { id: true, name: true, year: true, programId: true, program: { select: { code: true } } },
+    select: { id: true, name: true, year: true, programId: true, intakeId: true },
   });
 
   return rows.map((row) => ({
     value: row.id,
-    label: `${row.name} · ${row.program.code}`,
+    label: row.name,
     // A class belongs to one programme; the admission form shows only its own programme's.
     programId: row.programId,
+    intakeId: row.intakeId,
+    year: row.year,
   }));
 }
 

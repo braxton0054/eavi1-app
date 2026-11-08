@@ -1076,9 +1076,13 @@ model AcademicClass {
 
   conversation Conversation?
 
-  @@unique([programId, name])
+  /// A name identifies a class within one campus, programme and intake. Scoping it to the
+  /// programme alone blocked the same name in a different intake, and let an intake's class be
+  /// found under a name that belonged to another.
+  @@unique([campusId, programId, intakeId, name])
   @@index([campusId, year, status])
   @@index([intakeId])
+  @@index([programId, intakeId, year])
   @@map("academic_classes")
 }
 

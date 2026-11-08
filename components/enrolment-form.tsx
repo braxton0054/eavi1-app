@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 import { enrolStudent } from "@/lib/actions/college/enrolment";
+import type { ClassOption } from "@/lib/dal/classes";
+import { nextClassLetter } from "@/lib/academics/classes";
 import { genderChoices } from "@/lib/content/apply";
 import { KENYA_COUNTIES } from "@/lib/data/kenya-locations";
 
@@ -117,8 +119,8 @@ export function EnrolmentForm({
   applications?: Application[];
   programs: Option[];
   intakes: Option[];
-  /** Classes already created on this campus, tagged with their programme. */
-  classes?: (Option & { programId?: string })[];
+  /** Classes already created on this campus, tagged with their programme and intake. */
+  classes?: ClassOption[];
   /** Each programme's own academic stages, keyed by programme id. */
   placementsByProgram?: Record<string, Option[]>;
 }) {
@@ -132,8 +134,28 @@ export function EnrolmentForm({
     initialApplication?.program.id ?? programs[0]?.value ?? "",
   );
   const stages = placementsByProgram?.[programId] ?? [];
-  // Only classes of the chosen programme can hold this student.
-  const classChoices = classes.filter((option) => !option.programId || option.programId === programId);
+
+  /* The intake decides the class list as much as the programme does: a class is one programme in
+     one intake, so January's ICT/A and May's ICT/A are different cohorts and one cannot stand in
+     for the other. Held in state so the class list can react to it. */
+  const [intakeId, setIntakeId] = useState<string>(initialApplication ? "" : "");
+
+  /*
+   * Classes the chosen programme teaches in the chosen intake. Empty until an intake is chosen,
+   * because before that there is no cohort to place the student in and offering every class of
+   * the programme would invite exactly the January-into-May mistake this guards against.
+   */
+  const classesInIntake = intakeId
+    ? classes.filter((option) => option.programId === programId && option.intakeId === intakeId)
+    : [];
+  const classChoices = classesInIntake;
+
+  /*
+   * The next free letter for this intake, so the office is offered "B" when A is taken instead of
+   * having to read the list and work it out. Only a hint: they may type any name they like, and a
+   * class without a letter is still valid.
+   */
+  const suggestedLetter = nextClassLetter(classesInIntake.map((option) => option.label));
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [guardians, setGuardians] = useState<Guardian[]>([{ ...emptyGuardian }]);
   const [emergencies, setEmergencies] = useState<Emergency[]>([{ ...emptyEmergency }]);
@@ -332,7 +354,13 @@ export function EnrolmentForm({
             <input type="date" name="admissionDate" className={inputCls} />
           </Field>
           <Field label="Official intake">
-            <select name="intakeId" required className={inputCls}>
+            <select
+              name="intakeId"
+              required
+              value={intakeId}
+              onChange={(event) => setIntakeId(event.target.value)}
+              className={inputCls}
+            >
               <option value="">—</option>
               {intakes.map((i) => (
                 <option key={i.value} value={i.value}>
@@ -346,9 +374,19 @@ export function EnrolmentForm({
             in February joins the January intake — their admission date is kept separately.
           </p>
 
+          {/* Keyed on the programme and intake together: switching either one remounts the
+              select, which clears a class chosen for the previous cohort instead of leaving a
+              now-invalid id selected. */}
           <Field label="Class">
-            <select name="classId" key={`cls-${programId}`} className={inputCls}>
-              <option value="">No class yet</option>
+            <select
+              name="classId"
+              key={`cls-${programId}-${intakeId}`}
+              className={inputCls}
+              disabled={!intakeId}
+            >
+              <option value="">
+                {intakeId ? (classChoices.length ? "No class yet" : "None — create one below") : "Choose an intake first"}
+              </option>
               {classChoices.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -357,7 +395,20 @@ export function EnrolmentForm({
             </select>
           </Field>
           <Field label="Or create a class now">
-            <input name="newClassName" placeholder="ICT/JAN/2027" className={inputCls} />
+            <input
+              name="newClassName"
+              key={`new-${programId}-${intakeId}`}
+              /* Named after the intake's own class list rather than a made-up example, so the
+                 hint is the next letter that really is free. */
+              placeholder={
+                !intakeId
+                  ? "Choose an intake first"
+                  : suggestedLetter
+                    ? `Leave blank unless adding a group — next free letter: ${suggestedLetter}`
+                    : "Type a class name"
+              }
+              className={inputCls}
+            />
           </Field>
 
           <Field label="Academic stage on joining" wide>
