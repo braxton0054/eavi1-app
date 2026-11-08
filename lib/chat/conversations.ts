@@ -341,6 +341,12 @@ export async function listMessages(
   return {
     rows: page.map((row) => ({
       id: row.id,
+      /*
+       * Every message carries its conversation id. The client stores messages in a map keyed by
+       * conversation, so a row without one would be filed under `undefined` and never shown —
+       * which is exactly what happened before this was added.
+       */
+      conversationId,
       body: row.deletedAt ? "" : row.body,
       deleted: Boolean(row.deletedAt),
       senderId: row.senderId,
