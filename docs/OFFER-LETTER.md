@@ -66,6 +66,21 @@ The letter is stamped because it is the document the student presents at the cou
 only because the stamp is ours and the pair cannot be forged in the other direction: anyone can
 check it at `/verify/<token>`.
 
+### Verifying at the counter
+
+`/verify/<token>` answers for both documents, because cards and letters print the same QR and share
+one token space. The token is looked up in both tables and whichever matches decides what the page
+says.
+
+A letter answers in four states: genuine, expired (past its apply-by date), cancelled (`revokedAt`),
+and unrecognised. The genuine page says in words that the letter **is not an offer of admission**
+and that a place is confirmed separately — a green tick alone would read as "this person is
+admitted", which is the one thing the letter must not imply. It also says "an admission letter",
+not "the back of a student card".
+
+Verified: `npm run verify:letters` — 16 checks, including that a letter page never tells the reader
+to scan a student card.
+
 ### Re-issuing keeps the token
 
 `issueLetterForApplication` upserts. A second call never mints a second token, because the first was

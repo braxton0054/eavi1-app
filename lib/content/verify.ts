@@ -1,5 +1,5 @@
 /**
- * Copy for the public card verification page.
+ * Copy for the public verification pages — student cards and admission letters.
  *
  * This page is reached by a stranger scanning a card, with no account and no context, so
  * every sentence has to stand alone. It lives here rather than in the page because the
@@ -38,4 +38,39 @@ export const verify = {
   scannedHint:
     "Point a phone camera at the QR code on the back of a student card to reach this page.",
   dinMissing: "No reference code was supplied.",
+
+  /*
+   * Admission letters. The letter is generated automatically when an applicant submits the public
+   * form, so a check has to distinguish "this really is one of our letters" from "this person has
+   * been admitted" — the letter itself claims only the first.
+   */
+  letter: {
+    title: "Admission letter verification",
+    heading: {
+      valid: "Genuine admission letter",
+      invalid: "Not one of our letters",
+      expired: "This letter has expired",
+      revoked: "This letter was cancelled",
+    },
+    validBody:
+      "This application was received by the institute, and the letter was issued from these records.",
+    // The distinction that matters at a counter: the letter is proof of applying, nothing more.
+    notAdmitted:
+      "This confirms the application only. It is not an offer of admission, and a place is confirmed by the campus office separately.",
+    invalidBody:
+      "No admission letter in the institute's records matches this code. It may be forged or mistyped.",
+    expiredBody:
+      "The application date this letter covers has passed, so it should be treated as out of date.",
+    revokedBody: "This letter was cancelled by the institute and must not be accepted.",
+    labels: {
+      name: "Applicant",
+      reference: "Reference",
+      programme: "Programme applied for",
+      campus: "Campus",
+      issued: "Issued",
+      expires: "Apply by",
+    },
+    scannedHint:
+      "Point a phone camera at the QR code on an admission letter to reach this page.",
+  },
 } as const;

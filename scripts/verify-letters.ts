@@ -82,6 +82,57 @@ async function main() {
     data: { revokedAt: null },
   });
 
+  // 7. The verify page a clerk reads. Every state must be distinguishable in words, because the
+  // colour alone is not the message.
+  const base = process.env.VERIFY_BASE ?? "http://localhost:3000";
+  const token = first!.verifyToken;
+  const read = async () => {
+    const r = await fetch(`${base}/verify/${token}`);
+    return r.text();
+  };
+
+  await prisma.offerLetter.update({
+    where: { applicationId: application.id },
+    data: { revokedAt: null, expiresAt: new Date(Date.now() + 30 * 86_400_000) },
+  });
+  const genuine = await read();
+  check("the verify page says the letter is genuine", genuine.includes("Genuine admission letter"));
+  check("it shows the reference", genuine.includes(application.reference));
+  check(
+    "it states the letter is not an offer of admission",
+    genuine.includes("not an offer of admission"),
+  );
+  check(
+    "it does not tell a letter reader to scan a student card",
+    !genuine.includes("back of a student card"),
+  );
+
+  await prisma.offerLetter.update({
+    where: { applicationId: application.id },
+    data: { revokedAt: new Date() },
+  });
+  check("a cancelled letter says so", (await read()).includes("This letter was cancelled"));
+
+  await prisma.offerLetter.update({
+    where: { applicationId: application.id },
+    data: { revokedAt: null, expiresAt: new Date("2020-01-01") },
+  });
+  check("an expired letter says so", (await read()).includes("This letter has expired"));
+
+  await prisma.offerLetter.update({
+    where: { applicationId: application.id },
+    data: { expiresAt: new Date(Date.now() + 30 * 86_400_000) },
+  });
+  check(
+    "a made-up token is not a letter",
+    (await (await fetch(`${base}/verify/definitely-not-a-token`)).text()).includes(
+      "Not one of our letters",
+    ) ||
+      (await (await fetch(`${base}/verify/definitely-not-a-token`)).text()).includes(
+        "Not a valid card",
+      ),
+  );
+
   console.log(failures === 0 ? "\nAll admission letter checks passed." : `\n${failures} check(s) failed.`);
   if (failures > 0) process.exitCode = 1;
 }
