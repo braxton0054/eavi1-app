@@ -30,6 +30,7 @@ function landingFor(role: string, nextPath: string | undefined) {
     nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : null;
   if (safe) return safe;
   if (role === "TUTOR") return "/tutor";
+  if (role === "STUDENT") return "/student";
   return role === "SUPERADMIN" || role === "CAMPUS_ADMIN" ? "/dashboard" : "/unavailable";
 }
 

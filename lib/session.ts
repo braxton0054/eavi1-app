@@ -193,3 +193,48 @@ export async function requireTutor(): Promise<TutorScope> {
     campusName: profile.campus.name,
   };
 }
+
+export type StudentScope = {
+  userId: string;
+  fullName: string;
+  email: string;
+  role: "STUDENT";
+  photoUrl: string | null;
+  studentId: string;
+  admissionNo: string;
+  campusId: number;
+  campusName: string;
+};
+
+/**
+ * Reads the session, proves the caller is a student and hands back their student record.
+ *
+ * A student account without a student record is an applicant who registered but has not been
+ * admitted yet: there is no enrolment, no units and nothing to bill, so the portal shows them
+ * their application instead of an empty dashboard. That is refused here rather than by
+ * rendering blank panels, so the screen they see is deliberate.
+ */
+export async function requireStudent(): Promise<StudentScope> {
+  const user = await signedInUser();
+  if (!user) redirect("/login?next=%2Fstudent");
+
+  if (user.role !== "STUDENT") redirect("/unavailable");
+
+  const profile = await prisma.studentProfile.findUnique({
+    where: { userId: user.id },
+    include: { campus: { select: { name: true } } },
+  });
+  if (!profile) redirect("/unavailable?reason=notadmitted");
+
+  return {
+    userId: user.id,
+    fullName: user.fullName,
+    email: user.email,
+    role: "STUDENT",
+    photoUrl: user.photoUrl ?? null,
+    studentId: profile.id,
+    admissionNo: profile.admissionNo,
+    campusId: profile.campusId,
+    campusName: profile.campus.name,
+  };
+}

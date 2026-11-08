@@ -90,6 +90,7 @@ export const shell = {
   allCampuses: "All campuses",
   chooseCampus: "Choose a campus from the College overview to add records here.",
   tutorNote: "Tutor portal",
+  studentNote: "Student portal",
   /** The campus switcher that a super admin works from, shown in the portal header. */
   scopeLabel: "Campus",
   account: {
@@ -200,7 +201,7 @@ export const tutorNavGroups: NavGroup[] = [
 ];
 
 /** The four links the bottom bar of any portal screen carries. */
-export const mobileNav: Record<"admin" | "tutor" | "portal", NavItem[]> = {
+export const mobileNav: Record<"admin" | "tutor" | "portal" | "student", NavItem[]> = {
   portal: [
     { href: "/portal/chat", label: "Chat", icon: "chat" },
   ],
@@ -210,6 +211,12 @@ export const mobileNav: Record<"admin" | "tutor" | "portal", NavItem[]> = {
     { href: "/dashboard/students", label: "Students", icon: "students" },
     { href: "/dashboard/enrollments", label: "Enrollments", icon: "enrollments" },
     { href: "/dashboard/classes", label: "Classes", icon: "students" },
+  ],
+  student: [
+    { href: "/student", label: "Overview", icon: "overview" },
+    { href: "/student/units", label: "Units", icon: "programs" },
+    { href: "/student/fees", label: "Fees", icon: "accounts" },
+    { href: "/student/profile", label: "Details", icon: "profile" },
   ],
   tutor: [
     { href: "/tutor", label: "Today", icon: "overview" },
@@ -2235,4 +2242,137 @@ export const pagination = {
   window: 20,
   label: (page: number, shown: number, total: number) =>
     `Page ${page} · showing ${shown} of ${total}`,
+};
+
+export const studentNavGroups: NavGroup[] = [
+  {
+    id: "study",
+    label: "My studies",
+    items: [
+      { href: "/student", label: "Overview", icon: "overview" },
+      { href: "/student/units", label: "My units", icon: "programs" },
+      { href: "/student/classes", label: "My class", icon: "students" },
+    ],
+  },
+  {
+    id: "account",
+    label: "My account",
+    items: [
+      { href: "/student/fees", label: "Fees", icon: "accounts" },
+      { href: "/student/id", label: "Student card", icon: "cards" },
+      { href: "/student/profile", label: "My details", icon: "profile" },
+    ],
+  },
+];
+
+/**
+ * The student portal. Everything here is read-only and belongs to the signed-in student: a
+ * student never edits marks, fees or their own programme from this side.
+ */
+export const studentPortal = {
+  home: {
+    title: "My dashboard",
+    greeting: "Hello,",
+    description: "Where you are in your programme, what you are studying, and what is due.",
+    noEnrolment: {
+      title: "No enrolment yet",
+      body: "Your account is active but you have not been enrolled on a programme. Visit the admissions office with your acknowledgement letter and they will complete your enrolment.",
+    },
+    course: "My programme",
+    place: "Where I am",
+    year: "Year",
+    semester: "Semester",
+    intake: "Intake",
+    class: "My class",
+    noClass: "Not placed in a class yet",
+    fees: "Fees",
+    balance: "Balance due",
+    cleared: "Fully paid",
+    nextDue: "Next due",
+    noDue: "Nothing due",
+    units: "My units this semester",
+    noUnits: "No units registered for this semester yet.",
+    seeAll: "See all units",
+    seeFees: "See fees",
+    unitCount: "units",
+  },
+  units: {
+    title: "My units",
+    description: "Every unit in your programme, and how you are doing on each.",
+    empty: "Your programme has no units on record yet.",
+    thisSemester: "This semester",
+    other: "Other semesters",
+  },
+  classes: {
+    title: "My class",
+    description: "The class you currently belong to, and any you belonged to before.",
+    current: "Current class",
+    note: "Note",
+    previous: "Previous classes",
+    none: {
+      title: "Not placed in a class",
+      body: "You are enrolled but have not been added to a class group. Your timetable and class chat will appear here once the office places you.",
+    },
+    tutor: "Class tutor",
+    members: "Classmates",
+    room: "Room",
+    joined: "Joined",
+    left: "Left",
+  },
+  fees: {
+    title: "Fees",
+    description: "What you have been billed and what you have paid.",
+    empty: "No fees have been billed to you yet.",
+    total: "Billed",
+    paid: "Paid",
+    balance: "Balance",
+    columns: [
+      { key: "invoice", label: "Invoice" },
+      { key: "period", label: "Period" },
+      { key: "due", label: "Due" },
+      { key: "amount", label: "Amount" },
+      { key: "status", label: "Status" },
+    ] satisfies Column[],
+    paymentsTitle: "Payments received",
+    paymentsEmpty: "No payments recorded yet.",
+    paymentColumns: [
+      { key: "date", label: "Date" },
+      { key: "reference", label: "Reference" },
+      { key: "amount", label: "Amount" },
+    ] satisfies Column[],
+  },
+  id: {
+    title: "Student card",
+    description: "Your campus identity card, and how to check that it is genuine.",
+    none: {
+      title: "No card issued yet",
+      body: "Once your card has been printed and issued it will appear here, with a code anyone can scan to confirm it is genuine.",
+    },
+    issued: "Issued",
+    serial: "Serial",
+    valid: "Valid until",
+    expired: "Expired",
+    check: "Anyone can confirm this card is genuine by scanning the code on it.",
+  },
+  profile: {
+    title: "My details",
+    description: "The information the college holds for you.",
+    admissionNo: "Admission number",
+    campus: "Campus",
+    email: "Email",
+    phone: "Phone",
+    gender: "Gender",
+    dob: "Date of birth",
+    guardian: "Guardian",
+    guardianPhone: "Guardian phone",
+    address: "Address",
+    notSet: "Not recorded",
+    changeNote: "To change any of these details, contact the admissions office.",
+    genderLabel: {
+      MALE: "Male",
+      FEMALE: "Female",
+      OTHER: "Other",
+      UNDECLARED: "Not stated",
+    } as Record<string, string>,
+  },
 };
