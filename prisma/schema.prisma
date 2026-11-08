@@ -214,26 +214,38 @@ model Campus {
 }
 
 model User {
-  id                 String          @id @default(uuid())
+  id                  String               @id @default(uuid())
   /// Stored lowercased so the unique index is effectively case-insensitive.
-  email              String          @unique
-  fullName           String
-  phone              String?
+  email               String               @unique
+  fullName            String
+  phone               String?
   /// The administrator's own picture, shown next to their name in the portal header.
-  photoUrl           String?
-  passwordHash       String
-  role               Role            @default(STUDENT)
-  status             Status          @default(ACTIVE)
-  mustChangePassword Boolean         @default(false)
-  campus             Campus?         @relation(fields: [campusId], references: [id])
-  campusId           Int?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  sessions           Session[]
-  student            StudentProfile?
-  tutor              TutorProfile?
-  announcements      Announcement[]  @relation("AnnouncementAuthor")
-  decisions          Application[]   @relation("ApplicationDecider")
+  photoUrl            String?
+  passwordHash        String
+  role                Role                 @default(STUDENT)
+  status              Status               @default(ACTIVE)
+  mustChangePassword  Boolean              @default(false)
+  /// Presence is opt-out: people can hide when they were last around.
+  showLastSeen        Boolean              @default(true)
+  /// Chat notification preferences, per person rather than per device.
+  hideMessageText     Boolean              @default(false)
+  chatSoundEnabled    Boolean              @default(true)
+  campus              Campus?              @relation(fields: [campusId], references: [id])
+  campusId            Int?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  sessions            Session[]
+  student             StudentProfile?
+  tutor               TutorProfile?
+  announcements       Announcement[]       @relation("AnnouncementAuthor")
+  decisions           Application[]        @relation("ApplicationDecider")
+  conversationMembers ConversationMember[]
+  messages            Message[]            @relation("MessageSender")
+  receipts            MessageReceipt[]
+  blocksIssued        UserBlock[]          @relation("BlockIssuer")
+  blocksReceived      UserBlock[]          @relation("BlockTarget")
+  reports             MessageReport[]      @relation("ReportAuthor")
+  chatRestrictions    ChatRestriction[]    @relation("RestrictedUser")
 
   @@index([role, status])
   @@index([campusId])
@@ -1047,6 +1059,8 @@ model AcademicClass {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
+  conversation Conversation?
+
   @@unique([programId, name])
   @@index([campusId, year, status])
   @@index([intakeId])
@@ -1118,4 +1132,163 @@ model CardBatch {
 
   @@index([campusId, createdAt])
   @@map("card_batches")
+}
+
+/**
+ * ───────────────────────── Chat ─────────────────────────
+ */
+
+/// DIRECT, CLASS or GROUP. A broadcast is not its own kind of conversation: it lands in a
+/// DIRECT thread with the sender, so the recipient can simply reply.
+enum ConversationType {
+  DIRECT
+  CLASS
+  GROUP
+}
+
+/// CLASS rooms default to open posting. STAFF_ONLY is for a class whose tutors want an
+/// announcements-only room, and is the same flag that stops a student posting to it.
+enum PostingMode {
+  ALL_MEMBERS
+  STAFF_ONLY
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
+}
+
+/// One thread. `directKey` is the ordered pair of user ids, so the database itself refuses a
+/// second thread between the same two people no matter how many tabs ask for one.
+model Conversation {
+  id            String           @id @default(uuid())
+  type          ConversationType
+  title         String?
+  /// Set for CLASS rooms only; unique so a class can never have two rooms.
+  classId       String?          @unique
+  academicClass AcademicClass?   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  directKey     String?          @unique
+  postingMode   PostingMode      @default(ALL_MEMBERS)
+  createdById   String?
+  createdAt     DateTime         @default(now())
+  /// Denormalised for ordering the chat list without a join over every message.
+  lastMessageAt DateTime         @default(now())
+
+  members  ConversationMember[]
+  messages Message[]
+
+  @@index([type, lastMessageAt])
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+/// A person's place in a thread. Left (or withdrawn) members keep the row so their read
+/// position and mute state survive a rejoin, and lose access through `leftAt`.
+model ConversationMember {
+  id                String       @id @default(uuid())
+  conversationId    String
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role              MemberRole   @default(MEMBER)
+  joinedAt          DateTime     @default(now())
+  /// The newest message this member has read. Nullable because a new member has read nothing.
+  lastReadMessageId String?
+  /// A muted thread produces no pop-up until this moment passes.
+  mutedUntil        DateTime?
+  leftAt            DateTime?
+
+  @@unique([conversationId, userId])
+  @@index([userId, leftAt])
+  @@map("conversation_members")
+}
+
+model Message {
+  id              String       @id @default(uuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId        String
+  sender          User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  body            String
+  /// The client's own id for optimistic sending: makes a retry after a flaky network land
+  /// once, not twice.
+  clientMessageId String?
+  replyToId       String?
+  replyTo         Message?     @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies         Message[]    @relation("MessageReply")
+  createdAt       DateTime     @default(now())
+  editedAt        DateTime?
+  /// Soft delete. The row stays so reports and the audit trail still resolve.
+  deletedAt       DateTime?
+
+  receipts       MessageReceipt[]
+  messageReports MessageReport[]
+
+  @@unique([senderId, clientMessageId])
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+/// Read and delivery are per person, so a group's double ticks mean "everyone has read it".
+model MessageReceipt {
+  id          String    @id @default(uuid())
+  messageId   String
+  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveredAt DateTime?
+  readAt      DateTime?
+
+  @@unique([messageId, userId])
+  @@index([userId, readAt])
+  @@map("message_receipts")
+}
+
+/// A block is one-directional: the blocker stops the blocked person messaging or finding them.
+model UserBlock {
+  id        String   @id @default(uuid())
+  blockerId String
+  blocker   User     @relation("BlockIssuer", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("BlockTarget", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("user_blocks")
+}
+
+model MessageReport {
+  id         String       @id @default(uuid())
+  messageId  String
+  message    Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  reporterId String
+  reporter   User         @relation("ReportAuthor", fields: [reporterId], references: [id], onDelete: Cascade)
+  reason     String
+  status     ReportStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+
+  @@index([status, createdAt])
+  @@map("message_reports")
+}
+
+/// An admin's decision that someone may not post for a while.
+model ChatRestriction {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation("RestrictedUser", fields: [userId], references: [id], onDelete: Cascade)
+  restrictedUntil DateTime?
+  reason          String
+  byAdminId       String?
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, restrictedUntil])
+  @@map("chat_restrictions")
 }

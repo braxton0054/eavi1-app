@@ -91,6 +91,39 @@ export async function requireCollegeAdmin(): Promise<AdminScope> {
   };
 }
 
+/**
+ * Any signed-in person with a usable account: admin, tutor or student.
+ *
+ * Chat is open to the whole school, so it cannot sit behind `requireCollegeAdmin`, which sends
+ * everyone below admin away. Everything campus-scoped stays on the admin paths; this hands back
+ * only what a shared screen needs to draw its shell.
+ */
+export type PortalScope = {
+  userId: string;
+  fullName: string;
+  email: string;
+  role: "SUPERADMIN" | "CAMPUS_ADMIN" | "TUTOR" | "STUDENT";
+  photoUrl: string | null;
+  campusId: number | null;
+  campusName: string;
+};
+
+export async function requirePortalUser(): Promise<PortalScope> {
+  const user = await signedInUser();
+  if (!user) redirect("/login?next=%2Fportal%2Fchat");
+  if (user.status !== "ACTIVE") redirect("/unavailable");
+
+  return {
+    userId: user.id,
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role as PortalScope["role"],
+    photoUrl: user.photoUrl ?? null,
+    campusId: user.campusId,
+    campusName: user.campus?.name ?? shell.allCampuses,
+  };
+}
+
 /** `where` fragment that keeps every query inside the admin's own campus. */
 export function campusWhere(campusId: number | null) {
   return campusId === null ? {} : { campusId };

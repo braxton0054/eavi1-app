@@ -34,6 +34,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run db:generate && npm run build
+# The chat server, pre-compiled so the runtime needs no TypeScript tooling.
+RUN npm run server:build
 
 # The app: only the traced standalone output plus static assets and public files.
 FROM node:24-slim AS runner
@@ -62,9 +64,20 @@ RUN groupadd --system --gid 1001 nodejs \
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public ./public
+# The custom entry point: Next's own server plus Socket.IO on the same port, built by
+# `npm run server:build` in the builder stage so the image runs plain JavaScript.
+#
+# The full dependency tree comes along rather than a hand-written list of package names. The
+# chat server imports Prisma's driver adapter directly, and Next's standalone tracing does not
+# follow that path — naming each package by hand only moves the failure one package later, as
+# it did for @prisma/driver-adapter-utils, then @prisma/debug, then postgres-array.
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build --chown=nextjs:nodejs /app/server.mjs ./server.mjs
+COPY --from=build --chown=nextjs:nodejs /app/generated ./generated
 USER nextjs
 EXPOSE 3000
-CMD ["node", "server.js"]
+# Not `server.js`: that is Next's standalone server, which has no Socket.IO attached.
+CMD ["node", "server.mjs"]
 
 # Migrations stay out of the app image so it can be minimal and read-only.
 FROM node:24-slim AS migrate

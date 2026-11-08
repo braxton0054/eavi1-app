@@ -1,6 +1,7 @@
 import {
   BookOpenIcon,
   CalendarDaysIcon,
+  MessagesSquareIcon,
   ClipboardListIcon,
   GraduationCapIcon,
   LayoutDashboardIcon,
@@ -31,5 +32,6 @@ export const icons: Record<DashboardIcon, typeof LayoutDashboardIcon> = {
   cards: ReceiptIcon,
   reports: ScrollTextIcon,
   communication: MegaphoneIcon,
+  chat: MessagesSquareIcon,
   profile: UserRoundIcon,
 };

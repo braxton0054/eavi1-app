@@ -45,6 +45,12 @@
   --eavi-band: #5c005c;
   --eavi-band-foreground: #f5f1f8;
   --eavi-band-muted: #dccfe4;
+  /* Verified ticks. The badge is never colour alone — it carries a glyph, a tooltip and an
+     accessible name — but each hue still clears AA on the card as large graphic text. Blue for
+     administrators, gold for tutors, mint for students. */
+  --eavi-tick-admin: #a8cfff; /* 8.06 on --eavi-card */
+  --eavi-tick-tutor: #f2d08a; /* 9.12 */
+  --eavi-tick-student: #a9e6bf; /* 9.31 */
   /* Tooltips and their arrows need a surface that separates from a same-colour page,
      so they keep a deep ink chip rather than a tint of the palette. */
   --eavi-tooltip: #2e0b33;

@@ -20,6 +20,7 @@ export type DashboardIcon =
   | "cards"
   | "reports"
   | "communication"
+  | "chat"
   | "profile";
 
 export type FieldType =
@@ -155,6 +156,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: "/dashboard/reports", label: "Reports", icon: "reports" },
       { href: "/dashboard/communication", label: "Communication", icon: "communication" },
+      { href: "/portal/chat", label: "Chat", icon: "chat" },
     ],
   },
 ];
@@ -198,7 +200,10 @@ export const tutorNavGroups: NavGroup[] = [
 ];
 
 /** The four links the bottom bar of any portal screen carries. */
-export const mobileNav: Record<"admin" | "tutor", NavItem[]> = {
+export const mobileNav: Record<"admin" | "tutor" | "portal", NavItem[]> = {
+  portal: [
+    { href: "/portal/chat", label: "Chat", icon: "chat" },
+  ],
   admin: [
     { href: "/dashboard", label: "Overview", icon: "overview" },
     { href: "/dashboard/applications", label: "Applications", icon: "applications" },
@@ -470,6 +475,11 @@ const profilePhoto = {
 };
 
 export const pages = {
+  chat: {
+    title: "Chat",
+    description:
+      "Message anyone in the school. Find people in Contacts, or pick up a conversation you already started.",
+  },
   overview: {
     title: "Overview",
     scopeNote: (campusName: string) => `Scope: ${campusName}`,
