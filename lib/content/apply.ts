@@ -126,6 +126,9 @@ export const applyPage = {
     tooLong: "That answer is too long. Shorten it and try again.",
     duplicate:
       "That phone number already has an application for this programme. The campus office will call you.",
+    /** Refused by the rate limit, not by anything the applicant typed. */
+    tooMany:
+      "You have sent several applications from this connection. Please wait a little, then try again, or call the campus office.",
   },
   applied: {
     heading: "Application received",

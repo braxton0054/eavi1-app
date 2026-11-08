@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ApplicationStatus, EntryGrade, Gender } from "@/generated/prisma/enums";
+import { limitApplications } from "@/lib/chat/rate-limit";
 import { nextApplicationReference } from "@/lib/actions/college/_shared";
 import { applyPage, genderValues } from "@/lib/content/apply";
 import { assignCampus } from "@/lib/dal/public";
@@ -24,9 +25,36 @@ function refused() {
   return NextResponse.json({ error: applyPage.errors.failed }, { status: 500 });
 }
 
+/**
+ * The caller's address, for rate limiting only.
+ *
+ * Behind Caddy the socket belongs to the proxy, so the forwarding headers are what identify the
+ * applicant. They are caller-supplied and therefore spoofable, which is acceptable here: the
+ * limit exists to stop casual flooding, and a determined attacker who rotates a spoofed header
+ * is bounded by what they can do anyway. Nothing is trusted from this value beyond the counter.
+ */
+function callerAddress(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || request.headers.get("x-real-ip") || "unknown";
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return refused();
+
+  /*
+   * Before any work is done. Each accepted application mints a reference, a verification token
+   * and a stored letter, so an unlimited endpoint is a cheap way to fill the database and bury
+   * the office queue in records nobody submitted.
+   */
+  try {
+    limitApplications(callerAddress(request));
+  } catch {
+    return NextResponse.json(
+      { error: applyPage.errors.tooMany },
+      { status: 429, headers: { "Retry-After": "3600" } },
+    );
+  }
 
   const answers = body as Record<string, unknown>;
 

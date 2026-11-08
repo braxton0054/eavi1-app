@@ -50,6 +50,20 @@ export function limitNewDirectChats(userId: string): void {
   spendToken(`direct:${userId}`, 30, 60 * 60_000);
 }
 
+/**
+ * Public applications from one address.
+ *
+ * The public form and its API need no session, so without a limit a single script can post
+ * thousands of applications, each of which mints a real reference, a real verification token
+ * and a stored letter — filling the database and the office queue with records nobody made.
+ *
+ * Five an hour is generous for a human filling the form once or twice, and far below what a
+ * flood needs. Keyed by IP rather than by email, because the email is chosen by the caller.
+ */
+export function limitApplications(ip: string): void {
+  spendToken(`apply:${ip}`, 5, 60 * 60_000);
+}
+
 /** Test seam: forget every bucket. */
 export function resetRateLimits(): void {
   buckets.clear();

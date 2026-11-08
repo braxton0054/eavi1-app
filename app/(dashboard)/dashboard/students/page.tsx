@@ -40,7 +40,14 @@ export default async function StudentsPage({
       eyebrow: student.admissionNo,
       title: student.user.fullName,
       subtitle: program ? `${program.code} · ${program.name}` : cardCopy.noProgram,
-      avatarUrl: student.profilePhotoUrl,
+      /*
+       * Read through the authenticated thumbnail route, never the storage URL.
+       *
+       * The bucket address is not signed and does not expire, so rendering it in a list hands
+       * every visitor a permanent link to a student's photograph — and bypasses the ownership
+       * check the route enforces. One extra hop keeps the picture inside the portal.
+       */
+      avatarUrl: student.profilePhotoUrl ? `/api/chat/avatar/${student.user.id}` : null,
       avatarAlt: student.user.fullName,
       // No chip at all when no card exists: "None" next to a name says nothing, and the
       // fact line below already says the card has not been issued.
