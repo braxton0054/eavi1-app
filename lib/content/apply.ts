@@ -39,6 +39,34 @@ export const gradeChoices = [
   { value: "E", label: "E" },
 ] satisfies Choice[];
 
+/**
+ * The sentences that explain why a grade does not clear a programme's minimum.
+ *
+ * Kept next to the form copy because the applicant reads them at the moment they are refused, and
+ * a refusal is where an applicant decides whether to bother with this college at all. So it says
+ * what is wrong, what they could do about it, and where to go next — in that order.
+ */
+export const applyGrade = {
+  /** Shown under the grade field when the chosen programme needs better. */
+  belowMinimum: (theirs: string, required: string) =>
+    `This course asks for KCSE ${required}, and you have ${theirs}.`,
+
+  /** Heading above the list of courses that would take them. */
+  suggestionsHeading: "Courses that accept your grade",
+  suggestionsBody: "Choose one of these and submit again. Your other details stay filled in.",
+
+  /** When their grade does not clear anything on offer. */
+  noneHeading: "No course matches your grade yet",
+  noneBody:
+    "Nothing on offer this term takes your grade. Call the campus office — they can tell you about bridging courses and the next intake.",
+
+  /** Labels for the suggestion list. */
+  requiresMinimum: (grade: string) => `Needs ${grade}`,
+
+  /** The note under the grade field, before anything is submitted. */
+  gradeHint: "Use your KCSE result grade. Each course has a minimum.",
+} as const;
+
 export const applyPage = {
   title: "Apply — East Africa Vision Institute",
   metaDescription:

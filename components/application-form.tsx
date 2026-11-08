@@ -21,7 +21,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { applyPage, genderChoices, gradeChoices, type Choice } from "@/lib/content/apply";
+import {
+  applyGrade,
+  applyPage,
+  genderChoices,
+  gradeChoices,
+  type Choice,
+} from "@/lib/content/apply";
 import { isEmail, normalizeKenyanPhone } from "@/lib/validation";
 
 const EMPTY = {
@@ -43,6 +49,13 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
+  /* Courses their grade does clear, filled in only after a refusal. */
+  const [suggestions, setSuggestions] = useState<
+    { id: string; name: string; minGrade: string }[]
+  >([]);
+  /* True once a refusal has reported that nothing on offer takes their grade. */
+  const [nothingFits, setNothingFits] = useState(false);
+
   const [applied, setApplied] = useState<{
     reference: string;
     campusName: string;
@@ -92,12 +105,20 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
         // would only repeat it and leave them guessing which box to fix.
         if (data.fieldErrors) {
           setErrors({ ...nextErrors, ...data.fieldErrors });
+          // A refusal is only useful if it offers a way forward, so the alternatives the API
+          // returned are kept and drawn as a list they can pick from.
+          if (Array.isArray(data.suggestions)) {
+            setSuggestions(data.suggestions);
+            setNothingFits(data.suggestions.length === 0);
+          }
         } else {
           setFailure(data.error ?? applyPage.errors.failed);
         }
         return;
       }
 
+      setSuggestions([]);
+      setNothingFits(false);
       setApplied({
         reference: data.reference,
         campusName: data.campusName,
@@ -307,6 +328,45 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
               {failure}
             </p>
           )}
+
+          {/*
+            The way forward after a refusal. Each suggestion is a button that picks that
+            programme and submits again, because making an applicant scroll back to a select and
+            find the course by name is the point where they give up instead.
+          */}
+          {suggestions.length > 0 || nothingFits ? (
+            <div
+              role="status"
+              className="rounded-xl border border-border bg-muted/40 px-4 py-3"
+            >
+              <p className="text-sm font-semibold text-foreground">
+                {nothingFits ? applyGrade.noneHeading : applyGrade.suggestionsHeading}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                {nothingFits ? applyGrade.noneBody : applyGrade.suggestionsBody}
+              </p>
+              {suggestions.length > 0 ? (
+                <ul className="mt-3 flex flex-col gap-2">
+                  {suggestions.map((choice) => (
+                    <li key={choice.id}>
+                      <button
+                        type="button"
+                        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 text-left text-sm font-medium"
+                        onClick={() => {
+                          set("programId", choice.id);
+                        }}
+                      >
+                        <span className="min-w-0">{choice.name}</span>
+                        <span className="shrink-0 text-xs font-normal text-muted-foreground">
+                          {applyGrade.requiresMinimum(choice.minGrade)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
 
           <ShimmerButton type="submit" className="mt-1 w-full" disabled={busy}>
             {busy && <Spinner data-icon="inline-start" />}

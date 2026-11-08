@@ -5,6 +5,8 @@ import { nextApplicationReference } from "@/lib/actions/college/_shared";
 import { applyPage, genderValues } from "@/lib/content/apply";
 import { assignCampus } from "@/lib/dal/public";
 import { issueLetterForApplication } from "@/lib/admissions/issue";
+import { checkGrade, gradeLabel, meetsMinimum } from "@/lib/admissions/grade";
+import { applyGrade } from "@/lib/content/apply";
 import { prisma } from "@/lib/prisma";
 import { isEmail, normalizeKenyanPhone } from "@/lib/validation";
 
@@ -65,6 +67,37 @@ export async function POST(request: NextRequest) {
 
   if (Object.keys(fieldErrors).length > 0) {
     return NextResponse.json({ fieldErrors }, { status: 400 });
+  }
+
+  /*
+   * The grade check happens before a place is assigned, because whether they qualify decides
+   * whether there is anything to place them in.
+   *
+   * The applicant picked a programme from a list of every course on offer, so nothing has
+   * confirmed their grade clears that programme's minimum until here. Rather than a bare refusal,
+   * the programmes they *do* qualify for are returned with it: an applicant with a D who is turned
+   * away from a diploma should be handed the certificates that will take them, not left to guess.
+   */
+  const minimum = await prisma.program.findUnique({
+    where: { id: programId },
+    select: { minKcseGrade: true },
+  });
+
+  if (minimum && !meetsMinimum(grade as EntryGrade, minimum.minKcseGrade)) {
+    const { eligible } = await checkGrade(grade as EntryGrade, programId);
+    return NextResponse.json(
+      {
+        fieldErrors: {
+          grade: applyGrade.belowMinimum(gradeLabel(grade as EntryGrade), gradeLabel(minimum.minKcseGrade)),
+        },
+        suggestions: eligible.map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          minGrade: gradeLabel(entry.minGrade),
+        })),
+      },
+      { status: 422 },
+    );
   }
 
   // The campus is not the applicant's choice: the one that teaches the course and still

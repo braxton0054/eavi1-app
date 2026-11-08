@@ -21,7 +21,8 @@
     "verify:chat": "tsx scripts/verify-chat.ts",
     "chat:sweep": "tsx scripts/sweep-chat-attachments.ts",
     "verify:class-rooms": "tsx scripts/verify-class-rooms.ts",
-    "verify:letters": "tsx scripts/verify-letters.ts"
+    "verify:letters": "tsx scripts/verify-letters.ts",
+    "verify:grades": "tsx scripts/verify-grades.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1162.0",
