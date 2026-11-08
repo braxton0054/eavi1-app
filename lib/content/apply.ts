@@ -101,10 +101,18 @@ export const applyPage = {
   },
   applied: {
     heading: "Application received",
-    body: "Keep this reference — the campus office uses it when they reach you.",
+    body: "Download your admission letter now and keep it safe — it is your proof that you applied, and you will need it when you enrol.",
     reference: "Your reference",
     campus: "You report to",
+    letter: {
+      button: "Download your admission letter",
+      downloading: "Preparing your letter…",
+      note: "The letter holds your fees, your programme requirements and a bursary form. Keep the file, or print it and bring it with you.",
+      failed: "Your letter could not be prepared just now. Try again, or show the office your reference above.",
+      missing: "Your letter is being prepared. Show the office your reference above and ask them to print it.",
+    },
     steps: [
+      "Download and keep your admission letter.",
       "The campus office checks your details.",
       "They call you on the number you gave.",
       "Admission runs every month, so a place can be confirmed in the same month.",

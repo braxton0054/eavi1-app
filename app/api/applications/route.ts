@@ -4,6 +4,7 @@ import { ApplicationStatus, EntryGrade, Gender } from "@/generated/prisma/enums"
 import { nextApplicationReference } from "@/lib/actions/college/_shared";
 import { applyPage, genderValues } from "@/lib/content/apply";
 import { assignCampus } from "@/lib/dal/public";
+import { issueLetterForApplication } from "@/lib/admissions/issue";
 import { prisma } from "@/lib/prisma";
 import { isEmail, normalizeKenyanPhone } from "@/lib/validation";
 
@@ -100,11 +101,24 @@ export async function POST(request: NextRequest) {
         programId,
         campusId: campus.id,
       },
-      select: { reference: true },
+      select: { id: true, reference: true },
     });
 
+    /*
+     * The letter is generated now, not by the office: the applicant downloads it straight away as
+     * proof they applied, and brings it to enrolment. If issuing fails the application still
+     * stands — losing a submitted application to keep a document tidy would be the worse trade.
+     */
+    const letter = await issueLetterForApplication(application.id).catch(() => null);
+
     return NextResponse.json(
-      { reference: application.reference, campusName: campus.name },
+      {
+        reference: application.reference,
+        campusName: campus.name,
+        letterUrl: letter
+          ? `/letter/${encodeURIComponent(letter.reference)}?t=${encodeURIComponent(letter.verifyToken)}`
+          : null,
+      },
       { status: 201 },
     );
   } catch {

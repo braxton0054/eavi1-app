@@ -1,5 +1,9 @@
 ## The admission letter
 
+**Generated automatically on submission.** There is no office approval step: the applicant fills in
+the public form, hits submit, and downloads the letter immediately. That letter is what they bring
+to enrolment as proof they applied.
+
 A four-page A4 document, generated from an application. Nothing is stored as a file: the letter is
 rebuilt each time, so a reprint always matches the terms it was issued on.
 
@@ -36,12 +40,37 @@ process.
 `fee structure — page 1 is 216×279mm, not A4 (210×297mm)`. Scaling silently would print a letter
 whose fee page is subtly wrong; a clear refusal is better.
 
-### Stamping is a decision, not decoration
+### The wording is not "you have been admitted"
 
-`LetterView.stamped` controls whether the signature and stamp are drawn. A signature and an official
-stamp on a PDF are credentials: released generically, they are a forgery template. The letter should
-only carry them when the office actually issues it, and the `OfferLetter` row records who issued it
-and when.
+Because nobody reviews the form before the letter is generated, the letter must not claim that
+anybody admitted the applicant. Anyone can submit the public form with any name — a document saying
+"we are pleased to offer you admission", downloadable without a check, would be both untrue and
+trivial to forge.
+
+So it is headed **ACKNOWLEDGEMENT OF APPLICATION** and states plainly: *"This is a record that your
+application was received. It is not an offer of a place."* It proves the application exists and ties
+it to a reference the office can confirm — which is exactly what an enrolment counter needs.
+
+### Authority comes from the token, not a session
+
+The applicant has no account, so the download is public. `OfferLetter.reference` is sequential
+(`APP/2026/0001`), so the **token** is what makes the letter theirs: `/letter/<reference>?t=<token>`.
+Honouring the reference alone would let anyone walk the range and download other people's letters,
+name and programme included. Verified: reference alone is refused, a wrong token is refused, and one
+applicant's token does not open another's letter.
+
+A wrong reference and a wrong token return the same message on purpose — distinguishing them would
+confirm that a reference exists.
+
+The letter is stamped because it is the document the student presents at the counter. That is safe
+only because the stamp is ours and the pair cannot be forged in the other direction: anyone can
+check it at `/verify/<token>`.
+
+### Re-issuing keeps the token
+
+`issueLetterForApplication` upserts. A second call never mints a second token, because the first was
+already handed to an applicant who may have printed it. `revokedAt` stops a download even with a
+correct token.
 
 ### Known limits
 

@@ -1,7 +1,3 @@
--- AlterTable
-ALTER TABLE "programs" ADD COLUMN     "admissionRequirements" TEXT,
-ADD COLUMN     "bursaryFormUrl" TEXT;
-
 -- CreateTable
 CREATE TABLE "offer_letters" (
     "id" TEXT NOT NULL,
@@ -38,4 +34,10 @@ CREATE UNIQUE INDEX "offer_letters_applicationId_key" ON "offer_letters"("applic
 
 -- AddForeignKey
 ALTER TABLE "offer_letters" ADD CONSTRAINT "offer_letters_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "applications"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "offer_letters" ADD CONSTRAINT "offer_letters_campusId_fkey" FOREIGN KEY ("campusId") REFERENCES "campuses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "offer_letters" ADD CONSTRAINT "offer_letters_programId_fkey" FOREIGN KEY ("programId") REFERENCES "programs"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 

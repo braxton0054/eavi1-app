@@ -209,6 +209,7 @@ model Campus {
   reportingDates  ReportingDate[]
   classes         AcademicClass[]
   cardBatches     CardBatch[]
+  offerLetters    OfferLetter[]
 
   @@map("campuses")
 }
@@ -366,6 +367,7 @@ model Program {
   timetableSlots         TimetableSlot[]
   idCards                IdCard[]
   classes                AcademicClass[]
+  offerLetters           OfferLetter[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
@@ -1385,6 +1387,8 @@ model OfferLetter {
   /// Set when the office withdraws a letter it should not have sent.
   revokedAt       DateTime?
   revokeReason    String?
+  campus          Campus      @relation(fields: [campusId], references: [id])
+  program         Program     @relation(fields: [programId], references: [id])
 
   @@unique([applicationId])
   @@index([campusId, issuedAt])

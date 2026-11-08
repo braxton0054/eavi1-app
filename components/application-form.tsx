@@ -43,7 +43,11 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
-  const [applied, setApplied] = useState<{ reference: string; campusName: string } | null>(null);
+  const [applied, setApplied] = useState<{
+    reference: string;
+    campusName: string;
+    letterUrl: string | null;
+  } | null>(null);
 
   const copy = applyPage.fields;
 
@@ -94,7 +98,11 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
         return;
       }
 
-      setApplied({ reference: data.reference, campusName: data.campusName });
+      setApplied({
+        reference: data.reference,
+        campusName: data.campusName,
+        letterUrl: data.letterUrl ?? null,
+      });
     } catch {
       setFailure(applyPage.errors.failed);
     } finally {
@@ -114,18 +122,18 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
         <CardContent className="flex flex-col gap-6 px-6 pb-6">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-border bg-eavi-plate px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-eavi-plate-muted">
                 {applyPage.applied.reference}
               </p>
-              <p className="text-lg leading-8 font-semibold tracking-wide tabular-nums">
+              <p className="text-lg leading-8 font-semibold tracking-wide text-eavi-plate-ink tabular-nums">
                 {applied.reference}
               </p>
             </div>
             <div className="rounded-xl border border-border bg-eavi-plate px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-eavi-plate-muted">
                 {applyPage.applied.campus}
               </p>
-              <p className="text-lg leading-8 font-semibold">{applied.campusName}</p>
+              <p className="text-lg leading-8 font-semibold text-eavi-plate-ink">{applied.campusName}</p>
             </div>
           </div>
 
@@ -137,6 +145,12 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
               ))}
             </ol>
           </div>
+
+          {/*
+            * The letter is the point of this screen: it is generated at submission and is what the
+            * applicant brings to enrolment, so it sits above "apply again" rather than below it.
+            */}
+          <LetterDownload letterUrl={applied.letterUrl} />
 
           <div className="flex flex-wrap gap-2">
             <ShimmerButton
@@ -301,5 +315,67 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Downloads the admission letter.
+ *
+ * Fetched rather than linked so the wait is visible. The letter is a four-page PDF built on
+ * demand, which takes a few seconds; a plain anchor would look like nothing happened and invite a
+ * second click that starts a second build.
+ */
+function LetterDownload({ letterUrl }: { letterUrl: string | null }) {
+  const [state, setState] = useState<"idle" | "working" | "failed">("idle");
+  const copy = applyPage.applied.letter;
+
+  if (!letterUrl) {
+    return (
+      <p className="rounded-xl border border-border bg-eavi-plate px-4 py-3 text-sm leading-6 text-muted-foreground">
+        {copy.missing}
+      </p>
+    );
+  }
+
+  const download = async () => {
+    setState("working");
+    try {
+      const response = await fetch(letterUrl);
+      if (!response.ok) throw new Error("failed");
+
+      const blob = await response.blob();
+      // The filename comes from the server's Content-Disposition, so the saved file is named
+      // after the reference rather than something generic like "download.pdf".
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const named = /filename="([^"]+)"/.exec(disposition)?.[1];
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = named ?? "Admission-Letter.pdf";
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      // Released on the next tick: revoking synchronously can cancel the download in some browsers.
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+      setState("idle");
+    } catch {
+      setState("failed");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-eavi-border bg-eavi-bg p-4">
+      <ShimmerButton type="button" onClick={download} disabled={state === "working"} className="min-h-11">
+        {state === "working" ? copy.downloading : copy.button}
+      </ShimmerButton>
+      <p className="text-sm leading-6 text-muted-foreground">{copy.note}</p>
+      {state === "failed" ? (
+        <p role="alert" className="text-sm leading-6 font-medium">
+          {copy.failed}
+        </p>
+      ) : null}
+    </div>
   );
 }

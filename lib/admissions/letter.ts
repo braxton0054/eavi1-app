@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { PDFDocument } from "pdf-lib";
 
-import { letterHtml } from "@/components/admissions/letter-html";
+import { letterHtml } from "@/lib/admissions/letter-html";
 import type { LetterView } from "@/components/admissions/offer-letter";
 import { renderHtmlPdf } from "@/lib/print/pdf";
 import { readFile as readStoredFile, storageConfigured } from "@/lib/storage";

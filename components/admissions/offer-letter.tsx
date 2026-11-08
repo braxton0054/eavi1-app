@@ -1,7 +1,13 @@
 import { formatDate } from "@/lib/format";
 
 /**
- * The offer letter, as paper.
+ * The admission letter, as paper.
+ *
+ * This is a **record of application**, not an offer of a place. It is generated automatically the
+ * moment the public form is submitted, with no office review in between, so it cannot honestly
+ * claim that anybody admitted the applicant. What it does is prove the application was received and
+ * tie it to a reference the college can confirm — which is exactly what it must do, since it is the
+ * document a student brings to enrolment.
  *
  * Laid out in millimetres because that is what the sheet is measured in: the same numbers that
  * define A4's margins in a print dialogue define them here, so the preview and the PDF cannot
@@ -92,34 +98,33 @@ function AdmissionPage({ view, assets }: { view: LetterView; assets: LetterAsset
 
       <p className="letter-to">{view.printedName}</p>
 
-      <h1 className="letter-title">LETTER OF ADMISSION</h1>
+      <h1 className="letter-title">ACKNOWLEDGEMENT OF APPLICATION</h1>
 
       <p>
-        We are pleased to inform you that you have been offered admission to the
-        <strong> {view.programName}</strong> ({view.programCode}) at {view.campusName},
-        commencing on <strong>{formatDate(view.startDate)}</strong> in the{" "}
+        This letter confirms that <strong>{view.printedName}</strong> has applied for admission to
+        the <strong>{view.programName}</strong> ({view.programCode}) at {view.campusName} for the{" "}
         {view.intakeLabel}.
       </p>
 
       <p>
-        This offer is made on the basis of the information and qualifications you provided. It is
-        subject to verification of your original certificates at registration. Any offer found to
-        have been obtained on the basis of false information will be withdrawn.
+        <strong>This is a record that your application was received. It is not an offer of a
+        place.</strong> Your application will be reviewed by the campus office, and you will be
+        contacted on the phone number you provided once a decision has been made.
       </p>
 
       <p>
-        Your fees are set out on page 2 of this letter, and the requirements for your programme on
-        page 3. A bursary application form is attached on page 4 for applicants who wish to seek
-        funding.
+        Keep this letter and bring it with you when you report. It is your proof of application, and
+        the reference printed on it is how the office will find your record. Present it at{" "}
+        {view.campusName} for enrolment, together with the documents listed on page 3.
       </p>
 
       <p>
-        Please confirm your acceptance on or before{" "}
-        <strong>{formatDate(view.expiresAt)}</strong>. After this date the place will be
-        released to another applicant.
+        The fees for your programme are set out on page 2, the requirements for your programme on
+        page 3, and a bursary application form on page 4 for applicants who wish to seek funding.
+        Please apply on or before <strong>{formatDate(view.expiresAt)}</strong>.
       </p>
 
-      <p className="letter-signoff-label">Yours faithfully,</p>
+      <p className="letter-signoff-label">Issued by the Office of the Registrar,</p>
 
       {/*
         Signature above the stamped block, with the stamp overlapping it. That is how it reads on
@@ -137,12 +142,16 @@ function AdmissionPage({ view, assets }: { view: LetterView; assets: LetterAsset
           ) : null}
         </div>
         <div className="signoff-rule" />
-        <p className="signoff-name">The Principal</p>
+        <p className="signoff-name">The Registrar</p>
         <p className="signoff-org">East Africa Vision Institute</p>
       </div>
 
       <p className="verify">
         Verify this letter at {view.verificationUrl} · Reference {view.reference}
+      </p>
+      <p className="verify-note">
+        Anyone can check that this letter is genuine at the address above. A letter whose reference
+        does not verify is not one of ours.
       </p>
     </section>
   );
@@ -257,7 +266,7 @@ strong { font-weight: 700; }
 .signoff { margin-top: 2mm; }
 .signature-slot { position: relative; height: 26mm; width: 62mm; }
 .signature { position: absolute; left: 0; top: 0; width: 30mm; height: auto; }
-.stamp { position: absolute; left: 14mm; top: 11mm; width: 46mm; height: auto; opacity: 0.92; }
+.stamp { position: absolute; left: 16mm; top: 13mm; width: 44mm; height: auto; opacity: 0.9; }
 
 .signoff-rule { width: 62mm; border-top: 0.3mm solid #444; margin-bottom: 1.5mm; }
 .signoff-name { margin: 0; font-weight: 700; }
@@ -272,6 +281,13 @@ strong { font-weight: 700; }
   border: 0.3mm solid #999;
   background: #f7f7f7;
   font-size: 10pt;
+}
+
+.verify-note {
+  margin: -2mm 0 0;
+  font-size: 7.5pt;
+  color: #777;
+  text-align: center;
 }
 
 .verify {

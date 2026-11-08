@@ -57,6 +57,10 @@
   --eavi-tooltip-foreground: #f5f1f8; /* 15.53 */
   /* The logo artwork assumes a light plate, so it always keeps one. */
   --eavi-plate: #ffffff;
+  /* Text on a white plate. The page colours are tuned for the purple background, so a white
+     card needs its own ink or it inherits near-white and becomes unreadable. */
+  --eavi-plate-ink: #2b1b33;
+  --eavi-plate-muted: #5d4a66;
   /* Neumorphic lighting. With one purple on every surface, depth has to come from the
      edges: a lit top-left rim and a cast shadow to the bottom-right, so a card reads as
      extruded from the page rather than printed on it. */
@@ -130,6 +134,8 @@
   --color-eavi-tooltip: var(--eavi-tooltip);
   --color-eavi-tooltip-foreground: var(--eavi-tooltip-foreground);
   --color-eavi-plate: var(--eavi-plate);
+  --color-eavi-plate-ink: var(--eavi-plate-ink);
+  --color-eavi-plate-muted: var(--eavi-plate-muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-eavi-display);
