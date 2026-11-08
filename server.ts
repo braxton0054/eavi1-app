@@ -30,7 +30,30 @@ async function main() {
   const handle = app.getRequestHandler();
   await app.prepare();
 
-  const httpServer = createServer((req, res) => handle(req, res));
+  /*
+   * Strip the framework banner at the edge of our own server.
+   *
+   * `poweredByHeader: false` in next.config is set and is honoured by the framework's own
+   * `sendRenderResult` — but in Next 16.4.4 the header still reaches the socket on rendered
+   * HTML and API responses, verified from inside the container against the origin itself.
+   * Rather than wait on that, remove it here: `setHeader` on a response that has not been
+   * written yet means the last writer wins, and the framework writes its headers afterwards.
+   *
+   * Done on the response object *before* handing over, so every path — pages, API routes,
+   * error responses — is covered by one line instead of by remembering it per route.
+   */
+  const httpServer = createServer((req, res) => {
+    const originalWriteHead = res.writeHead;
+    const strip = () => {
+      if (!res.headersSent) res.removeHeader("X-Powered-By");
+    };
+    res.writeHead = function patchedWriteHead(this: typeof res, ...args: never[]) {
+      strip();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (originalWriteHead as any).apply(this, args);
+    } as typeof res.writeHead;
+    handle(req, res);
+  });
 
   const io = new Server(httpServer, {
     /*
