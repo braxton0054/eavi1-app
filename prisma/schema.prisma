@@ -347,6 +347,12 @@ model Program {
   description            String?
   curriculumUrl          String?
   feeStructureUrl        String?
+  /// Requirements printed on page 3 of an offer letter, one per line. Free text so the office
+  /// phrases them in their own words, the same way a class name is theirs to write.
+  admissionRequirements  String?
+  /// The bursary form attached to every offer letter. Null falls back to the college default,
+  /// so a programme only stores its own when it differs.
+  bursaryFormUrl         String?
   campuses               Campus[]                @relation("ProgramCampuses")
   tutors                 TutorProfile[]          @relation("ProgramTutors")
   enrollments            Enrollment[]
@@ -456,6 +462,8 @@ model Application {
   decidedBy             User?             @relation("ApplicationDecider", fields: [decidedById], references: [id])
   decidedAt             DateTime?
   createdAt             DateTime          @default(now())
+  /// The offer letter issued from this application, if any.
+  offerLetter           OfferLetter?
   studentProfile        StudentProfile?
   updatedAt             DateTime          @updatedAt
 
@@ -1343,4 +1351,42 @@ model ClassTutor {
   @@unique([classId, tutorId])
   @@index([tutorId])
   @@map("class_tutors")
+}
+
+/// One admission letter the college has issued.
+///
+/// A row is what makes a letter trustworthy: it records the exact snapshot that was printed, the
+/// reference the applicant quotes, the deadline to accept, and who issued it. Letters are
+/// regenerated from this snapshot rather than stored, so reprinting a year later still shows the
+/// terms the applicant was actually offered — not today's fees.
+model OfferLetter {
+  id              String      @id @default(uuid())
+  /// The number printed on the letter and quoted by the applicant: EAVI/OL/2026/00042.
+  reference       String      @unique
+  /// The unguessable half of the public verification link behind the letter's QR.
+  verifyToken     String      @unique
+  applicationId   String
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  programId       String
+  campusId        Int
+  /// The applicant's name as printed, frozen so a later correction does not rewrite history.
+  printedName     String
+  /// The fee structure and bursary PDFs in force when the letter was issued.
+  feeStructureUrl String?
+  bursaryFormUrl  String?
+  /// The requirements text as printed on page 3.
+  requirements    String?
+  /// How long the applicant has to accept. Printed on the letter and enforced by nothing but
+  /// the office, because admissions run monthly and a late acceptance is a decision.
+  expiresAt       DateTime
+  issuedAt        DateTime    @default(now())
+  issuedById      String?
+  issuedByEmail   String?
+  /// Set when the office withdraws a letter it should not have sent.
+  revokedAt       DateTime?
+  revokeReason    String?
+
+  @@unique([applicationId])
+  @@index([campusId, issuedAt])
+  @@map("offer_letters")
 }

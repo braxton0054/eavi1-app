@@ -126,3 +126,63 @@ export async function renderPdf(options: {
     await browser.close();
   }
 }
+
+/**
+ * Renders a self-contained HTML string to A4.
+ *
+ * Deliberately separate from `renderPdf`: a letter is not a portal page. There is no session to
+ * carry, no running header or footer (the college's own letterhead is the frame), and the markup
+ * is passed in directly rather than fetched, so the letter cannot depend on the app being
+ * reachable — which matters in a container where the print call and the web server may not agree
+ * on an address.
+ *
+ * Images in the markup must already be `data:` URIs. The document is set with `setContent`, which
+ * gives it an opaque origin, so a relative `/letterhead.png` cannot resolve — and fetching from
+ * our own server would make the letter depend on the web server being reachable from inside the
+ * print process, which is exactly the kind of thing that works locally and fails in a container.
+ */
+export async function renderHtmlPdf(html: string): Promise<Buffer> {
+  const executablePath = CANDIDATES.find(Boolean);
+  if (!executablePath) {
+    throw new Error(
+      "No Chromium binary was found. Set CHROMIUM_PATH to the browser used for printing.",
+    );
+  }
+
+  const browser = await chromium.launch({
+    executablePath,
+    args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+    timeout: 20_000,
+  });
+
+  try {
+    const context = await browser.newContext({ viewport: { width: 794, height: 1123 } });
+    const page = await context.newPage();
+    page.setDefaultTimeout(20_000);
+
+    await page.setContent(html, { waitUntil: "load" });
+    await page.emulateMedia({ media: "print" });
+
+    /*
+     * Images are awaited explicitly: `load` fires for the document but not necessarily for
+     * every <img>, and a letter printed before the letterhead decodes comes out blank at the
+     * top — the one part of the page that must never be missing.
+     */
+    await page.waitForFunction(
+      () =>
+        Array.from(document.images).every((img) => img.complete && img.naturalWidth > 0),
+      undefined,
+      { timeout: 10_000 },
+    ).catch(() => undefined);
+
+    const pdf = await page.pdf({
+      printBackground: true,
+      preferCSSPageSize: true,
+      displayHeaderFooter: false,
+    });
+
+    return Buffer.from(pdf);
+  } finally {
+    await browser.close();
+  }
+}
