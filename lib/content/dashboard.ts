@@ -1521,6 +1521,7 @@ export const pages = {
       of: "of",
       intakeDeadline: "Apply by",
       intakeStarts: "Classes start",
+      intakeEnds: "Ends",
       summaryCount: (intakes: number, exams: number, events: number) =>
         [
           intakes ? `${intakes} intake${intakes === 1 ? "" : "s"}` : null,
@@ -1565,17 +1566,48 @@ export const pages = {
         button: "Add intake",
         title: "New intake",
         fields: [
-          { name: "name", label: "Name", type: "text", required: true, placeholder: "May 2026 intake" },
-          { name: "applicationDeadline", label: "Applications close", type: "date", required: true },
+          // Only a super admin sees this; a campus admin is pinned to their own campus.
+          { name: "campusId", label: "Campus", type: "select", required: true, optionKey: "campuses" },
           {
-            name: "commenceAt",
-            label: "Classes start",
+            name: "name",
+            label: "Name",
+            type: "text",
+            required: false,
+            placeholder: "January 2026 intake",
+            hint: "Leave blank to name it after its month and year.",
+          },
+          {
+            name: "startsAt",
+            label: "Intake begins",
             type: "date",
             required: true,
-            hint: "Day one of this cohort's Semester 1. Their semesters count from here.",
+            hint: "Start of January, May or September only. This fixes the intake's month.",
+          },
+          {
+            name: "endsAt",
+            label: "Intake ends",
+            type: "date",
+            required: true,
+            hint: "The last day of this intake. Must fall after the start.",
+          },
+          {
+            name: "applicationDeadline",
+            label: "Applications close",
+            type: "date",
+            required: true,
+            hint: "Soonest a new applicant may no longer choose this intake on the public form.",
           },
         ] satisfies Field[],
         created: "Intake saved.",
+        note:
+          "There are three intakes a year — January, May and September — while admissions run every month. A student admitted in February or March still joins the January intake, so pick the intake they belong to, not the month they applied.",
+        empty: "No intakes recorded for this year yet.",
+        endBeforeStart: "The intake cannot end before it starts.",
+        notAnOfficialMonth:
+          "Intakes start in January, May or September only. Pick a start date in one of those months.",
+        deadlineAfterStart:
+          "Applications must close before the intake begins, otherwise a new applicant is offered a cohort that has already started.",
+        chooseCampus: "Choose a campus before adding an intake — an intake belongs to one campus.",
       },
     },
     events: {

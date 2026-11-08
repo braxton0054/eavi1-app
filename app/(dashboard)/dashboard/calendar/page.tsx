@@ -96,6 +96,13 @@ export default async function CalendarPage({
     (field) => field.name !== "campusId" || collegeAdmin,
   );
 
+  // The intake's own dates, in the order the office reads them: when it runs, then when
+  // applications for it close. The campus field is only offered to a super admin, exactly as
+  // on the semester form, because a campus admin is pinned to their own.
+  const intakeFields = copy.semesters.intake.fields.filter(
+    (field) => field.name !== "campusId" || collegeAdmin,
+  );
+
   /**
    * Order the year by date, not by slot number: an odd term 1 configuration or a missing
    * semester 2 should still read top to bottom as a timeline.
@@ -221,6 +228,62 @@ export default async function CalendarPage({
       ) : null}
 
       {/*
+        Intakes stand on their own, not inside a semester.
+
+        An intake is the thing a student actually joins — January, May or September — and there
+        are three a year while admissions run every month. Filing one under a semester made it look
+        like calendar decoration and meant a campus could not record a May intake without first
+        setting up a semester to hang it on.
+      */}
+      {view.editable ? (
+        <section className="max-w-4xl">
+          <h2 className="font-display text-lg font-semibold tracking-tight">
+            {copy.semesters.intake.button}
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-eavi-muted-text">{copy.semesters.intake.note}</p>
+          {/*
+            What has been recorded, so a saved intake is visible on the page it was created from
+            rather than living only in the database.
+          */}
+          {view.standaloneIntakes.length > 0 ? (
+            <ul className="mt-3 divide-y divide-eavi-border rounded-2xl border border-eavi-border bg-eavi-card">
+              {view.standaloneIntakes.map((intake) => (
+                <li
+                  key={intake.id}
+                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3"
+                >
+                  <span className="font-medium text-eavi-on-bg">{intake.name}</span>
+                  <span className="text-xs text-eavi-muted-text tabular-nums">
+                    {formatDate(intake.startsAt)}
+                    {intake.endsAt ? ` – ${formatDate(intake.endsAt)}` : ""} ·{" "}
+                    {copy.semesters.intakeDeadline} {formatDate(intake.applicationDeadline)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-eavi-muted-text">{copy.semesters.intake.empty}</p>
+          )}
+
+          <div className="mt-3">
+            <DisclosureForm
+              id="new-intake"
+              button={copy.semesters.intake.button}
+              title={copy.semesters.intake.title}
+              fields={intakeFields}
+              options={options}
+              values={{}}
+              // The campus being viewed, not inferred: a super admin reading one campus must
+              // file the intake against that campus, and the action cannot see which one.
+              hidden={{ campusId: String(view.campusId) }}
+              action={createIntake}
+              submitLabel={common.create}
+            />
+          </div>
+        </section>
+      ) : null}
+
+      {/*
         The year reads as a timeline: semesters in date order, the one running today open,
         the rest folded to a single line. An empty section costs nothing instead of four
         "no events" headings, so a quiet year is short and a busy one is readable.
@@ -324,6 +387,9 @@ export default async function CalendarPage({
                                     {semesterCopy.intakeDeadline}{" "}
                                     {formatDate(intake.applicationDeadline)} ·{" "}
                                     {semesterCopy.intakeStarts} {formatDate(intake.commenceAt)}
+                                    {intake.endsAt
+                                      ? ` · ${semesterCopy.intakeEnds} ${formatDate(intake.endsAt)}`
+                                      : ""}
                                   </span>
                                 </li>
                               ))}

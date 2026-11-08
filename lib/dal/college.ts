@@ -962,7 +962,7 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year, 11, 31, 23, 59, 59);
 
-  const [semesters, collegeEvents, cards] = await Promise.all([
+  const [semesters, collegeEvents, standaloneIntakes, cards] = await Promise.all([
     prisma.semester.findMany({
       where: { campusId: context.campusId, year },
       orderBy: { semesterNo: "asc" },
@@ -988,6 +988,15 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
     }),
     prisma.calendarEvent.findMany({
       where: { campusId: null, semesterId: null, startsAt: { gte: yearStart, lte: yearEnd } },
+      orderBy: { startsAt: "asc" },
+    }),
+    /*
+     * Intakes are listed in their own right, not only through a semester. An intake is the thing
+     * a student joins and the office now records it straight from this page, so one that belongs
+     * to no semester — which is the normal case — would otherwise be saved and never seen again.
+     */
+    prisma.intake.findMany({
+      where: { campusId: context.campusId, year },
       orderBy: { startsAt: "asc" },
     }),
     prisma.idCard.findMany({
@@ -1029,6 +1038,7 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
     canNext: year < lastYear,
     slots,
     collegeEvents,
+    standaloneIntakes,
   };
 }
 

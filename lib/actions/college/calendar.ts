@@ -20,11 +20,13 @@ import {
 } from "@/lib/actions/college/_shared";
 
 import { startOfDay } from "@/lib/academics/progression";
+import { intakeMeta, intakeValueForMonth, isOfficialIntakeMonth } from "@/lib/academics/classes";
 
 const SEMESTER_STATUSES = Object.keys(SemesterStatus) as (keyof typeof SemesterStatus)[];
 const EVENT_TYPES = Object.keys(CalendarEventType) as (keyof typeof CalendarEventType)[];
 
 const copy = pages.calendar;
+const intakeCopy = copy.semesters.intake;
 
 const fieldLabel = (name: string) =>
   copy.semesters.create.fields.find((field) => field.name === name)?.label ??
@@ -175,39 +177,77 @@ export async function updateSemester(formData: FormData) {
   });
 }
 
+/**
+ * Creates an official intake from its start and end dates.
+ *
+ * The month comes from the START date, because that is what the cohort is: a January intake is
+ * January however long it runs. Deriving it from the commence date — or from the semester the
+ * entry happened to be filed under — is how an intake ended up with a month no class could
+ * match, and the class layer refuses anything but January, May and September.
+ *
+ * The semester is optional now. An intake only ever used it as calendar decoration, and requiring
+ * one meant the college could not record a May or September intake until somebody had first set up
+ * a semester to hang it on.
+ */
 export async function createIntake(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
-    const semesterId = hiddenId(formData, "semesterId", copy.semesters.heading);
-    const semester = await ownSemester(semesterId, scope.campusId);
-    assertNotEnded(semester.endDate);
+    const startRaw = requiredDate(formData, "startsAt", fieldLabel("startsAt"));
+    const endRaw = requiredDate(formData, "endsAt", fieldLabel("endsAt"));
+    const startsAt = startOfDay(startRaw);
+    const endsAt = startOfDay(endRaw);
 
-    const name = requiredText(formData, "name", fieldLabel("name"));
+    if (endsAt.getTime() <= startsAt.getTime()) {
+      throw new FieldError(intakeCopy.endBeforeStart);
+    }
+
+    // The three official months, checked from the start date before anything is written: a
+    // December start would create a cohort the class picker can never place a student in.
+    const month = startsAt.getMonth() + 1;
+    if (!isOfficialIntakeMonth(month)) {
+      throw new FieldError(intakeCopy.notAnOfficialMonth);
+    }
+
+    const name =
+      text(formData, "name")?.trim() ||
+      `${intakeMeta(intakeValueForMonth(month)).name} intake ${startsAt.getFullYear()}`;
+
     const applicationDeadline = requiredDate(
       formData,
       "applicationDeadline",
       fieldLabel("applicationDeadline"),
     );
-    const commenceAt = requiredDate(formData, "commenceAt", fieldLabel("commenceAt"));
-    orderedDates(applicationDeadline, commenceAt);
+    if (applicationDeadline.getTime() > startsAt.getTime()) {
+      throw new FieldError(intakeCopy.deadlineAfterStart);
+    }
 
-    // The intake anchors its cohort's own Semester 1, so it carries its own campus, year and
-    // month. The semester it was advertised in is recorded for the calendar but decides
-    // nothing about where the joining students start.
-    const startsAt = startOfDay(commenceAt);
+    // Optional, and only kept when it really belongs to this admin's campus.
+    const semesterId = text(formData, "semesterId") || null;
+    const semester = semesterId ? await ownSemester(semesterId, scope.campusId) : null;
+    /*
+     * The campus this intake belongs to, in the order that always resolves: the semester it is
+     * filed under, then the campus already in scope, then the field on the form.
+     *
+     * A super admin who has picked a campus in the header is already saying "this campus" for
+     * every screen, so asking them again in this one form would be a second question with the
+     * same answer — and the form does not even offer it in that case.
+     */
+    const campusId =
+      semester?.campusId ?? scope.campusId ?? (await semesterCampusId(scope, formData));
 
     await unique(fieldLabel("name"), () =>
       prisma.intake.create({
         data: {
-          semesterId: semester.id,
-          campusId: semester.campusId,
+          semesterId: semester?.id ?? null,
+          campusId,
           year: startsAt.getFullYear(),
-          month: startsAt.getMonth() + 1,
+          month,
           startsAt,
+          endsAt,
           name,
           applicationDeadline,
-          commenceAt,
+          commenceAt: startsAt,
         },
       }),
     );

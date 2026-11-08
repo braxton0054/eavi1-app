@@ -523,6 +523,9 @@ model Intake {
   month               Int
   /// Day one of THIS intake's Semester 1. Every later period counts from here.
   startsAt            DateTime
+  /// The last day the intake is open for joining. Null on intakes recorded before the calendar
+  /// asked for an end date; the office sets it the next time it edits the intake.
+  endsAt              DateTime?
   applicationDeadline DateTime
   commenceAt          DateTime
   enrollments         Enrollment[]
