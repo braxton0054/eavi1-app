@@ -56,14 +56,26 @@ export async function enrolStudent(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/students", ["/dashboard/students", "/dashboard", "/dashboard/enrollments"], async () => {
-    const applicationId = String(formData.get("applicationId") ?? "");
-    if (!applicationId) throw new FieldError("Application is required.");
+    /*
+     * An application is optional.
+     *
+     * Most students arrive through the public form, but a college also admits walk-ins at the
+     * counter: somebody who applied on paper, transferred in from another college, or simply
+     * turned up with their results. Requiring an application record meant those people could
+     * not be admitted at all, and the clerk was told nothing beyond "wrong format".
+     *
+     * When there is no application the campus comes from the administrator's own scope, and
+     * the details are taken from the form exactly as before.
+     */
+    const applicationId = text(formData, "applicationId");
 
-    const application = await prisma.application.findFirst({
-      where: { id: applicationId, ...(scope.campusId ? { campusId: scope.campusId } : {}) },
-      include: { program: { select: { id: true } } },
-    });
-    if (!application) throw new FieldError("Application not found.");
+    const application = applicationId
+      ? await prisma.application.findFirst({
+          where: { id: applicationId, ...(scope.campusId ? { campusId: scope.campusId } : {}) },
+          include: { program: { select: { id: true } } },
+        })
+      : null;
+    if (applicationId && !application) throw new FieldError("That application is not on file.");
 
     /*
      * Checked before anything is created. A form carrying a photograph with nowhere to put
@@ -76,10 +88,12 @@ export async function enrolStudent(formData: FormData) {
         .filter((value): value is File => value instanceof File && value.size > 0),
     );
 
-    const existing = await prisma.studentProfile.findUnique({ where: { applicationId } });
-    if (existing) throw new FieldError("This application has already been enrolled.");
+    if (applicationId) {
+      const existing = await prisma.studentProfile.findUnique({ where: { applicationId } });
+      if (existing) throw new FieldError("This application has already been enrolled.");
+    }
 
-    const campusId = scope.campusId ?? application.campusId;
+    const campusId = scope.campusId ?? application?.campusId ?? null;
     if (campusId === null) throw new FieldError(fieldErrors.notOnCampus);
 
     const fullName = requiredText(formData, "fullName", "Full name");
@@ -224,10 +238,13 @@ export async function enrolStudent(formData: FormData) {
       }
     }
 
-    const profilePhotoUrl = await maybeUpload(formData.get("profilePhoto"), "profile-photos", applicationId);
-    const birthCertificateUrl = await maybeUpload(formData.get("birthCertificate"), "birth-certificates", applicationId);
-    const primarySchoolDocUrl = await maybeUpload(formData.get("primarySchoolDoc"), "school-docs", applicationId);
-    const secondarySchoolDocUrl = await maybeUpload(formData.get("secondarySchoolDoc"), "school-docs", applicationId);
+    // A walk-in has no application id to file documents under, so the folder is derived from
+    // whichever identifier exists and the upload still lands somewhere it can be found.
+    const folder = applicationId ?? `walkin-${campusId}-${Date.now()}`;
+    const profilePhotoUrl = await maybeUpload(formData.get("profilePhoto"), "profile-photos", folder);
+    const birthCertificateUrl = await maybeUpload(formData.get("birthCertificate"), "birth-certificates", folder);
+    const primarySchoolDocUrl = await maybeUpload(formData.get("primarySchoolDoc"), "school-docs", folder);
+    const secondarySchoolDocUrl = await maybeUpload(formData.get("secondarySchoolDoc"), "school-docs", folder);
 
     await prisma.$transaction(async (tx) => {
       const user = await unique("Email", () =>

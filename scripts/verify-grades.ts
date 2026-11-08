@@ -94,16 +94,33 @@ async function main() {
       none.eligible.every((entry) => entry.meets && gradeRank(entry.minGrade) >= gradeRank("E")),
     );
 
-    // One grade below the floor clears nothing, which is what drives the "no course fits" message.
-    const belowFloor = await checkGrade(
-      ladder[Math.min(gradeRank(lowest.minKcseGrade) + 1, ladder.length - 1)],
-      programmes[0].id,
-    );
-    check(
-      `below the lowest requirement (${gradeLabel(lowest.minKcseGrade)}) there is nothing to suggest`,
-      belowFloor.eligible.length === 0,
-      `${belowFloor.eligible.length} eligible`,
-    );
+    /*
+     * One grade below the floor clears nothing, which is what drives the "no course fits"
+     * message.
+     *
+     * This can only be asserted when some programme asks above E. Once the college lists a
+     * programme that admits E — a certificate, realistically — E is the floor of the ladder
+     * itself, there is no grade below it, and "nothing fits" is unreachable by definition. The
+     * meaningful check then becomes the mirror image: E clears exactly those programmes.
+     */
+    if (gradeRank(lowest.minKcseGrade) < gradeRank("E")) {
+      const belowFloor = await checkGrade(
+        ladder[Math.min(gradeRank(lowest.minKcseGrade) + 1, ladder.length - 1)],
+        programmes[0].id,
+      );
+      check(
+        `below the lowest requirement (${gradeLabel(lowest.minKcseGrade)}) there is nothing to suggest`,
+        belowFloor.eligible.length === 0,
+        `${belowFloor.eligible.length} eligible`,
+      );
+    } else {
+      const atFloor = await checkGrade("E" as EntryGrade, programmes[0].id);
+      check(
+        "the lowest requirement is E, so every programme accepting E is offered and nothing is refused",
+        atFloor.eligible.every((entry) => gradeRank(entry.minGrade) === gradeRank("E")),
+        `${atFloor.eligible.length} eligible`,
+      );
+    }
 
     // 7. Suggestions are genuinely obtainable: every one must admit the grade that earned it.
     const midGrade = highest.minKcseGrade;

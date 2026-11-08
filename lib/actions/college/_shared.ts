@@ -402,7 +402,10 @@ export async function onSave(
   try {
     await work();
   } catch (error) {
-    if (error instanceof FieldError) redirect(`${returnPath}?invalid=1`);
+    if (error instanceof FieldError) {
+      console.error("[FieldError]", returnPath, "::", error.message);
+      redirect(`${returnPath}?invalid=1`);
+    }
     throw error;
   }
 
