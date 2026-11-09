@@ -53,6 +53,20 @@ export function intakeLabel(value: OfficialIntakeValue): string {
   return intakeMeta(value).label;
 }
 
+/**
+ * The one name an intake can have, from the date it starts.
+ *
+ * Three intakes a year, each fixed to a month, so the month and the year are the whole identity:
+ * "May intake 2026". Deriving it means the list can never hold both "May 2026" and "May intake
+ * 2026" for the same window, and nobody has to retype what the date already says. The month is
+ * read from the date rather than passed in, so the name cannot drift from the start date.
+ */
+export function intakeDefaultName(startsAt: Date): string {
+  const month = startsAt.getMonth() + 1;
+  const meta = intakeMeta(intakeValueForMonth(month));
+  return `${meta.name} intake ${startsAt.getFullYear()}`;
+}
+
 /** The enum value for a stored intake month, e.g. 5 becomes "MAY". */
 export function intakeValueForMonth(month: number): OfficialIntakeValue {
   const found = OFFICIAL_INTAKES.find((intake) => intake.month === month);

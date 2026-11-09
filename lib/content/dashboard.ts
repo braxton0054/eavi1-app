@@ -1576,19 +1576,12 @@ export const pages = {
           // Only a super admin sees this; a campus admin is pinned to their own campus.
           { name: "campusId", label: "Campus", type: "select", required: true, optionKey: "campuses" },
           {
-            name: "name",
-            label: "Name",
-            type: "text",
-            required: false,
-            placeholder: "January 2026 intake",
-            hint: "Leave blank to name it after its month and year.",
-          },
-          {
             name: "startsAt",
             label: "Intake begins",
             type: "date",
             required: true,
-            hint: "Start of January, May or September only. This fixes the intake's month.",
+            hint:
+              "The first of January, May or September. The month names the intake: May 2026 becomes \"May intake 2026\".",
           },
           {
             name: "endsAt",

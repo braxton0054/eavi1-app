@@ -19,8 +19,7 @@ import {
   unique,
 } from "@/lib/actions/college/_shared";
 
-import { startOfDay } from "@/lib/academics/progression";
-import { intakeMeta, intakeValueForMonth, isOfficialIntakeMonth } from "@/lib/academics/classes";
+import { intakeDefaultName, isOfficialIntakeMonth } from "@/lib/academics/classes";
 
 const SEMESTER_STATUSES = Object.keys(SemesterStatus) as (keyof typeof SemesterStatus)[];
 const EVENT_TYPES = Object.keys(CalendarEventType) as (keyof typeof CalendarEventType)[];
@@ -193,10 +192,13 @@ export async function createIntake(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
-    const startRaw = requiredDate(formData, "startsAt", fieldLabel("startsAt"));
-    const endRaw = requiredDate(formData, "endsAt", fieldLabel("endsAt"));
-    const startsAt = startOfDay(startRaw);
-    const endsAt = startOfDay(endRaw);
+    /*
+     * Already the exact day that was typed: `requiredDate` pins a date input to UTC midnight,
+     * so passing these through `startOfDay` would shift them again into the server's zone and
+     * store 21:00 the day before in a UTC+3 container.
+     */
+    const startsAt = requiredDate(formData, "startsAt", fieldLabel("startsAt"));
+    const endsAt = requiredDate(formData, "endsAt", fieldLabel("endsAt"));
 
     if (endsAt.getTime() <= startsAt.getTime()) {
       throw new FieldError(intakeCopy.endBeforeStart);
@@ -209,9 +211,16 @@ export async function createIntake(formData: FormData) {
       throw new FieldError(intakeCopy.notAnOfficialMonth);
     }
 
-    const name =
-      text(formData, "name")?.trim() ||
-      `${intakeMeta(intakeValueForMonth(month)).name} intake ${startsAt.getFullYear()}`;
+    /*
+     * The name is decided here, never typed.
+     *
+     * There are exactly three intakes a year, and the month comes from the start date, so
+     * "May intake 2026" is the only thing that intake could be called. Letting an admin retype
+     * it invites "May Intake", "MAY 2026" and "May intake (late)" into the same list for the
+     * same window, which makes every picker and report read differently for the same cohort.
+     * Any `name` posted to this action is ignored rather than trusted.
+     */
+    const name = intakeDefaultName(startsAt);
 
     const applicationDeadline = requiredDate(
       formData,

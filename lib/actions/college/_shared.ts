@@ -50,6 +50,22 @@ export function requiredNumber(formData: FormData, name: string, label: string):
 export function dateField(formData: FormData, name: string): Date | null {
   const raw = text(formData, name);
   if (!raw) return null;
+
+  /*
+   * A date input posts `YYYY-MM-DD`, which is a calendar day and not an instant. Parsed with
+   * `new Date(raw)` it becomes UTC midnight, but the server then runs `startOfDay` in local
+   * time — and in a UTC+3 container that moves UTC midnight back to 21:00 on the *previous*
+   * day. The displayed date survives because every read shifts the same way, but the row is
+   * stored at the wrong instant, and anything comparing it against a date built elsewhere
+   * (a cron sweep, a report in UTC, an export) sees the day before.
+   *
+   * Pinned to UTC midnight here instead, so what is stored is exactly the day that was typed.
+   */
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const exact = new Date(`${raw}T00:00:00.000Z`);
+    return Number.isNaN(exact.getTime()) ? null : exact;
+  }
+
   const value = new Date(raw);
   return Number.isNaN(value.getTime()) ? null : value;
 }
