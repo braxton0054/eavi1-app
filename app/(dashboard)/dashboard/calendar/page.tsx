@@ -96,17 +96,17 @@ export default async function CalendarPage({
   const choiceClass =
     "h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-  // A campus admin is pinned to their own campus, so the campus select is not offered.
-  const semesterFields = copy.semesters.create.fields.filter(
-    (field) => field.name !== "campusId" || collegeAdmin,
-  );
-
-  // The intake's own dates, in the order the office reads them: when it runs, then when
-  // applications for it close. The campus field is only offered to a super admin, exactly as
-  // on the semester form, because a campus admin is pinned to their own.
-  const intakeFields = copy.semesters.intake.fields.filter(
-    (field) => field.name !== "campusId" || collegeAdmin,
-  );
+  /*
+   * No campus field on either form, for anyone.
+   *
+   * Both forms file their record against the campus the page is already showing, which the
+   * header picker and the campus links above have already chosen. Offering the campus a third
+   * time inside the form invited a record to be filed somewhere other than the page you were
+   * looking at — and when the field went in twice the wrong one won, which is how intakes
+   * silently stopped being created. One place decides the campus: the page.
+   */
+  const semesterFields = copy.semesters.create.fields.filter((field) => field.name !== "campusId");
+  const intakeFields = copy.semesters.intake.fields.filter((field) => field.name !== "campusId");
 
   /**
    * Order the year by date, not by slot number: an odd term 1 configuration or a missing
@@ -233,6 +233,8 @@ export default async function CalendarPage({
           fields={semesterFields}
           options={options}
           values={{ year: String(view.year) }}
+          // Same rule as the intake form: the campus is the page's, not a third question.
+          hidden={{ campusId: String(view.campusId) }}
           action={createSemester}
           submitLabel={common.create}
         />
@@ -284,16 +286,9 @@ export default async function CalendarPage({
               fields={intakeFields}
               options={options}
               values={{}}
-              /*
-               * Pinned to the campus being viewed ONLY when the admin cannot choose one.
-               *
-               * A campus admin has no campusId field, so the action needs to be told which campus
-               * the page is showing. A super admin is shown the picker, and posting a hidden
-               * campusId alongside it would send the field twice — `FormData.get` returns the
-               * first, so the hidden value silently overrode whatever campus they picked and the
-               * intake was filed against the wrong one, or refused as already existing there.
-               */
-              hidden={collegeAdmin ? undefined : { campusId: String(view.campusId) }}
+              // Always the campus being viewed. There is no campus field, so this is the only
+              // place the action learns which campus the page is showing.
+              hidden={{ campusId: String(view.campusId) }}
               action={createIntake}
               submitLabel={common.create}
             />
