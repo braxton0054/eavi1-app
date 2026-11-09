@@ -71,9 +71,14 @@ function StepLink({
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; campus?: string; invalid?: string }>;
+  searchParams: Promise<{
+    year?: string;
+    campus?: string;
+    invalid?: string;
+    reason?: string;
+  }>;
 }) {
-  const { year, campus, invalid } = await searchParams;
+  const { year, campus, invalid, reason } = await searchParams;
 
   const view = await getCalendar(year, campus);
   const collegeAdmin = view.campuses.length > 0;
@@ -146,7 +151,13 @@ export default async function CalendarPage({
       <PageHeader title={copy.title} description={copy.description} />
 
       {invalid ? (
-        <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} />
+        <Notice
+          tone="warning"
+          title={common.errorTitle}
+          // The specific refusal when the action sent one back, so the notice names the field
+          // that is wrong instead of telling the admin only that something was.
+          body={reason ? decodeURIComponent(reason) : common.invalidSubmit}
+        />
       ) : null}
 
       {collegeAdmin ? (

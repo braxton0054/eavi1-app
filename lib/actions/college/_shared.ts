@@ -420,7 +420,16 @@ export async function onSave(
   } catch (error) {
     if (error instanceof FieldError) {
       console.error("[FieldError]", returnPath, "::", error.message);
-      redirect(`${returnPath}?invalid=1`);
+      /*
+       * Carry the reason back with the redirect.
+       *
+       * It used to send `?invalid=1` and show one fixed sentence — "Some answers are missing or
+       * in the wrong format" — for every refusal, so an admin who had typed a date in the wrong
+       * order was told something that named no field and suggested nothing to change. The message
+       * already exists and is written for a person; putting it in the URL costs nothing and is
+       * the difference between a form that explains itself and one that just says no.
+       */
+      redirect(`${returnPath}?invalid=1&reason=${encodeURIComponent(error.message)}`);
     }
     throw error;
   }

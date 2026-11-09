@@ -1595,7 +1595,8 @@ export const pages = {
             label: "Applications close",
             type: "date",
             required: true,
-            hint: "Soonest a new applicant may no longer choose this intake on the public form.",
+            hint:
+              "The last day to apply. Must be on or before the start date, because an applicant cannot join a cohort that has already begun.",
           },
         ] satisfies Field[],
         created: "Intake saved.",
@@ -1606,7 +1607,7 @@ export const pages = {
         notAnOfficialMonth:
           "Intakes start in January, May or September only. Pick a start date in one of those months.",
         deadlineAfterStart:
-          "Applications must close before the intake begins, otherwise a new applicant is offered a cohort that has already started.",
+          "Applications close must be on or before the intake begins — otherwise a new applicant would be offered a cohort that has already started. Move the closing date earlier, or start the intake later.",
         chooseCampus: "Choose a campus before adding an intake — an intake belongs to one campus.",
       },
     },
