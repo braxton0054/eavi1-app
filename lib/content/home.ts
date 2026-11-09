@@ -325,8 +325,6 @@ export const footer = {
   socialPending: "Add profile links",
   privacy: "Privacy policy",
   terms: "Terms of use",
-  /** TODO: /privacy and /terms pages do not exist yet. */
-  legalPending: "Pages to write",
   /** {year} is filled in on the client; Cache Components blocks Date at prerender. */
   copyrightTemplate: `© {year} ${site.name}.`,
 } as const;

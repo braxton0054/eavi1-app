@@ -10,6 +10,10 @@ const directionsHref = (place: string) =>
 const linkClass =
   "inline-flex min-h-11 items-center text-sm text-eavi-band-muted underline-offset-4 transition-colors hover:text-eavi-band-foreground hover:underline";
 
+/** The footer's own baseline links: same colour as the copyright, underline on hover. */
+const legalLinkClass =
+  "inline-flex min-h-11 items-center underline-offset-4 transition-colors hover:text-eavi-band-foreground hover:underline";
+
 export function SiteFooter() {
   return (
     <footer className="border-t border-eavi-band-muted/20 bg-eavi-band text-eavi-band-foreground">
@@ -108,12 +112,18 @@ export function SiteFooter() {
           <CopyrightYear template={footer.copyrightTemplate} />
         </p>
         <p className="flex flex-wrap items-center gap-2">
-          <span>{footer.privacy}</span>
+          {/*
+            Real links now that both documents exist. They were placeholders carrying a
+            "pending" badge, which is honest while there is no page to point at and has to go
+            the moment there is one — a privacy notice nobody can open is not a notice.
+          */}
+          <Link href="/privacy" className={legalLinkClass}>
+            {footer.privacy}
+          </Link>
           <span aria-hidden>·</span>
-          <span>{footer.terms}</span>
-          <span className="rounded border border-dashed border-eavi-band-muted/50 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-[0.14em]">
-            {footer.legalPending}
-          </span>
+          <Link href="/terms" className={legalLinkClass}>
+            {footer.terms}
+          </Link>
         </p>
       </div>
     </footer>
