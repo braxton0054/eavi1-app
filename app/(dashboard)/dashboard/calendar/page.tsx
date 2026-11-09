@@ -273,9 +273,16 @@ export default async function CalendarPage({
               fields={intakeFields}
               options={options}
               values={{}}
-              // The campus being viewed, not inferred: a super admin reading one campus must
-              // file the intake against that campus, and the action cannot see which one.
-              hidden={{ campusId: String(view.campusId) }}
+              /*
+               * Pinned to the campus being viewed ONLY when the admin cannot choose one.
+               *
+               * A campus admin has no campusId field, so the action needs to be told which campus
+               * the page is showing. A super admin is shown the picker, and posting a hidden
+               * campusId alongside it would send the field twice — `FormData.get` returns the
+               * first, so the hidden value silently overrode whatever campus they picked and the
+               * intake was filed against the wrong one, or refused as already existing there.
+               */
+              hidden={collegeAdmin ? undefined : { campusId: String(view.campusId) }}
               action={createIntake}
               submitLabel={common.create}
             />

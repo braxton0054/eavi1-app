@@ -10,6 +10,7 @@ import {
   dateField,
   enumField,
   hiddenId,
+  numberField,
   onSave,
   requiredDate,
   requiredNumber,
@@ -52,13 +53,25 @@ function assertNotEnded(endDate: Date) {
  * is ignored; a super admin has no campus of their own, so they name the one being configured.
  */
 async function semesterCampusId(scope: AdminScope, formData: FormData): Promise<number> {
+  /*
+   * A campus admin is pinned to their own campus and never shown the field, so scope is the
+   * whole answer for them. A super admin has no scope campus and is shown a picker; reading the
+   * posted value first is what makes that picker mean anything.
+   */
+  const posted = numberField(formData, "campusId", fieldLabel("campusId"));
+  if (posted !== null) {
+    const campus = await prisma.campus.findUnique({ where: { id: posted }, select: { id: true } });
+    if (!campus) throw new FieldError(fieldErrors.choice(fieldLabel("campusId")));
+    // A campus admin may only ever file against their own campus, whatever was posted.
+    if (scope.campusId !== null && campus.id !== scope.campusId) {
+      throw new FieldError(fieldErrors.choice(fieldLabel("campusId")));
+    }
+    return campus.id;
+  }
+
   if (scope.campusId !== null) return scope.campusId;
 
-  const campusId = requiredNumber(formData, "campusId", fieldLabel("campusId"));
-  const campus = await prisma.campus.findUnique({ where: { id: campusId }, select: { id: true } });
-  if (!campus) throw new FieldError(fieldErrors.choice(fieldLabel("campusId")));
-
-  return campus.id;
+  throw new FieldError(fieldErrors.required(fieldLabel("campusId")));
 }
 
 /** The label a campus admin reads for a slot, generated so nobody types a duplicate. */
@@ -242,8 +255,18 @@ export async function createIntake(formData: FormData) {
      * every screen, so asking them again in this one form would be a second question with the
      * same answer — and the form does not even offer it in that case.
      */
+    /*
+     * The order changed: an explicit choice on the form now beats the campus in scope.
+     *
+     * A campus admin has no campus field, so nothing is posted and their scope decides, as
+     * before. A super admin is *shown* a picker, and preferring the scope cookie meant picking
+     * a campus in this form did nothing — the intake was filed against whichever campus the
+     * header happened to be set to. A value the admin typed must win over an implicit default.
+     */
     const campusId =
-      semester?.campusId ?? scope.campusId ?? (await semesterCampusId(scope, formData));
+      semester?.campusId ??
+      (await semesterCampusId(scope, formData)) ??
+      scope.campusId;
 
     await unique(fieldLabel("name"), () =>
       prisma.intake.create({
