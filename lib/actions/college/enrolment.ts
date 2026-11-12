@@ -2,6 +2,8 @@
 
 import { randomUUID } from "node:crypto";
 
+import { redirect } from "next/navigation";
+
 import { EnrollmentStatus, Role, Status } from "@/generated/prisma/enums";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -16,10 +18,10 @@ import {
   nextAdmissionNo,
   nextCardSerial,
   nextInvoiceNumbers,
-  onSave,
   passwordField,
   phoneField,
   putFile,
+  refresh,
   requiredText,
   text,
   unique,
@@ -55,7 +57,10 @@ function all(formData: FormData, name: string): string[] {
 export async function enrolStudent(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
-  return onSave("/dashboard/students", ["/dashboard/students", "/dashboard", "/dashboard/enrollments"], async () => {
+  const applicationParam = text(formData, "applicationId");
+  const returnPath = `/dashboard/students/enrol${applicationParam ? `?application=${encodeURIComponent(applicationParam)}` : ""}`;
+
+  try {
     /*
      * An application is optional.
      *
@@ -426,5 +431,15 @@ export async function enrolStudent(formData: FormData) {
     if (classRecord) {
       await syncClassConversation(classRecord.id).catch(() => null);
     }
-  });
+  } catch (error) {
+    if (error instanceof FieldError) {
+      console.error("[FieldError]", returnPath, "::", error.message);
+      const sep = returnPath.includes("?") ? "&" : "?";
+      redirect(`${returnPath}${sep}invalid=1&reason=${encodeURIComponent(error.message)}`);
+    }
+    throw error;
+  }
+
+  refresh("/dashboard/students", "/dashboard", "/dashboard/enrollments");
+  redirect("/dashboard/students");
 }

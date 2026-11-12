@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useFormStatus } from "react-dom";
+import { Loader2Icon } from "lucide-react";
 import { enrolStudent } from "@/lib/actions/college/enrolment";
 import type { ClassOption } from "@/lib/dal/classes";
 import { nextClassLetter } from "@/lib/academics/classes";
@@ -49,12 +51,27 @@ function Section({ step, title, hint, children }: { step?: string; title: string
   );
 }
 
-function Field({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
+function Field({ label, children, wide, error }: { label: string; children: ReactNode; wide?: boolean; error?: string }) {
   return (
     <div className={"flex flex-col gap-1.5" + (wide ? " sm:col-span-2" : "")}>
       <label className={labelCls}>{label}</label>
       {children}
+      {error ? <p className="text-xs font-medium text-eavi-destructive">{error}</p> : null}
     </div>
+  );
+}
+
+function EnrolSubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-eavi-fill px-6 text-sm font-medium text-eavi-on-fill disabled:opacity-60"
+    >
+      {pending ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : null}
+      {pending ? "Enrolling student…" : "Complete enrolment"}
+    </button>
   );
 }
 
@@ -128,6 +145,8 @@ export function EnrolmentForm({
   const selectedApp = applications.find((a) => a.id === selectedId) ?? initialApplication ?? null;
 
   const [step, setStep] = useState(1);
+  const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
+  const formRef = useRef<HTMLFormElement>(null);
   // The student's stage depends on the programme, so the list follows the programme picker
   // instead of being fixed to whichever programme was listed first.
   const [programId, setProgramId] = useState<string>(
@@ -160,9 +179,54 @@ export function EnrolmentForm({
   const [guardians, setGuardians] = useState<Guardian[]>([{ ...emptyGuardian }]);
   const [emergencies, setEmergencies] = useState<Emergency[]>([{ ...emptyEmergency }]);
 
+  function validateStepOne(): boolean {
+    const form = formRef.current;
+    if (!form) return true;
+    const fd = new FormData(form);
+    const errors: Record<string, string> = {};
+    const fullName = String(fd.get("fullName") ?? "").trim();
+    const email = String(fd.get("email") ?? "").trim();
+    const program = String(fd.get("programId") ?? "").trim();
+    const intake = String(fd.get("intakeId") ?? "").trim();
+    const password = String(fd.get("password") ?? "");
+    if (!fullName) errors.fullName = "Enter the student's full name.";
+    if (!email) errors.email = "Enter the sign-in email address.";
+    if (!program) errors.programId = "Choose a programme.";
+    if (!intake) errors.intakeId = "Choose the official intake.";
+    if (!password) errors.password = "Enter a temporary password.";
+    else if (password.length < 10) errors.password = "Temporary password must be at least 10 characters.";
+    setStepErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setStep(1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return false;
+    }
+    return true;
+  }
+
+  function goToFamily() {
+    if (validateStepOne()) {
+      setStep(2);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (!validateStepOne()) {
+      event.preventDefault();
+    }
+  }
+
   return (
-    <form action={enrolStudent} className="space-y-5" key={selectedApp?.id ?? "new"}>
+    <form ref={formRef} action={enrolStudent} onSubmit={handleSubmit} className="space-y-5" key={selectedApp?.id ?? "new"} noValidate>
       <input type="hidden" name="applicationId" value={selectedApp?.id ?? ""} />
+
+      {Object.keys(stepErrors).length > 0 ? (
+        <div role="alert" className="rounded-xl border border-eavi-border bg-eavi-warn-soft px-4 py-3 text-sm text-eavi-warn-text">
+          <p className="font-semibold">Some required details are missing.</p>
+          <p className="mt-0.5 opacity-90">Check the highlighted fields below before continuing.</p>
+        </div>
+      ) : null}
 
       {/* Stepper */}
       <ol className="flex items-start gap-2 rounded-2xl border border-eavi-border bg-eavi-card p-3 shadow-eavi-card" aria-label="Enrolment progress">
@@ -227,11 +291,11 @@ export function EnrolmentForm({
       {/* STEP 1 */}
       <div className={step === 1 ? "space-y-5" : "hidden"}>
         <Section step="A" title="Student identity" hint="From the application — review and edit.">
-          <Field label="Full name">
-            <input name="fullName" defaultValue={selectedApp?.fullName ?? ""} required className={inputCls} />
+          <Field label="Full name" error={stepErrors.fullName}>
+            <input name="fullName" defaultValue={selectedApp?.fullName ?? ""} required className={inputCls} aria-invalid={stepErrors.fullName ? true : undefined} />
           </Field>
-          <Field label="Email (sign-in)">
-            <input name="email" type="email" defaultValue={selectedApp?.email ?? ""} required className={inputCls} />
+          <Field label="Email (sign-in)" error={stepErrors.email}>
+            <input name="email" type="email" defaultValue={selectedApp?.email ?? ""} required className={inputCls} aria-invalid={stepErrors.email ? true : undefined} />
           </Field>
           <Field label="Phone">
             <input name="phone" defaultValue={selectedApp?.phone ?? ""} className={inputCls} />
@@ -326,16 +390,17 @@ export function EnrolmentForm({
           <Field label="Previous institution (if transfer)">
             <input name="previousInstitution" className={inputCls} />
           </Field>
-          <Field label="Campus">
-            <input value={selectedApp?.campus?.name ?? ""} readOnly placeholder="Applicant's campus" className={inputCls + " bg-eavi-muted"} />
-          </Field>
-          <Field label="Programme">
+          <Field label="Programme" error={stepErrors.programId}>
             <select
               name="programId"
               value={programId}
-              onChange={(event) => setProgramId(event.target.value)}
+              onChange={(event) => {
+                setProgramId(event.target.value);
+                if (stepErrors.programId) setStepErrors((e) => ({ ...e, programId: "" }));
+              }}
               required
               className={inputCls}
+              aria-invalid={stepErrors.programId ? true : undefined}
             >
               {programs.map((p) => (
                 <option key={p.value} value={p.value}>
@@ -353,13 +418,17 @@ export function EnrolmentForm({
           <Field label="Admission date (blank = intake start)">
             <input type="date" name="admissionDate" className={inputCls} />
           </Field>
-          <Field label="Official intake">
+          <Field label="Official intake" error={stepErrors.intakeId}>
             <select
               name="intakeId"
               required
               value={intakeId}
-              onChange={(event) => setIntakeId(event.target.value)}
+              onChange={(event) => {
+                setIntakeId(event.target.value);
+                if (stepErrors.intakeId) setStepErrors((e) => ({ ...e, intakeId: "" }));
+              }}
               className={inputCls}
+              aria-invalid={stepErrors.intakeId ? true : undefined}
             >
               <option value="">—</option>
               {intakes.map((i) => (
@@ -424,14 +493,25 @@ export function EnrolmentForm({
             A student who completed Semester 1 elsewhere, or who has approved prior credit, can start
             part-way in. The class does not decide this.
           </p>
-          <Field label="Temporary password (min 10 chars)" wide>
-            <input name="password" type="text" required minLength={10} placeholder="Student changes this on first login" className={inputCls} />
+          <Field label="Temporary password (min 10 chars)" wide error={stepErrors.password}>
+            <input
+              name="password"
+              type="text"
+              required
+              minLength={10}
+              placeholder="Student changes this on first login"
+              className={inputCls}
+              aria-invalid={stepErrors.password ? true : undefined}
+              onChange={() => {
+                if (stepErrors.password) setStepErrors((e) => ({ ...e, password: "" }));
+              }}
+            />
           </Field>
           <LocationPicker prefix="address" />
         </Section>
 
         <div className="sticky bottom-0 flex justify-end rounded-2xl border border-eavi-border bg-eavi-card/95 p-3 shadow-eavi-card backdrop-blur">
-          <button type="button" onClick={() => { setStep(2); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-6 text-sm font-medium text-eavi-on-fill">
+          <button type="button" onClick={goToFamily} className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-6 text-sm font-medium text-eavi-on-fill">
             Continue to family →
           </button>
         </div>
@@ -524,9 +604,7 @@ export function EnrolmentForm({
           <button type="button" onClick={() => { setStep(1); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted">
             ← Back
           </button>
-          <button type="submit" className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-6 text-sm font-medium text-eavi-on-fill">
-            Complete enrolment
-          </button>
+          <EnrolSubmitButton />
         </div>
       </div>
     </form>

@@ -4,16 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { EnrolmentForm } from "@/components/enrolment-form";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
-import { shell } from "@/lib/content/dashboard";
+import { common, shell } from "@/lib/content/dashboard";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import Link from "next/link";
 
 export default async function EnrolStudentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ application?: string }>;
+  searchParams: Promise<{ application?: string; invalid?: string; reason?: string }>;
 }) {
-  const { application: applicationId } = await searchParams;
+  const { application: applicationId, invalid, reason } = await searchParams;
   const scope = await requireCollegeAdmin();
 
   const [apps, programOptions, intakeOptions] = await Promise.all([
@@ -93,18 +93,21 @@ export default async function EnrolStudentPage({
       {scope.campusId === null ? (
         <Notice tone="neutral" title="New enrolment" body={shell.chooseCampus} />
       ) : (
-        <Panel>
-          <div className="p-4 sm:p-6">
-            <EnrolmentForm
-              application={selectedApplication}
-              applications={availableApps}
-              programs={programOptions}
-              intakes={intakeOptions}
-              classes={classOptions}
-              placementsByProgram={placementsByProgram}
-            />
-          </div>
-        </Panel>
+        <>
+          {invalid ? <Notice tone="warning" title={common.errorTitle} body={reason || common.invalidSubmit} /> : null}
+          <Panel>
+            <div className="p-4 sm:p-6">
+              <EnrolmentForm
+                application={selectedApplication}
+                applications={availableApps}
+                programs={programOptions}
+                intakes={intakeOptions}
+                classes={classOptions}
+                placementsByProgram={placementsByProgram}
+              />
+            </div>
+          </Panel>
+        </>
       )}
 
       {scope.campusId !== null && !selectedApplication && availableApps.length === 0 && (
