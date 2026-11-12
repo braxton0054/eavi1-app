@@ -154,8 +154,8 @@ export async function maySeeClassRoom(
   });
   if (!academicClass) return false;
 
-  if (viewer.role === "SUPER_ADMIN") return true;
-  if (viewer.role === "ADMIN") return viewer.campusId === null || viewer.campusId === academicClass.campusId;
+  if (viewer.role === "SUPERADMIN") return true;
+  if (viewer.role === "CAMPUS_ADMIN") return viewer.campusId === academicClass.campusId;
 
   if (viewer.role === "TUTOR") {
     const assigned = await prisma.classTutor.findFirst({

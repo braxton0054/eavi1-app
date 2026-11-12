@@ -240,7 +240,7 @@ export async function createIntake(formData: FormData) {
       "applicationDeadline",
       fieldLabel("applicationDeadline"),
     );
-    if (applicationDeadline.getTime() > startsAt.getTime()) {
+    if (applicationDeadline.getTime() > endsAt.getTime()) {
       throw new FieldError(intakeCopy.deadlineAfterStart);
     }
 
