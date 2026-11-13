@@ -52,17 +52,17 @@ export default async function ProgramFeesPage({
     dueOffsetDays: period.dueOffsetDays ?? 0,
   }));
 
-  const semestersPerYear = new Set(calendar.map((semester) => semester.semesterNo)).size || undefined;
+  const periodsPerYear = new Set(calendar.map((period) => period.sequence)).size || undefined;
 
-  const calendarRows: Row[] = calendar.map((semester) => ({
-    id: semester.id,
+  const calendarRows: Row[] = calendar.map((period) => ({
+    id: period.id,
     cells: {
-      name: semester.name,
-      starts: formatDate(semester.startDate),
-      ends: formatDate(semester.endDate),
+      name: period.name,
+      starts: formatDate(period.startsAt),
+      ends: formatDate(period.endsAt),
       status: (
-        <StatusChip tone={semesterTone[semester.status] ?? "neutral"}>
-          {labels.semesterStatus[semester.status]}
+        <StatusChip tone={semesterTone[period.status] ?? "neutral"}>
+          {labels.semesterStatus[period.status]}
         </StatusChip>
       ),
     },
@@ -118,7 +118,7 @@ export default async function ProgramFeesPage({
             initialCadenceId={initialCadenceId}
             initialDuration={initialDuration}
             initialPeriods={initialPeriods}
-            semestersPerYear={semestersPerYear}
+            semestersPerYear={periodsPerYear}
             copy={{
               cadence: feeCopy.cadence,
               duration: feeCopy.duration,

@@ -33,12 +33,11 @@ export default async function ClassDetailPage({
       note: true,
       year: true,
       status: true,
-      intakeMonth: true,
       programId: true,
-      intakeId: true,
+      periodId: true,
       program: { select: { name: true, code: true, structure: true } },
       campus: { select: { name: true } },
-      intake: { select: { name: true, year: true } },
+      period: { select: { name: true, year: true } },
     },
   });
   if (!klass) notFound();
@@ -60,7 +59,7 @@ export default async function ClassDetailPage({
     <div className="space-y-6">
       <PageHeader
         title={klass.name}
-        description={`${klass.program.name} · ${klass.intake.name} ${klass.intake.year} · ${klass.campus.name}`}
+        description={`${klass.program.name} · ${klass.period.name} · ${klass.campus.name}`}
         action={
           <div className="flex flex-wrap gap-2">
             <Link
@@ -87,7 +86,7 @@ export default async function ClassDetailPage({
         <DetailList
           items={[
             { label: copy.fields.program, value: `${klass.program.code} · ${klass.program.name}` },
-            { label: copy.fields.intake, value: `${klass.intake.name} · ${klass.intake.year}` },
+            { label: copy.fields.intake, value: klass.period.name },
             { label: copy.fields.year, value: String(klass.year) },
             {
               label: copy.card.students,

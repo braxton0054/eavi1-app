@@ -26,7 +26,7 @@ export async function getStudentEnrolment() {
     orderBy: { enrolledAt: "desc" },
     include: {
       program: { select: { name: true, code: true, durationMonths: true } },
-      intake: { select: { name: true, year: true, month: true, startsAt: true } },
+      period: { select: { name: true, year: true, month: true, startsAt: true } },
       campus: { select: { name: true } },
       memberships: {
         where: { leftAt: null },

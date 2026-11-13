@@ -27,7 +27,7 @@ import {
   unique,
 } from "@/lib/actions/college/_shared";
 import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
-import { intakeValueForMonth, normaliseClassName } from "@/lib/academics/classes";
+import { normaliseClassName } from "@/lib/academics/classes";
 import { recordAudit } from "@/lib/academics/audit";
 import { registerEnrolmentUnits } from "@/lib/academics/registration";
 import { syncClassConversation } from "@/lib/chat/class-rooms";
@@ -165,7 +165,7 @@ export async function enrolStudent(formData: FormData) {
     // numbers are: it counts rows globally rather than inside the transaction's view.
     const cardSerial = await nextCardSerial();
     const intake = intakeId
-      ? await prisma.intake.findUnique({
+      ? await prisma.academicPeriod.findUnique({
           where: { id: intakeId },
           select: { id: true, campusId: true, startsAt: true, month: true, year: true },
         })
@@ -196,7 +196,7 @@ export async function enrolStudent(formData: FormData) {
             id: classId,
             campusId,
             programId,
-            intakeId: intake.id,
+            periodId: intake.id,
             year: intake.year,
             status: "ACTIVE",
           },
@@ -211,7 +211,7 @@ export async function enrolStudent(formData: FormData) {
        * May joiner could quietly enrol them into the January class.
        */
       const clash = await prisma.academicClass.findFirst({
-        where: { programId, campusId, intakeId: intake.id, name: className },
+        where: { programId, campusId, periodId: intake.id, name: className },
         select: { id: true, campusId: true, name: true, status: true },
       });
       if (clash) {
@@ -223,8 +223,7 @@ export async function enrolStudent(formData: FormData) {
           data: {
             campusId,
             programId,
-            intakeId: intake.id,
-            intakeMonth: intakeValueForMonth(intake.month),
+            periodId: intake.id,
             year: intake.year,
             name: className,
           },
@@ -299,7 +298,7 @@ export async function enrolStudent(formData: FormData) {
         data: {
           studentId: profile.id,
           programId,
-          intakeId: intake.id,
+          periodId: intake.id,
           campusId,
           // The student's own starting stage, which they may have earned elsewhere. It is
           // never derived from the class they were put in.
@@ -342,7 +341,7 @@ export async function enrolStudent(formData: FormData) {
         campusId,
         programId,
         startDate,
-        intakeId: intake.id,
+        periodId: intake.id,
         // Fees begin at the level the student was placed at, not at Year 1. Someone who
         // joins at Semester 3 studied the earlier periods elsewhere, at their own cost.
         from: stage,

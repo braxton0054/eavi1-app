@@ -1,0 +1,5 @@
+# Claude Code (global)
+mkdir -p ~/.claude/skills && unzip ui-ux-designer.skill -d ~/.claude/skills/
+
+# Claude Code (this project only)
+mkdir -p .claude/skills && unzip ui-ux-designer.skill -d .claude/skills/

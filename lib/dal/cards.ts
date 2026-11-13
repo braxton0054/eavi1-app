@@ -60,14 +60,14 @@ type FaceInput = {
   fullName: string;
   email: string;
   guardian: { fullName: string; phone: string | null } | null;
-  intake: { month: number; year: number } | null;
+  period: { month: number; year: number } | null;
   enrollmentProgram: string | null;
 };
 
 /** Fills the artwork's slots from one student's record, and reports what was missing. */
 async function mergeFace(input: FaceInput) {
-  const intakeLabel = input.intake
-    ? `${labels.months[input.intake.month - 1] ?? ""} ${input.intake.year}`.trim()
+  const intakeLabel = input.period
+    ? `${labels.months[input.period.month - 1] ?? ""} ${input.period.year}`.trim()
     : null;
 
   const slots: CardSlots = {
@@ -139,7 +139,7 @@ export async function getCardFace(cardId: string, campusId: number | null) {
             take: 1,
             orderBy: { enrolledAt: "desc" },
             select: {
-              intake: { select: { month: true, year: true } },
+              period: { select: { month: true, year: true } },
               program: { select: { name: true } },
             },
           },
@@ -166,7 +166,7 @@ export async function getCardFace(cardId: string, campusId: number | null) {
     fullName: card.student.user.fullName,
     email: card.student.user.email,
     guardian: card.student.parentGuardians[0] ?? null,
-    intake: enrollment?.intake ?? null,
+    period: enrollment?.period ?? null,
     enrollmentProgram: enrollment?.program.name ?? null,
   });
 
@@ -208,7 +208,7 @@ export async function getCardCandidates(
     target.kind === "student"
       ? { id: target.studentId, ...scope }
       : target.kind === "intake"
-        ? { enrollments: { some: { intakeId: target.intakeId, status: "ACTIVE" as const, ...scope } } }
+        ? { enrollments: { some: { periodId: target.intakeId, status: "ACTIVE" as const, ...scope } } }
         : {
             // Class membership hangs off the enrollment, so the filter crosses that way.
             enrollments: { some: { memberships: { some: { classId: target.classId, leftAt: null } } } },
@@ -228,7 +228,7 @@ export async function getCardCandidates(
         orderBy: { enrolledAt: "desc" },
         select: {
           program: { select: { name: true } },
-          intake: { select: { month: true, year: true } },
+          period: { select: { month: true, year: true } },
           memberships: {
             where: { leftAt: null },
             take: 1,
@@ -247,7 +247,7 @@ export async function getCardCandidates(
       fullName: row.user.fullName,
       programName: enrollment?.program.name ?? null,
       intakeLabel: enrollment
-        ? `${labels.months[enrollment.intake.month - 1] ?? ""} ${enrollment.intake.year}`.trim()
+        ? `${labels.months[enrollment.period.month - 1] ?? ""} ${enrollment.period.year}`.trim()
         : null,
       classLabel: enrollment?.memberships[0]?.class.name ?? null,
       hasPhoto: Boolean(row.profilePhotoUrl),
@@ -331,7 +331,7 @@ export async function issueCard(studentId: string, campusId: number) {
     orderBy: { enrolledAt: "desc" },
     select: {
       programId: true,
-      intake: { select: { startsAt: true } },
+      period: { select: { startsAt: true } },
       program: { select: { durationMonths: true } },
     },
   });
@@ -345,7 +345,7 @@ export async function issueCard(studentId: string, campusId: number) {
       programId: enrollment?.programId ?? null,
       status: "PENDING",
       expiresAt: enrollment
-        ? expiryForProgram(enrollment.intake.startsAt, enrollment.program.durationMonths)
+        ? expiryForProgram(enrollment.period.startsAt, enrollment.program.durationMonths)
         : null,
       remarks: pages.cards.create.autoRemark,
     },

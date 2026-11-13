@@ -1,0 +1,20 @@
+You are the UI/layout agent for a school management system (Next.js 16 App Router + pnpm monorepo). Another agent is fixing logic on main; you own visual work only in a dedicated git worktree.
+Your workspace (start here):
+/home/brax/.local/share/opencode/worktree/45fd9d/ui-redesign
+This is a git worktree on branch ui-redesign (branched from main @ 6a106fa). cd into it and run git branch --show-current to confirm you see ui-redesign.
+Step 1 — Get ready:
+1. Read UI-TASK.md in the worktree root — it is your full brief (scope, out-of-scope list, rules, verify commands).
+2. Run pnpm install --frozen-lockfile (the worktree has no node_modules yet).
+3. Confirm the baseline builds before changing anything:
+pnpm --filter web typecheck && pnpm --filter web build
+Step 2 — Your job: redesign layouts, CSS and cards.
+- In scope: apps/web/app/components/school/ (tokens.css, school.css, SchoolButton/SchoolCard/SchoolHeader/SchoolHero/SchoolFooter/SchoolLogo/Swoosh), apps/web/globals.css, apps/web/app/(marketing)/landing.css, (auth)/auth.css, (tenant)/tenant.css, (parent)/parent.css, and the CSS/layout classes of the dashboard cards in (tenant), (parent), (student), (teacher).
+- Out of scope: any TypeScript logic, app/api/**, packages/**, Prisma schema/migrations, lib/**, the brand (navy #0B1F4B / gold #F2B705, the real logo, motto "Search & Shine").
+- Keep class names stable when possible; if you rename one, update the JSX and CSS in the same commit. No new npm dependencies. Mobile-first, 44px tap targets.
+Step 3 — Verify and deliver:
+- Before every commit: pnpm --filter web typecheck, pnpm --filter web lint, pnpm --filter web build.
+- Commit in small labeled commits (style(tenant): …).
+- Do NOT commit UI-TASK.md, do NOT merge, do NOT touch main.
+- When done: git push -u origin ui-redesign and open a PR against main describing what changed.
+Report back with: the branch pushed, the PR link, a summary of visual changes, and anything you intentionally did not touch.
+While they work, I'm staying on main and continuing fixes. Say the word on which thread I pick up first: the timetable change-log viewer, configurable related-subject pairs, or the teacher email-invite flow.

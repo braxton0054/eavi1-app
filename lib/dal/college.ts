@@ -10,6 +10,7 @@ import { campusWhere, requireCollegeAdmin, type AdminScope } from "@/lib/session
 import { pagination } from "@/lib/content/dashboard";
 import { generatedPeriods, type Structure } from "@/lib/academics/structure";
 import { planningSemesters } from "@/lib/academics/planning";
+import { OFFICIAL_INTAKES } from "@/lib/academics/classes";
 import { syncProgression } from "@/lib/academics/progression-sync";
 
 export type ListQuery = { q?: string; status?: string; page?: number };
@@ -102,18 +103,21 @@ async function overviewFor(campusId: number | null) {
   const billed = money(lineTotals._sum.amount);
   const collected = money(paymentTotals._sum.amount);
 
-  const deadlines = await prisma.intake.findMany({
-    where: { semester: { status: "ACTIVE" }, commenceAt: { gte: now } },
+  const deadlines = await prisma.academicPeriod.findMany({
+    where: {
+      status: { in: ["PLANNED", "ACTIVE"] },
+      startsAt: { gte: now },
+      ...campusWhere(campusId),
+    },
     orderBy: { applicationDeadline: "asc" },
     take: 4,
-    include: { semester: { select: { name: true } } },
   });
 
   const events = await prisma.calendarEvent.findMany({
     where: { OR: [{ campusId: null }, campusId === null ? {} : { campusId }], startsAt: { gte: now } },
     orderBy: { startsAt: "asc" },
     take: 5,
-    include: { semester: { select: { name: true } }, campus: { select: { name: true } } },
+    include: { period: { select: { name: true } }, campus: { select: { name: true } } },
   });
 
   const exams = await prisma.exam.findMany({
@@ -360,7 +364,7 @@ export async function getStudent(id: string) {
           program: {
             select: { name: true, code: true, structure: true, durationMonths: true },
           },
-          intake: { select: { name: true } },
+          period: { select: { name: true } },
           // The whole unit plan with the student's standing, and any attachment stages.
           units: {
             orderBy: [
@@ -411,7 +415,7 @@ export async function getStudent(id: string) {
           // record can leave out periods the student has not reached.
           feePeriod: { select: { sequence: true, label: true, yearIndex: true, semesterNo: true } },
           feePlan: { select: { version: true } },
-          semester: { select: { name: true, startDate: true, endDate: true } },
+          period: { select: { name: true, startsAt: true, endsAt: true } },
         },
       },
       idCards: { orderBy: { createdAt: "desc" }, include: { program: { select: { name: true } } } },
@@ -561,7 +565,7 @@ export async function getEnrollments(query: ListQuery) {
       include: {
         student: { select: { id: true, admissionNo: true, user: { select: { fullName: true } } } },
         program: { select: { name: true, code: true } },
-        intake: { select: { id: true, name: true, startsAt: true } },
+        period: { select: { id: true, name: true, startsAt: true } },
       },
     }),
     prisma.enrollment.count({ where }),
@@ -703,10 +707,19 @@ export async function getProgramFees(programId: string) {
   const [calendar, cadences] = await Promise.all([
     campusId === null
       ? Promise.resolve([])
-      : prisma.semester.findMany({
+      : prisma.academicPeriod.findMany({
           where: { campusId },
-          orderBy: { startDate: "asc" },
-          select: { id: true, year: true, semesterNo: true, name: true, startDate: true, endDate: true, status: true },
+          orderBy: { startsAt: "asc" },
+          select: {
+            id: true,
+            year: true,
+            month: true,
+            sequence: true,
+            name: true,
+            startsAt: true,
+            endsAt: true,
+            status: true,
+          },
         }),
     prisma.feeCadence.findMany({
       orderBy: { name: "asc" },
@@ -914,7 +927,7 @@ export async function getTimetable() {
 /* ------------------------------------------------------------------ calendar */
 
 /** The three semester slots every campus is expected to run inside one calendar year. */
-const SEMESTER_SLOTS = [1, 2, 3] as const;
+
 
 /** How far back a closed year can still be read, and how far ahead one may be planned. */
 const HISTORY_YEARS = 5;
@@ -962,12 +975,11 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year, 11, 31, 23, 59, 59);
 
-  const [semesters, collegeEvents, standaloneIntakes, cards] = await Promise.all([
-    prisma.semester.findMany({
+  const [periods, collegeEvents, cards] = await Promise.all([
+    prisma.academicPeriod.findMany({
       where: { campusId: context.campusId, year },
-      orderBy: { semesterNo: "asc" },
+      orderBy: { month: "asc" },
       include: {
-        intakes: { orderBy: { applicationDeadline: "asc" } },
         exams: {
           orderBy: { date: "asc" },
           select: {
@@ -987,16 +999,7 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
       },
     }),
     prisma.calendarEvent.findMany({
-      where: { campusId: null, semesterId: null, startsAt: { gte: yearStart, lte: yearEnd } },
-      orderBy: { startsAt: "asc" },
-    }),
-    /*
-     * Intakes are listed in their own right, not only through a semester. An intake is the thing
-     * a student joins and the office now records it straight from this page, so one that belongs
-     * to no semester — which is the normal case — would otherwise be saved and never seen again.
-     */
-    prisma.intake.findMany({
-      where: { campusId: context.campusId, year },
+      where: { campusId: null, periodId: null, startsAt: { gte: yearStart, lte: yearEnd } },
       orderBy: { startsAt: "asc" },
     }),
     prisma.idCard.findMany({
@@ -1012,18 +1015,23 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
     }),
   ]);
 
-  // A card belongs to the semester whose window covers the day it was issued.
+  // A card belongs to the period whose window covers the day it was issued.
   const cardsIn = (from: Date, to: Date) =>
     cards.filter((card) => card.issuedAt! >= from && card.issuedAt! <= to);
 
-  const slots = SEMESTER_SLOTS.map((semesterNo) => {
-    const semester = semesters.find((row) => row.semesterNo === semesterNo) ?? null;
+  /*
+   * The three intake months are always shown, created or not, so the office can see at a glance
+   * which of the year's periods is still missing rather than discovering it at enrolment.
+   */
+  const slots = OFFICIAL_INTAKES.map((intake) => {
+    const period = periods.find((row) => row.month === intake.month) ?? null;
     return {
-      semesterNo,
-      semester,
-      // A semester stops taking changes the day its window closes.
-      editable: year >= currentYear && (!semester || semester.endDate >= startOfToday),
-      cards: semester ? cardsIn(semester.startDate, semester.endDate) : [],
+      month: intake.month,
+      label: intake.label,
+      period,
+      // A period stops taking changes the day its window closes.
+      editable: year >= currentYear && (!period || period.endsAt >= startOfToday),
+      cards: period ? cardsIn(period.startsAt, period.endsAt) : [],
     };
   });
 
@@ -1038,7 +1046,6 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
     canNext: year < lastYear,
     slots,
     collegeEvents,
-    standaloneIntakes,
   };
 }
 
@@ -1118,7 +1125,7 @@ export async function getAccounts(query: ListQuery) {
       take: pagination.window,
       include: {
         student: { select: { id: true, admissionNo: true, user: { select: { fullName: true } } } },
-        semester: { select: { name: true } },
+        period: { select: { name: true } },
         lines: true,
         payments: { orderBy: { paidAt: "desc" } },
       },
@@ -1455,9 +1462,9 @@ export async function getTutorOptions(campusId: number | null) {
  */
 export async function getSemesterOptions() {
   const scope = await requireCollegeAdmin();
-  const rows = await prisma.semester.findMany({
+  const rows = await prisma.academicPeriod.findMany({
     where: campusWhere(scope.campusId),
-    orderBy: [{ year: "desc" }, { semesterNo: "desc" }],
+    orderBy: [{ year: "desc" }, { sequence: "desc" }],
     select: { id: true, name: true, campus: { select: { name: true } } },
   });
 
@@ -1482,15 +1489,16 @@ export async function getIntakeOptions() {
    * to record the truth — the student then gets filed against the current intake and their
    * progression, fees and class all start in the wrong place.
    */
-  const rows = await prisma.intake.findMany({
+  const rows = await prisma.academicPeriod.findMany({
     where: campusWhere(scope.campusId),
     orderBy: [{ year: "desc" }, { month: "desc" }],
+    select: { id: true, name: true, year: true },
   });
 
   return rows.map((row) => ({
     value: row.id,
-    // Say the month and year, which is how staff refer to a cohort.
-    label: `${row.name} · ${monthName(row.month)} ${row.year}`,
+    // The name already carries the month and year, which is how staff refer to a cohort.
+    label: row.name,
   }));
 }
 

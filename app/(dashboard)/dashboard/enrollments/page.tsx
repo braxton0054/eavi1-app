@@ -64,7 +64,7 @@ export default async function EnrollmentsPage({
       {
         label: cardCopy.intake,
         // The cohort names the month the student joined, which is what staff go by.
-        value: enrollment.intake.name,
+        value: enrollment.period.name,
         tone: "muted" as const,
         showLabel: true,
       },

@@ -25,7 +25,7 @@ export type ActivePlan = {
   periods: { id: string; label: string; amount: unknown; yearIndex: number | null; semesterNo: number | null; dueOffsetDays: number | null }[];
 };
 
-type Reader = Pick<Prisma.TransactionClient, "programFeePlan" | "semester">;
+type Reader = Pick<Prisma.TransactionClient, "programFeePlan" | "academicPeriod">;
 
 /** The one published version of a programme's fees, or null when none is set up yet. */
 export async function activePlanFor(programId: string, reader: Reader = prisma): Promise<ActivePlan | null> {
@@ -52,10 +52,10 @@ export async function activePlanFor(programId: string, reader: Reader = prisma):
 
 /** The campus calendar rows a plan is dated against. */
 async function calendarFor(reader: Reader, campusId: number): Promise<CalendarPeriod[]> {
-  return reader.semester.findMany({
+  return reader.academicPeriod.findMany({
     where: { campusId },
-    orderBy: { startDate: "asc" },
-    select: { id: true, year: true, semesterNo: true, name: true, startDate: true, endDate: true },
+    orderBy: { startsAt: "asc" },
+    select: { id: true, year: true, month: true, sequence: true, name: true, startsAt: true, endsAt: true },
   });
 }
 
@@ -82,10 +82,10 @@ export async function generateFeeSchedule(
     enrollmentId: string;
     campusId: number;
     programId: string;
-    /** Day one of the student's own Semester 1 — their intake's start, not the term date. */
+    /** Day one of the student's own Semester 1 — their period's start, not the term date. */
     startDate: Date;
     /** The cohort the student joined, recorded on every bill it produces. */
-    intakeId?: string;
+    periodId?: string;
     /**
      * Bill no further than this period of the plan. Enrolment bills the whole programme up
      * front; a student who has since advanced bills only what they have reached, so nobody
@@ -108,7 +108,7 @@ export async function generateFeeSchedule(
   }
 
   const calendar = await calendarFor(tx, input.campusId);
-  const semestersPerYear = new Set(calendar.map((row) => row.semesterNo)).size || undefined;
+  const semestersPerYear = new Set(calendar.map((row) => row.sequence)).size || undefined;
 
   const drafts: PeriodDraft[] = plan.periods.map((period) => ({
     label: period.label,
@@ -174,7 +174,7 @@ export async function generateFeeSchedule(
         feePeriodId,
         periodYear: period.periodYear,
         periodSemester: period.periodSemester,
-        semesterId: period.semesterId,
+        periodId: period.periodId,
         dueAt: period.dueDate,
         status: "OPEN",
         note: `Fees v${plan.version} · ${period.periodLabel}`,

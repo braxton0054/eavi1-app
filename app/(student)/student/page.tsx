@@ -41,7 +41,7 @@ export default async function StudentHomePage() {
             <Panel title={copy.course}>
               <dl className="divide-y divide-eavi-border">
                 <Row label={copy.course} value={enrollment.program.name} />
-                <Row label={copy.intake} value={enrollment.intake.name} />
+                <Row label={copy.intake} value={enrollment.period.name} />
                 <Row
                   label={copy.place}
                   value={`${copy.year} ${place.yearIndex} · ${copy.semester} ${place.semesterNo}`}

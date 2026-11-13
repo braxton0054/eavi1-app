@@ -54,7 +54,7 @@ export async function createExam(formData: FormData) {
     if (!program) throw new FieldError(fieldErrors.notOnCampus);
 
     // The paper sits inside this campus's semester, so a semester id from another campus is refused.
-    const semesterId = await semesterOnCampus(formData, "semesterId", campusId);
+    const periodId = await semesterOnCampus(formData, "periodId", campusId);
 
     const type = enumField(formData, "type", TYPES, fieldLabel("type"));
     const date = requiredDate(formData, "date", fieldLabel("date"));
@@ -84,7 +84,7 @@ export async function createExam(formData: FormData) {
         title,
         programId,
         campusId,
-        semesterId,
+        periodId,
         invigilatorId: invigilatorId ?? null,
         date,
         startAt,

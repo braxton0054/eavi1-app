@@ -58,7 +58,9 @@ enum EntryGrade {
   E
 }
 
-enum SemesterStatus {
+/// Where a period is in its life cycle. A period is PLANNED until it opens, ACTIVE while it
+/// is running, and COMPLETED once it has ended and its results are settled.
+enum AcademicPeriodStatus {
   PLANNED
   ACTIVE
   COMPLETED
@@ -198,8 +200,7 @@ model Campus {
   applications    Application[]
   enrollments     Enrollment[]
   calendarEvents  CalendarEvent[]
-  semesters       Semester[]
-  intakes         Intake[]
+  periods         AcademicPeriod[]
   timetableSlots  TimetableSlot[]
   exams           Exam[]
   invoices        Invoice[]
@@ -473,67 +474,60 @@ model Application {
   @@map("applications")
 }
 
-/// One of the semesters a campus runs in a calendar year. Campuses never share a
-/// semester, so the identity of a semester is (campus, year, semester number).
+/// One academic period a campus runs: an intake, and the teaching window that goes with it.
 ///
-/// This is the INSTITUTIONAL CALENDAR: it says when the campus is open for teaching and
-/// where its holidays, exams and administrative dates fall. It does NOT say what semester
-/// any individual student is in — that comes from the student's intake (see Intake).
-model Semester {
-  id             String          @id @default(uuid())
-  campusId       Int
-  campus         Campus          @relation(fields: [campusId], references: [id])
-  year           Int
-  semesterNo     Int
-  name           String
-  startDate      DateTime
-  endDate        DateTime
-  status         SemesterStatus  @default(PLANNED)
-  intakes        Intake[]
-  calendarEvents CalendarEvent[]
-  exams          Exam[]
-  timetableSlots TimetableSlot[]
-  feeItems       FeeItem[]
-  invoices       Invoice[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-
-  @@unique([campusId, year, semesterNo])
-  @@index([campusId, startDate])
-  @@map("semesters")
-}
-
-/// An admission window a student joins through: January, May, September.
+/// This replaces two separate tables — a `Semester` calendar and an `Intake` admission window —
+/// which described the same thing and drifted apart in practice, leaving campuses with one
+/// populated and the other empty. The college runs three intakes a year, and each one IS the
+/// start of a period, so they are one row here.
 ///
-/// The intake is the anchor for that student's whole academic life. Their Semester 1 starts
-/// when the intake starts, and their Semester 2, 3, … follow on from it, independent of
-/// which calendar semester the campus happens to be running. A May joiner is in their own
-/// Semester 1 in May even though the campus calendar has moved on to its second semester.
-model Intake {
-  id                  String          @id @default(uuid())
-  name                String
+/// A period is the INSTITUTIONAL CALENDAR: when the campus is open for teaching, where its
+/// exams and holidays fall, and when applications for that intake close. Classes, invoices,
+/// exams and timetable slots all point at it.
+///
+/// It is NOT the student's own semester number. A student's position in their programme lives
+/// on `Enrollment.yearIndex` / `semesterNo`, derived from the period they joined and counted
+/// forward from there, so a May joiner is in their own Semester 1 in May even though the
+/// campus calendar has moved on.
+model AcademicPeriod {
+  id                  String               @id @default(uuid())
   campusId            Int
-  campus              Campus          @relation(fields: [campusId], references: [id])
-  /// The calendar semester this admission window is advertised in. Informational only:
-  /// it never decides the student's own semester number.
-  semesterId          String?
-  semester            Semester?       @relation(fields: [semesterId], references: [id])
-  /// The year and month the cohort is admitted, e.g. 2026 and 5 for the May 2026 intake.
+  campus              Campus               @relation(fields: [campusId], references: [id])
+  /// The calendar year the period opens in.
   year                Int
+  /// The month the period opens: 1, 5 or 9 only. Those three are the college's intakes, and the
+  /// database enforces it (see the CHECK constraint in the migration) so a December cohort
+  /// cannot exist to confuse every picker downstream.
   month               Int
-  /// Day one of THIS intake's Semester 1. Every later period counts from here.
+  /// Which of the year's three periods this is: 1 for January, 2 for May, 3 for September.
+  /// Derived from `month` on write — stored so ordering and exports need no arithmetic.
+  sequence            Int
+  /// "January 2026", "May intake 2026". Derived from the month and year on write, never typed:
+  /// free text let "May Intake", "MAY 2026" and "May intake (late)" accumulate for one cohort.
+  name                String
+  /// Day one. Every later period of a student who joined here counts from this date.
   startsAt            DateTime
-  /// The last day the intake is open for joining. Null on intakes recorded before the calendar
-  /// asked for an end date; the office sets it the next time it edits the intake.
-  endsAt              DateTime?
+  /// The last day the period runs.
+  endsAt              DateTime
+  /// The last day to apply. Must be on or before `startsAt`: an applicant cannot be offered a
+  /// cohort that has already begun.
   applicationDeadline DateTime
-  commenceAt          DateTime
-  enrollments         Enrollment[]
-  classes             AcademicClass[]
+  status              AcademicPeriodStatus @default(PLANNED)
 
-  @@unique([campusId, year, month, name])
+  enrollments     Enrollment[]
+  classes         AcademicClass[]
+  calendarEvents  CalendarEvent[]
+  exams           Exam[]
+  timetableSlots  TimetableSlot[]
+  feeItems        FeeItem[]
+  invoices        Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([campusId, year, month])
   @@index([campusId, startsAt])
-  @@map("intakes")
+  @@map("academic_periods")
 }
 
 /// Admission runs every month here, so each month of a campus year carries the day its
@@ -559,8 +553,8 @@ model ReportingDate {
 model CalendarEvent {
   id          String            @id @default(uuid())
   /// Nullable so a super admin can post a college-wide entry that belongs to no campus term.
-  semesterId  String?
-  semester    Semester?         @relation(fields: [semesterId], references: [id])
+  periodId    String?
+  period      AcademicPeriod?   @relation(fields: [periodId], references: [id])
   campusId    Int?
   campus      Campus?           @relation(fields: [campusId], references: [id])
   title       String
@@ -617,8 +611,9 @@ model Enrollment {
   campus      Campus              @relation(fields: [campusId], references: [id])
   /// The cohort this student joined through. Required: every student follows an intake's
   /// progression, so there is no such thing as an enrolment without one.
-  intakeId    String
-  intake      Intake              @relation(fields: [intakeId], references: [id])
+  /// The period this student joined. Their academic life counts forward from here.
+  periodId    String
+  period      AcademicPeriod      @relation(fields: [periodId], references: [id])
   cohort      String?
   /// Where this student is in THEIR programme, counted from their intake's start — not the
   /// campus calendar semester. A May joiner begins here at 1/1 whatever the campus is doing.
@@ -640,7 +635,7 @@ model Enrollment {
 
   @@unique([studentId, programId])
   @@index([campusId, status])
-  @@index([intakeId, yearIndex, semesterNo])
+  @@index([periodId, yearIndex, semesterNo])
   @@map("enrollments")
 }
 
@@ -653,8 +648,8 @@ model TimetableSlot {
   program         Program       @relation(fields: [programId], references: [id])
   tutorId         String?
   tutor           TutorProfile? @relation(fields: [tutorId], references: [id])
-  semesterId      String?
-  semester        Semester?     @relation(fields: [semesterId], references: [id])
+  periodId        String?
+  period          AcademicPeriod? @relation(fields: [periodId], references: [id])
   day             Weekday
   startAt         String
   endAt           String
@@ -673,8 +668,8 @@ model Exam {
   program         Program       @relation(fields: [programId], references: [id])
   campusId        Int
   campus          Campus        @relation(fields: [campusId], references: [id])
-  semesterId      String?
-  semester        Semester?     @relation(fields: [semesterId], references: [id])
+  periodId        String?
+  period          AcademicPeriod? @relation(fields: [periodId], references: [id])
   invigilatorId   String?
   invigilator     TutorProfile? @relation("ExamInvigilator", fields: [invigilatorId], references: [id])
   date            DateTime
@@ -884,8 +879,8 @@ model FeeItem {
   program       Program         @relation(fields: [programId], references: [id])
   planId        String?
   plan          ProgramFeePlan? @relation(fields: [planId], references: [id], onDelete: Cascade)
-  semesterId    String?
-  semester      Semester?       @relation(fields: [semesterId], references: [id])
+  periodId      String?
+  period        AcademicPeriod? @relation(fields: [periodId], references: [id])
   label         String
   amount        Decimal         @db.Decimal(12, 2)
   isOptional    Boolean         @default(false)
@@ -914,8 +909,8 @@ model Invoice {
   student        StudentProfile  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   campusId       Int
   campus         Campus          @relation(fields: [campusId], references: [id])
-  semesterId     String?
-  semester       Semester?       @relation(fields: [semesterId], references: [id])
+  periodId       String?
+  period         AcademicPeriod? @relation(fields: [periodId], references: [id])
   programId      String?
   /// Set on a bill generated from a programme's fee plan. Null on a manually raised bill.
   enrollmentId   String?
@@ -1056,10 +1051,8 @@ model AcademicClass {
   campus      Campus            @relation(fields: [campusId], references: [id])
   programId   String
   program     Program           @relation(fields: [programId], references: [id])
-  intakeId    String
-  intake      Intake            @relation(fields: [intakeId], references: [id])
-  /// Taken from the intake so a class can never advertise a window the intake disagrees with.
-  intakeMonth OfficialIntake
+  periodId    String
+  period      AcademicPeriod    @relation(fields: [periodId], references: [id])
   /// The academic year the class is taught in, e.g. 2027.
   year        Int
   /// What the office calls it, e.g. "ICT/JAN/2027" or "ICT/JAN-FEB/2027". Free text: names
@@ -1082,10 +1075,10 @@ model AcademicClass {
   /// A name identifies a class within one campus, programme and intake. Scoping it to the
   /// programme alone blocked the same name in a different intake, and let an intake's class be
   /// found under a name that belonged to another.
-  @@unique([campusId, programId, intakeId, name])
+  @@unique([campusId, programId, periodId, name])
   @@index([campusId, year, status])
-  @@index([intakeId])
-  @@index([programId, intakeId, year])
+  @@index([periodId])
+  @@index([programId, periodId, year])
   @@map("academic_classes")
 }
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { CalendarEventType, SemesterStatus } from "@/generated/prisma/enums";
+import { AcademicPeriodStatus, CalendarEventType } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin, type AdminScope } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
@@ -20,9 +20,13 @@ import {
   unique,
 } from "@/lib/actions/college/_shared";
 
-import { intakeDefaultName, isOfficialIntakeMonth } from "@/lib/academics/classes";
+import {
+  intakeDefaultName,
+  intakeSequenceForMonth,
+  isOfficialIntakeMonth,
+} from "@/lib/academics/classes";
 
-const SEMESTER_STATUSES = Object.keys(SemesterStatus) as (keyof typeof SemesterStatus)[];
+const PERIOD_STATUSES = Object.keys(AcademicPeriodStatus) as (keyof typeof AcademicPeriodStatus)[];
 const EVENT_TYPES = Object.keys(CalendarEventType) as (keyof typeof CalendarEventType)[];
 
 const copy = pages.calendar;
@@ -38,21 +42,21 @@ const fieldLabel = (name: string) =>
 /** The calendar screen and the overview deadline/event strips all read this. */
 const AFFECTED = ["/dashboard/calendar", "/dashboard"];
 
-/** A semester window has to close after it opens, and one campus cannot run two at a time. */
+/** A period window has to close after it opens. */
 function orderedDates(from: Date, to: Date) {
   if (to < from) throw new FieldError(fieldErrors.dateOrder);
 }
 
-/** Once a semester's window has closed, its schedule is history and stops accepting changes. */
+/** Once a period's window has closed, its schedule is history and stops accepting changes. */
 function assertNotEnded(endDate: Date) {
   if (endDate < startOfToday()) throw new FieldError(fieldErrors.semesterEnded);
 }
 
 /**
- * The campus a semester is written to. A campus admin is pinned to their own and the form value
+ * The campus a period is written to. A campus admin is pinned to their own and the form value
  * is ignored; a super admin has no campus of their own, so they name the one being configured.
  */
-async function semesterCampusId(scope: AdminScope, formData: FormData): Promise<number> {
+async function periodCampusId(scope: AdminScope, formData: FormData): Promise<number> {
   /*
    * A campus admin is pinned to their own campus and never shown the field, so scope is the
    * whole answer for them. A super admin has no scope campus and is shown a picker; reading the
@@ -74,134 +78,34 @@ async function semesterCampusId(scope: AdminScope, formData: FormData): Promise<
   throw new FieldError(fieldErrors.required(fieldLabel("campusId")));
 }
 
-/** The label a campus admin reads for a slot, generated so nobody types a duplicate. */
-const semesterName = (semesterNo: number, year: number) => `${copy.semesters.slot} ${semesterNo} · ${year}`;
-
-async function assertNoOverlap(campusId: number, from: Date, to: Date, exceptId?: string) {
-  const clash = await prisma.semester.findFirst({
-    where: {
-      campusId,
-      ...(exceptId ? { id: { not: exceptId } } : {}),
-      startDate: { lte: to },
-      endDate: { gte: from },
-    },
-    select: { name: true },
-  });
-  if (clash) throw new FieldError(fieldErrors.windowOverlap(clash.name));
-}
-
 /**
- * Only one semester per campus may be active. Windows need not overlap for this to go wrong:
- * a term that ran and finished keeps its ACTIVE status until somebody closes it, and the
- * calendar then has two current semesters. The window that has already closed is the one to
+ * Only one period per campus may be active. Windows need not overlap for this to go wrong:
+ * a period that ran and finished keeps its ACTIVE status until somebody closes it, and the
+ * calendar then has two current periods. The window that has already closed is the one to
  * ask about, so the message names it.
  */
 async function assertOnlyActive(campusId: number, exceptId?: string) {
-  const other = await prisma.semester.findFirst({
+  const other = await prisma.academicPeriod.findFirst({
     where: { campusId, status: "ACTIVE", ...(exceptId ? { id: { not: exceptId } } : {}) },
-    orderBy: { endDate: "asc" },
+    orderBy: { endsAt: "asc" },
     select: { name: true },
   });
   if (other) throw new FieldError(fieldErrors.semesterAlreadyActive(other.name));
 }
 
-export async function createSemester(formData: FormData) {
-  const scope = await requireCollegeAdmin();
-
-  return onSave("/dashboard/calendar", AFFECTED, async () => {
-    const campusId = await semesterCampusId(scope, formData);
-
-    const year = Math.round(requiredNumber(formData, "year", fieldLabel("year")));
-    assertOpenYear(year);
-
-    const semesterNo = requiredNumber(formData, "semesterNo", fieldLabel("semesterNo"));
-    if (!Number.isInteger(semesterNo) || semesterNo < 1 || semesterNo > 3) {
-      throw new FieldError(fieldErrors.semesterSlot(fieldLabel("semesterNo")));
-    }
-
-    const startDate = requiredDate(formData, "startDate", fieldLabel("startDate"));
-    const endDate = requiredDate(formData, "endDate", fieldLabel("endDate"));
-    orderedDates(startDate, endDate);
-    assertNotEnded(endDate);
-
-    const name = semesterName(semesterNo, year);
-    const taken = await prisma.semester.findUnique({
-      where: { campusId_year_semesterNo: { campusId, year, semesterNo } },
-      select: { id: true },
-    });
-    if (taken) throw new FieldError(fieldErrors.semesterExists(name, year));
-
-    await assertNoOverlap(campusId, startDate, endDate);
-
-    await unique(name, () =>
-      prisma.semester.create({
-        data: { campusId, year, semesterNo, name, startDate, endDate, status: "PLANNED" },
-      }),
-    );
-  });
-}
-
-/** A semester is campus property, so its id is only honoured when it is the caller's own. */
-async function ownSemester(semesterId: string, campusId: number | null) {
-  const semester = await prisma.semester.findUnique({
-    where: { id: semesterId },
-    select: {
-      id: true,
-      campusId: true,
-      year: true,
-      startDate: true,
-      endDate: true,
-    },
-  });
-  if (!semester || (campusId !== null && semester.campusId !== campusId)) {
-    throw new FieldError(fieldErrors.notOnCampus);
-  }
-  assertOpenYear(semester.year);
-  return semester;
-}
-
-export async function updateSemester(formData: FormData) {
-  const scope = await requireCollegeAdmin();
-
-  return onSave("/dashboard/calendar", AFFECTED, async () => {
-    const semester = await ownSemester(hiddenId(formData, "semesterId", copy.semesters.heading), scope.campusId);
-
-    const startDate = requiredDate(formData, "startDate", fieldLabel("startDate"));
-    const endDate = requiredDate(formData, "endDate", fieldLabel("endDate"));
-    orderedDates(startDate, endDate);
-    const status = enumField(formData, "status", SEMESTER_STATUSES, fieldLabel("status"));
-
-    // Marking this one active has to leave the campus with exactly one active semester.
-    if (status === "ACTIVE") await assertOnlyActive(semester.campusId, semester.id);
-
-    // An ended semester keeps its dates; the office can still record how it finished.
-    const sameWindow =
-      startDate.getTime() === semester.startDate.getTime() &&
-      endDate.getTime() === semester.endDate.getTime();
-    if (!sameWindow) assertNotEnded(semester.endDate);
-
-    await assertNoOverlap(semester.campusId, startDate, endDate, semester.id);
-
-    await prisma.semester.update({
-      where: { id: semester.id },
-      data: { startDate, endDate, status },
-    });
-  });
-}
-
 /**
- * Creates an official intake from its start and end dates.
+ * Creates an academic period — an intake and the teaching window that goes with it.
  *
  * The month comes from the START date, because that is what the cohort is: a January intake is
- * January however long it runs. Deriving it from the commence date — or from the semester the
- * entry happened to be filed under — is how an intake ended up with a month no class could
- * match, and the class layer refuses anything but January, May and September.
+ * January however long it runs. Only January, May and September are accepted; the database holds
+ * the same rule as a CHECK constraint, so a December cohort cannot be introduced by a path that
+ * skips this action.
  *
- * The semester is optional now. An intake only ever used it as calendar decoration, and requiring
- * one meant the college could not record a May or September intake until somebody had first set up
- * a semester to hang it on.
+ * Everything else is derived. The year and month are read from the date, the sequence is which of
+ * the three periods of that year this is, and the name is "May intake 2026". An admin never types
+ * any of them, so one cohort cannot appear in the list under three different spellings.
  */
-export async function createIntake(formData: FormData) {
+export async function createPeriod(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
@@ -218,22 +122,11 @@ export async function createIntake(formData: FormData) {
     }
 
     // The three official months, checked from the start date before anything is written: a
-    // December start would create a cohort the class picker can never place a student in.
+    // December start would create a cohort nothing downstream can place a student in.
     const month = startsAt.getMonth() + 1;
     if (!isOfficialIntakeMonth(month)) {
       throw new FieldError(intakeCopy.notAnOfficialMonth);
     }
-
-    /*
-     * The name is decided here, never typed.
-     *
-     * There are exactly three intakes a year, and the month comes from the start date, so
-     * "May intake 2026" is the only thing that intake could be called. Letting an admin retype
-     * it invites "May Intake", "MAY 2026" and "May intake (late)" into the same list for the
-     * same window, which makes every picker and report read differently for the same cohort.
-     * Any `name` posted to this action is ignored rather than trusted.
-     */
-    const name = intakeDefaultName(startsAt);
 
     const applicationDeadline = requiredDate(
       formData,
@@ -244,45 +137,98 @@ export async function createIntake(formData: FormData) {
       throw new FieldError(intakeCopy.deadlineAfterStart);
     }
 
-    // Optional, and only kept when it really belongs to this admin's campus.
-    const semesterId = text(formData, "semesterId") || null;
-    const semester = semesterId ? await ownSemester(semesterId, scope.campusId) : null;
     /*
-     * The campus this intake belongs to, in the order that always resolves: the semester it is
-     * filed under, then the campus already in scope, then the field on the form.
-     *
-     * A super admin who has picked a campus in the header is already saying "this campus" for
-     * every screen, so asking them again in this one form would be a second question with the
-     * same answer — and the form does not even offer it in that case.
+     * The campus this period belongs to, in the order that always resolves: an explicit choice on
+     * the form, then the campus already in scope. A campus admin has no campus field, so nothing
+     * is posted and their scope decides. A super admin is shown a picker, and preferring the scope
+     * cookie would make picking a campus in this form do nothing.
      */
-    /*
-     * The order changed: an explicit choice on the form now beats the campus in scope.
-     *
-     * A campus admin has no campus field, so nothing is posted and their scope decides, as
-     * before. A super admin is *shown* a picker, and preferring the scope cookie meant picking
-     * a campus in this form did nothing — the intake was filed against whichever campus the
-     * header happened to be set to. A value the admin typed must win over an implicit default.
-     */
-    const campusId =
-      semester?.campusId ??
-      (await semesterCampusId(scope, formData)) ??
-      scope.campusId;
+    const campusId = (await periodCampusId(scope, formData)) ?? scope.campusId;
+
+    const year = startsAt.getUTCFullYear();
+    assertOpenYear(year);
+
+    const taken = await prisma.academicPeriod.findUnique({
+      where: { campusId_year_month: { campusId, year, month } },
+      select: { name: true },
+    });
+    if (taken) throw new FieldError(fieldErrors.windowOverlap(taken.name));
 
     await unique(fieldLabel("name"), () =>
-      prisma.intake.create({
+      prisma.academicPeriod.create({
         data: {
-          semesterId: semester?.id ?? null,
           campusId,
-          year: startsAt.getFullYear(),
+          year,
           month,
+          sequence: intakeSequenceForMonth(month),
+          name: intakeDefaultName(startsAt),
           startsAt,
           endsAt,
-          name,
           applicationDeadline,
-          commenceAt: startsAt,
+          status: "PLANNED",
         },
       }),
     );
+  });
+}
+
+/** A period is campus property, so its id is only honoured when it is the caller's own. */
+async function ownPeriod(periodId: string, campusId: number | null) {
+  const period = await prisma.academicPeriod.findUnique({
+    where: { id: periodId },
+    select: { id: true, campusId: true, year: true, startsAt: true, endsAt: true },
+  });
+  if (!period || (campusId !== null && period.campusId !== campusId)) {
+    throw new FieldError(fieldErrors.notOnCampus);
+  }
+  assertOpenYear(period.year);
+  return period;
+}
+
+/**
+ * Edits a period's teaching window and status.
+ *
+ * The month and year are not editable: they are the period's identity, and every class, invoice
+ * and enrolment points at it. A window that moved to a different month would leave students
+ * attached to a cohort that no longer matches the date they started. To change the month, create
+ * the right period and move the students.
+ */
+export async function updatePeriod(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+
+  return onSave("/dashboard/calendar", AFFECTED, async () => {
+    const period = await ownPeriod(hiddenId(formData, "periodId", copy.semesters.heading), scope.campusId);
+
+    const startsAt = requiredDate(formData, "startsAt", fieldLabel("startsAt"));
+    const endsAt = requiredDate(formData, "endsAt", fieldLabel("endsAt"));
+    orderedDates(startsAt, endsAt);
+    const status = enumField(formData, "status", PERIOD_STATUSES, fieldLabel("status"));
+
+    // A period's start date IS its intake month, so it may only move within that month.
+    if (startsAt.getUTCMonth() + 1 !== period.startsAt.getUTCMonth() + 1) {
+      throw new FieldError(intakeCopy.monthIsFixed);
+    }
+
+    const applicationDeadline = requiredDate(
+      formData,
+      "applicationDeadline",
+      fieldLabel("applicationDeadline"),
+    );
+    if (applicationDeadline.getTime() > startsAt.getTime()) {
+      throw new FieldError(intakeCopy.deadlineAfterStart);
+    }
+
+    if (status === "ACTIVE") await assertOnlyActive(period.campusId, period.id);
+
+    // An ended period keeps its dates; the office can still record how it finished.
+    const sameWindow =
+      startsAt.getTime() === period.startsAt.getTime() && endsAt.getTime() === period.endsAt.getTime();
+    if (!sameWindow) assertNotEnded(period.endsAt);
+
+    await prisma.academicPeriod.update({
+      where: { id: period.id },
+      data: { startsAt, endsAt, applicationDeadline, status },
+    });
   });
 }
 
@@ -294,7 +240,7 @@ export async function createEvent(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
-    const semesterId = text(formData, "semesterId");
+    const periodId = text(formData, "periodId");
     const title = requiredText(formData, "title", fieldLabel("title"));
     const type = enumField(formData, "type", EVENT_TYPES, fieldLabel("type"));
     const startsAt = requiredDate(formData, "startsAt", fieldLabel("startsAt"));
@@ -304,19 +250,19 @@ export async function createEvent(formData: FormData) {
     if (endsAt && endsAt < startsAt) throw new FieldError(fieldErrors.dateOrder);
 
     let campusId: number | null = null;
-    let linkedSemesterId: string | null = null;
+    let linkedPeriodId: string | null = null;
 
-    if (semesterId) {
-      const semester = await ownSemester(semesterId, scope.campusId);
-      assertNotEnded(semester.endDate);
-      campusId = semester.campusId;
-      linkedSemesterId = semester.id;
+    if (periodId) {
+      const period = await ownPeriod(periodId, scope.campusId);
+      assertNotEnded(period.endsAt);
+      campusId = period.campusId;
+      linkedPeriodId = period.id;
     } else if (scope.campusId !== null) {
       throw new FieldError(fieldErrors.notOnCampus);
     }
 
     await prisma.calendarEvent.create({
-      data: { semesterId: linkedSemesterId, campusId, title, description, type, startsAt, endsAt },
+      data: { periodId: linkedPeriodId, campusId, title, description, type, startsAt, endsAt },
     });
   });
 }
@@ -332,18 +278,18 @@ export async function deleteEvent(formData: FormData) {
       select: {
         id: true,
         campusId: true,
-        semester: { select: { campusId: true, year: true, endDate: true } },
+        period: { select: { campusId: true, year: true, endsAt: true } },
       },
     });
-    const owner = event?.campusId ?? event?.semester?.campusId ?? null;
+    const owner = event?.campusId ?? event?.period?.campusId ?? null;
 
     // A college-wide entry is the super admin's to remove; anything else goes to its campus.
     if (!event || (scope.campusId !== null && owner !== scope.campusId)) {
       throw new FieldError(fieldErrors.notOnCampus);
     }
-    if (event.semester) {
-      assertOpenYear(event.semester.year);
-      assertNotEnded(event.semester.endDate);
+    if (event.period) {
+      assertOpenYear(event.period.year);
+      assertNotEnded(event.period.endsAt);
     }
 
     await prisma.calendarEvent.delete({ where: { id: event.id } });

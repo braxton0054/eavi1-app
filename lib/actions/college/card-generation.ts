@@ -52,11 +52,11 @@ async function targetLabel(target: CardTarget) {
     });
     return `${copy.kinds.class} · ${row?.name ?? ""}`.trim();
   }
-  const row = await prisma.intake.findUnique({
+  const row = await prisma.academicPeriod.findUnique({
     where: { id: target.intakeId },
-    select: { name: true, year: true },
+    select: { name: true },
   });
-  return `${copy.kinds.intake} · ${row?.name ?? ""} ${row?.year ?? ""}`.trim();
+  return `${copy.kinds.intake} · ${row?.name ?? ""}`.trim();
 }
 
 /**

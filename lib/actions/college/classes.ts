@@ -34,15 +34,16 @@ export async function createClass(formData: FormData) {
         where: { id: programId, archivedAt: null, campuses: { some: { id: campusId } } },
         select: { id: true, code: true },
       }),
-      prisma.intake.findFirst({
+      prisma.academicPeriod.findFirst({
         where: { id: intakeId, campusId },
-        select: { id: true, month: true, year: true },
+        select: { id: true, month: true, year: true, name: true },
       }),
     ]);
     if (!program) throw new FieldError(fieldErrors.notOnCampus);
     if (!intake) throw new FieldError(fieldErrors.notOnCampus);
 
-    // A month outside the three windows would be an intake nobody can be placed in.
+    // A month outside the three windows would be an intake nobody can be placed in. The
+    // database enforces the same rule, but the message here can say why.
     let intakeMonth;
     try {
       intakeMonth = intakeValueForMonth(intake.month);
@@ -51,7 +52,7 @@ export async function createClass(formData: FormData) {
     }
 
     const clash = await prisma.academicClass.findFirst({
-      where: { programId, name },
+      where: { programId, periodId: intake.id, name },
       select: { id: true },
     });
     if (clash) throw new FieldError(pages.classes.nameTaken);
@@ -60,8 +61,7 @@ export async function createClass(formData: FormData) {
       data: {
         campusId,
         programId,
-        intakeId,
-        intakeMonth,
+        periodId: intake.id,
         year: intake.year,
         name,
         note,
@@ -75,7 +75,7 @@ export async function createClass(formData: FormData) {
       action: "class.create",
       entityType: "class",
       entityId: created.id,
-      detail: { name, program: program.code, intakeMonth, year: intake.year },
+      detail: { name, program: program.code, intakeMonth, year: intake.year, period: intake.name },
     });
 
     /*
@@ -233,7 +233,7 @@ export async function mergeClasses(formData: FormData) {
       select: {
         id: true,
         enrollmentId: true,
-        enrollment: { select: { yearIndex: true, semesterNo: true, intakeId: true } },
+        enrollment: { select: { yearIndex: true, semesterNo: true, periodId: true } },
       },
     });
     const targetMemberships = await prisma.classMembership.findMany({

@@ -238,24 +238,25 @@ async function main() {
       const endsAt = day(new Date(year, plan.end[0] - 1, plan.end[1]));
       const deadline = addDays(startsAt, -21);
 
-      const existing = await prisma.intake.findFirst({
+      const sequence = [1, 5, 9].indexOf(plan.month) + 1;
+      const existing = await prisma.academicPeriod.findFirst({
         where: { campusId: campus.id, year, month: plan.month },
       });
       const row = existing
-        ? await prisma.intake.update({
+        ? await prisma.academicPeriod.update({
             where: { id: existing.id },
             data: { startsAt, endsAt, applicationDeadline: deadline, name },
           })
-        : await prisma.intake.create({
+        : await prisma.academicPeriod.create({
             data: {
               campusId: campus.id,
               year,
               month: plan.month,
+              sequence,
               name,
               startsAt,
               endsAt,
               applicationDeadline: deadline,
-              commenceAt: startsAt,
             },
           });
       list.push({ id: row.id, month: plan.month, year });
@@ -275,10 +276,10 @@ async function main() {
         }/A/${intake.year}`;
         const row = await prisma.academicClass.upsert({
           where: {
-            campusId_programId_intakeId_name: {
+            campusId_programId_periodId_name: {
               campusId: campus.id,
               programId: program.id,
-              intakeId: intake.id,
+              periodId: intake.id,
               name,
             },
           },
@@ -286,8 +287,7 @@ async function main() {
           create: {
             campusId: campus.id,
             programId: program.id,
-            intakeId: intake.id,
-            intakeMonth: ["JANUARY", "MAY", "SEPTEMBER"][[1, 5, 9].indexOf(intake.month)] as never,
+            periodId: intake.id,
             year: intake.year,
             name,
             status: "ACTIVE",
@@ -351,7 +351,7 @@ async function main() {
           studentId: student.id,
           programId: program.id,
           campusId: campus.id,
-          intakeId: intake.id,
+          periodId: intake.id,
           yearIndex,
           semesterNo,
           status: "ACTIVE",

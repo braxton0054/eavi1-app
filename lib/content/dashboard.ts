@@ -1496,7 +1496,7 @@ export const pages = {
       show: "Show",
       previous: "Previous year",
       next: "Next year",
-      heading: "Semester windows for",
+      heading: "Intake periods for",
       closed: "Closed for changes",
       closedTitle: "Changes closed",
       closedBody: (year: number) => `The calendar for ${year} can no longer be changed.`,
@@ -1504,77 +1504,50 @@ export const pages = {
     campus: {
       select: "Campus",
     },
+    /*
+     * One entity, three rows. The calendar used to show a semester list *and* an intake list and
+     * ask the office to create both; campuses ended up with one filled in and the other empty.
+     * Now a period is the intake and its teaching window together, and the only thing to create
+     * on this page is the period itself.
+     */
     semesters: {
-      heading: "Semesters",
+      heading: "Intakes and periods",
       empty: "Nothing configured for this year yet.",
-      slot: "Semester",
+      slot: "Period",
       notConfigured: "Not configured.",
       window: "Runs",
       through: "to",
       configure: "Configure",
       endedNote: (date: string) => `Ended ${date}`,
-      intakesHeading: "Intake windows",
-      emptyIntakes: "No intake window on this semester.",
+      intakesHeading: "Intake window",
+      emptyIntakes: "No intake window on this period.",
       examsHeading: "Exam dates",
-      emptyExams: "No exam dates on this semester.",
+      emptyExams: "No exam dates on this period.",
       cardsHeading: "Cards issued",
       emptyCards: "No cards issued in this window.",
       eventsHeading: "Events",
-      emptyEvents: "No events on this semester.",
-      /* The timeline: one row per semester, only the current one expanded. */
+      emptyEvents: "No events on this period.",
+      /* The timeline: one row per intake month, only the current one expanded. */
       current: "Current",
       nowRunning: "Running now",
       showDetails: "Show details",
       hideDetails: "Hide details",
-      nothingScheduled: "Nothing scheduled yet — no intakes, exams or events.",
+      nothingScheduled: "Nothing scheduled yet — no exams or events.",
       weekOf: "Week",
       of: "of",
       intakeDeadline: "Apply by",
       intakeStarts: "Classes start",
       intakeEnds: "Ends",
-      summaryCount: (intakes: number, exams: number, events: number) =>
+      summaryCount: (exams: number, events: number) =>
         [
-          intakes ? `${intakes} intake${intakes === 1 ? "" : "s"}` : null,
           exams ? `${exams} exam${exams === 1 ? "" : "s"}` : null,
           events ? `${events} event${events === 1 ? "" : "s"}` : null,
         ]
           .filter(Boolean)
           .join(" · "),
       create: {
-        button: "Add semester",
-        title: "New semester",
-        fields: [
-          { name: "campusId", label: "Campus", type: "select", required: true, optionKey: "campuses" },
-          { name: "year", label: "Year", type: "select", required: true, optionKey: "years" },
-          {
-            name: "semesterNo",
-            label: "Semester",
-            type: "select",
-            required: true,
-            options: [
-              { value: "1", label: "Semester 1" },
-              { value: "2", label: "Semester 2" },
-              { value: "3", label: "Semester 3" },
-            ],
-          },
-          { name: "startDate", label: "Semester starts", type: "date", required: true },
-          { name: "endDate", label: "Semester ends", type: "date", required: true },
-        ] satisfies Field[],
-        created: "Semester saved.",
-      },
-      edit: {
-        button: "Change dates",
-        title: "Change the semester window",
-        fields: [
-          { name: "startDate", label: "Semester starts", type: "date", required: true },
-          { name: "endDate", label: "Semester ends", type: "date", required: true },
-          { name: "status", label: "Status", type: "select", required: true, options: toOptions(labels.semesterStatus) },
-        ] satisfies Field[],
-        saved: "Semester updated.",
-      },
-      intake: {
-        button: "Add intake",
-        title: "New intake",
+        button: "Add a period",
+        title: "New intake period",
         fields: [
           // Only a super admin sees this; a campus admin is pinned to their own campus.
           { name: "campusId", label: "Campus", type: "select", required: true, optionKey: "campuses" },
@@ -1602,7 +1575,38 @@ export const pages = {
               "The last day to apply. Must be on or before the intake ends.",
           },
         ] satisfies Field[],
-        created: "Intake saved.",
+        created: "Period saved.",
+      },
+      edit: {
+        button: "Change dates",
+        title: "Change the period window",
+        fields: [
+          { name: "startsAt", label: "Intake begins", type: "date", required: true },
+          { name: "endsAt", label: "Intake ends", type: "date", required: true },
+          {
+            name: "applicationDeadline",
+            label: "Applications close",
+            type: "date",
+            required: true,
+            hint: "Must be on or before the start date.",
+          },
+          { name: "status", label: "Status", type: "select", required: true, options: toOptions(labels.semesterStatus) },
+        ] satisfies Field[],
+        saved: "Period updated.",
+      },
+      intake: {
+        /*
+         * The row form on a period adds an event, and the action reads this list for the label of
+         * a field it refuses. It carries the event fields plus the period link, because an entry
+         * added from a period is filed against it.
+         */
+        fields: [
+          { name: "title", label: "Title", type: "text", required: true, wide: true },
+          { name: "type", label: "Type", type: "select", required: true, options: toOptions(labels.calendarEventType) },
+          { name: "startsAt", label: "Starts", type: "date", required: true },
+          { name: "endsAt", label: "Ends", type: "date" },
+          { name: "description", label: "Detail", type: "textarea", wide: true },
+        ] satisfies Field[],
         note:
           "There are three intakes a year — January, May and September — while admissions run every month. A student admitted in February or March still joins the January intake, so pick the intake they belong to, not the month they applied.",
         empty: "No intakes recorded for this year yet.",
@@ -1612,6 +1616,8 @@ export const pages = {
         deadlineAfterStart:
           "Applications close must be on or before the intake ends. Move the closing date earlier, or extend the intake.",
         chooseCampus: "Choose a campus before adding an intake — an intake belongs to one campus.",
+        monthIsFixed:
+          "An intake's start date decides which intake it is, so it cannot move to another month. Create the correct intake and move the students across.",
       },
     },
     events: {
@@ -1671,7 +1677,7 @@ export const pages = {
       fields: [
         { name: "title", label: "Paper title", type: "text", required: true, wide: true },
         { name: "programId", label: "Programme", type: "select", required: true, optionKey: "programs" },
-        { name: "semesterId", label: "Semester", type: "select", optionKey: "semesters" },
+        { name: "periodId", label: "Intake", type: "select", optionKey: "semesters" },
         {
           name: "type",
           label: "Type",
@@ -1762,7 +1768,7 @@ export const pages = {
       title: "New invoice",
       fields: [
         { name: "studentId", label: "Student", type: "select", required: true, optionKey: "students" },
-        { name: "semesterId", label: "Semester", type: "select", optionKey: "semesters" },
+        { name: "periodId", label: "Intake", type: "select", optionKey: "semesters" },
         { name: "dueAt", label: "Due date", type: "date" },
         { name: "note", label: "Note on the invoice", type: "textarea", wide: true },
       ] satisfies Field[],

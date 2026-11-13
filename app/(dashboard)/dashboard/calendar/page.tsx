@@ -1,9 +1,8 @@
 import {
   createEvent,
-  createIntake,
-  createSemester,
+  createPeriod,
   deleteEvent,
-  updateSemester,
+  updatePeriod,
 } from "@/lib/actions/college/calendar";
 import { getCalendar } from "@/lib/dal/college";
 import { common, labels, pages } from "@/lib/content/dashboard";
@@ -17,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 const copy = pages.calendar;
 
-const semesterTone: Record<string, ChipTone> = {
+const periodTone: Record<string, ChipTone> = {
   PLANNED: "info",
   ACTIVE: "success",
   COMPLETED: "neutral",
@@ -105,46 +104,38 @@ export default async function CalendarPage({
    * looking at — and when the field went in twice the wrong one won, which is how intakes
    * silently stopped being created. One place decides the campus: the page.
    */
-  const semesterFields = copy.semesters.create.fields.filter((field) => field.name !== "campusId");
-  const intakeFields = copy.semesters.intake.fields.filter((field) => field.name !== "campusId");
+  const periodFields = copy.semesters.create.fields.filter((field) => field.name !== "campusId");
 
   /**
-   * Order the year by date, not by slot number: an odd term 1 configuration or a missing
-   * semester 2 should still read top to bottom as a timeline.
+   * The three intake months, ordered as a timeline. Every slot is shown whether or not a period
+   * exists for it, so a missing one is visible instead of silently absent.
    */
-  const slots = [...view.slots]
-    .sort((a, b) => {
-      const aStart = a.semester?.startDate.getTime() ?? Number.MAX_SAFE_INTEGER;
-      const bStart = b.semester?.startDate.getTime() ?? Number.MAX_SAFE_INTEGER;
-      return aStart - bStart || a.semesterNo - b.semesterNo;
-    })
-    .map((slot) => {
-      const semester = slot.semester;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const running =
-        !!semester && semester.startDate <= today && semester.endDate >= today;
-      const days = running
-        ? Math.floor((today.getTime() - semester!.startDate.getTime()) / 86_400_000) + 1
-        : null;
+  const slots = view.slots.map((slot) => {
+    const period = slot.period;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const running = !!period && period.startsAt <= today && period.endsAt >= today;
+    const days = running
+      ? Math.floor((today.getTime() - period!.startsAt.getTime()) / 86_400_000) + 1
+      : null;
 
-      return {
-        slot,
-        semester,
-        days,
-        // A stored ACTIVE status is not enough: more than one semester can carry it, so
-        // the calendar trusts the dates and treats only the covering window as current.
-        phase: !semester
-          ? ("none" as const)
-          : semester.endDate < today
-            ? ("past" as const)
-            : semester.startDate > today
-              ? ("upcoming" as const)
-              : ("current" as const),
-        isCurrent: running,
-        canEdit: view.editable && slot.editable,
-      };
-    });
+    return {
+      slot,
+      period,
+      days,
+      // A stored ACTIVE status is not enough: more than one period can carry it, so the
+      // calendar trusts the dates and treats only the covering window as current.
+      phase: !period
+        ? ("none" as const)
+        : period.endsAt < today
+          ? ("past" as const)
+          : period.startsAt > today
+            ? ("upcoming" as const)
+            : ("current" as const),
+      isCurrent: running,
+      canEdit: view.editable && slot.editable,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -227,92 +218,34 @@ export default async function CalendarPage({
 
       {view.editable ? (
         <DisclosureForm
-          id="new-semester"
+          id="new-period"
           button={copy.semesters.create.button}
           title={copy.semesters.create.title}
-          fields={semesterFields}
+          fields={periodFields}
           options={options}
           values={{ year: String(view.year) }}
-          // Same rule as the intake form: the campus is the page's, not a third question.
+          // The campus is the page's, not a third question.
           hidden={{ campusId: String(view.campusId) }}
-          action={createSemester}
+          action={createPeriod}
           submitLabel={common.create}
         />
       ) : null}
 
       {/*
-        Intakes stand on their own, not inside a semester.
-
-        An intake is the thing a student actually joins — January, May or September — and there
-        are three a year while admissions run every month. Filing one under a semester made it look
-        like calendar decoration and meant a campus could not record a May intake without first
-        setting up a semester to hang it on.
-      */}
-      {view.editable ? (
-        <section className="max-w-4xl">
-          <h2 className="font-display text-lg font-semibold tracking-tight">
-            {copy.semesters.intake.button}
-          </h2>
-          <p className="mt-1 text-sm leading-6 text-eavi-muted-text">{copy.semesters.intake.note}</p>
-          {/*
-            What has been recorded, so a saved intake is visible on the page it was created from
-            rather than living only in the database.
-          */}
-          {view.standaloneIntakes.length > 0 ? (
-            <ul className="mt-3 divide-y divide-eavi-border rounded-2xl border border-eavi-border bg-eavi-card">
-              {view.standaloneIntakes.map((intake) => (
-                <li
-                  key={intake.id}
-                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3"
-                >
-                  <span className="font-medium text-eavi-on-bg">{intake.name}</span>
-                  <span className="text-xs text-eavi-muted-text tabular-nums">
-                    {formatDate(intake.startsAt)}
-                    {intake.endsAt ? ` – ${formatDate(intake.endsAt)}` : ""} ·{" "}
-                    {copy.semesters.intakeDeadline} {formatDate(intake.applicationDeadline)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-eavi-muted-text">{copy.semesters.intake.empty}</p>
-          )}
-
-          <div className="mt-3">
-            <DisclosureForm
-              id="new-intake"
-              button={copy.semesters.intake.button}
-              title={copy.semesters.intake.title}
-              fields={intakeFields}
-              options={options}
-              values={{}}
-              // Always the campus being viewed. There is no campus field, so this is the only
-              // place the action learns which campus the page is showing.
-              hidden={{ campusId: String(view.campusId) }}
-              action={createIntake}
-              submitLabel={common.create}
-            />
-          </div>
-        </section>
-      ) : null}
-
-      {/*
-        The year reads as a timeline: semesters in date order, the one running today open,
+        The year reads as a timeline of the three intake periods. The one running today is open,
         the rest folded to a single line. An empty section costs nothing instead of four
         "no events" headings, so a quiet year is short and a busy one is readable.
       */}
       <ol className="max-w-4xl space-y-3">
-        {slots.map(({ slot, semester, canEdit, isCurrent, days, phase }) => {
-          const semesterCopy = copy.semesters;
-          const heading = `${semesterCopy.slot} ${slot.semesterNo} · ${view.year}`;
-          const total = semester
-            ? semester.intakes.length + semester.exams.length + semester.calendarEvents.length
-            : 0;
+        {slots.map(({ slot, period, canEdit, isCurrent, days, phase }) => {
+          const periodCopy = copy.semesters;
+          const heading = `${slot.label} · ${view.year}`;
+          const total = period ? period.exams.length + period.calendarEvents.length : 0;
 
           return (
-            <li key={slot.semesterNo}>
+            <li key={slot.month}>
               <details
-                open={isCurrent || !semester}
+                open={isCurrent || !period}
                 className={cn(
                   "overflow-hidden rounded-2xl border bg-eavi-card shadow-eavi-card",
                   isCurrent ? "border-eavi-primary-text/60" : "border-eavi-border",
@@ -321,60 +254,65 @@ export default async function CalendarPage({
                 <summary className="flex min-h-14 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 [&::-webkit-details-marker]:hidden">
                   <span className="flex min-w-0 flex-1 items-baseline gap-2">
                     <span className="text-sm font-semibold text-eavi-on-bg">{heading}</span>
-                    {semester ? (
+                    {period ? (
                       <span className="text-xs text-eavi-muted-text tabular-nums">
-                        {formatDate(semester.startDate)} – {formatDate(semester.endDate)}
+                        {formatDate(period.startsAt)} – {formatDate(period.endsAt)}
                       </span>
                     ) : null}
                   </span>
 
                   <span className="flex shrink-0 items-center gap-2">
                     {phase === "current" ? (
-                      <StatusChip tone="success">{semesterCopy.current}</StatusChip>
+                      <StatusChip tone="success">{periodCopy.current}</StatusChip>
                     ) : phase === "none" ? (
-                      <StatusChip tone="neutral">{semesterCopy.notConfigured}</StatusChip>
+                      <StatusChip tone="neutral">{periodCopy.notConfigured}</StatusChip>
                     ) : phase === "past" ? (
                       <StatusChip tone="neutral">{labels.semesterStatus.COMPLETED}</StatusChip>
                     ) : (
-                      <StatusChip tone={semesterTone[semester!.status] ?? "neutral"}>
-                        {labels.semesterStatus[semester!.status]}
+                      <StatusChip tone={periodTone[period!.status] ?? "neutral"}>
+                        {labels.semesterStatus[period!.status]}
                       </StatusChip>
                     )}
                   </span>
                 </summary>
 
-                {!semester ? (
-                  <EmptyState body={semesterCopy.notConfigured} icon="calendar" />
+                {!period ? (
+                  <EmptyState body={periodCopy.notConfigured} icon="calendar" />
                 ) : (
                   <div className="space-y-4 border-t border-eavi-border p-4">
-                    {/* Where we are in the term, and the one action worth taking here. */}
+                    {/* Where we are in the period, and the one action worth taking here. */}
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                       {days !== null ? (
                         <p className="text-sm font-medium text-eavi-on-bg">
-                          {semesterCopy.weekOf} {Math.ceil(days / 7)} {semesterCopy.of}{" "}
+                          {periodCopy.weekOf} {Math.ceil(days / 7)} {periodCopy.of}{" "}
                           {Math.ceil(
-                            (semester.endDate.getTime() - semester.startDate.getTime()) /
+                            (period.endsAt.getTime() - period.startsAt.getTime()) /
                               (7 * 24 * 60 * 60 * 1000),
                           )}
                         </p>
                       ) : (
                         <p className="text-sm text-eavi-muted-text">
-                          {semesterCopy.endedNote(formatDate(semester.endDate))}
+                          {periodCopy.endedNote(formatDate(period.endsAt))}
                         </p>
                       )}
 
+                      <p className="text-sm text-eavi-muted-text">
+                        {periodCopy.intakeDeadline} {formatDate(period.applicationDeadline)}
+                      </p>
+
                       {canEdit ? (
                         <RowForm
-                          id={`edit-semester-${semester.id}`}
-                          button={semesterCopy.edit.button}
-                          fields={semesterCopy.edit.fields}
+                          id={`edit-period-${period.id}`}
+                          button={periodCopy.edit.button}
+                          fields={periodCopy.edit.fields}
                           values={{
-                            startDate: toDateInput(semester.startDate),
-                            endDate: toDateInput(semester.endDate),
-                            status: semester.status,
+                            startsAt: toDateInput(period.startsAt),
+                            endsAt: toDateInput(period.endsAt),
+                            applicationDeadline: toDateInput(period.applicationDeadline),
+                            status: period.status,
                           }}
-                          hidden={{ semesterId: semester.id }}
-                          action={updateSemester}
+                          hidden={{ periodId: period.id }}
+                          action={updatePeriod}
                           submitLabel={common.save}
                           className="ms-auto"
                         />
@@ -382,41 +320,16 @@ export default async function CalendarPage({
                     </div>
 
                     {total === 0 ? (
-                      <p className="text-xs text-eavi-muted-text">
-                        {semesterCopy.nothingScheduled}
-                      </p>
+                      <p className="text-xs text-eavi-muted-text">{periodCopy.nothingScheduled}</p>
                     ) : (
                       <div className="grid gap-4 sm:grid-cols-2">
-                        {semester.intakes.length > 0 ? (
+                        {period.exams.length > 0 ? (
                           <section>
                             <h3 className="text-xs font-semibold tracking-wide text-eavi-primary-text uppercase">
-                              {semesterCopy.intakesHeading}
+                              {periodCopy.examsHeading}
                             </h3>
                             <ul className="mt-1 space-y-1.5 text-sm">
-                              {semester.intakes.map((intake) => (
-                                <li key={intake.id} className="leading-tight">
-                                  <span className="font-medium text-eavi-on-bg">{intake.name}</span>
-                                  <span className="block text-xs text-eavi-muted-text">
-                                    {semesterCopy.intakeDeadline}{" "}
-                                    {formatDate(intake.applicationDeadline)} ·{" "}
-                                    {semesterCopy.intakeStarts} {formatDate(intake.commenceAt)}
-                                    {intake.endsAt
-                                      ? ` · ${semesterCopy.intakeEnds} ${formatDate(intake.endsAt)}`
-                                      : ""}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          </section>
-                        ) : null}
-
-                        {semester.exams.length > 0 ? (
-                          <section>
-                            <h3 className="text-xs font-semibold tracking-wide text-eavi-primary-text uppercase">
-                              {semesterCopy.examsHeading}
-                            </h3>
-                            <ul className="mt-1 space-y-1.5 text-sm">
-                              {semester.exams.map((exam) => (
+                              {period.exams.map((exam) => (
                                 <li
                                   key={exam.id}
                                   className="flex items-baseline justify-between gap-3 leading-tight"
@@ -433,13 +346,13 @@ export default async function CalendarPage({
                           </section>
                         ) : null}
 
-                        {semester.calendarEvents.length > 0 ? (
+                        {period.calendarEvents.length > 0 ? (
                           <section>
                             <h3 className="text-xs font-semibold tracking-wide text-eavi-primary-text uppercase">
-                              {semesterCopy.eventsHeading}
+                              {periodCopy.eventsHeading}
                             </h3>
                             <ul className="mt-1 space-y-1.5 text-sm">
-                              {semester.calendarEvents.map((event) => (
+                              {period.calendarEvents.map((event) => (
                                 <li
                                   key={event.id}
                                   className="flex items-baseline justify-between gap-3 leading-tight"
@@ -478,7 +391,7 @@ export default async function CalendarPage({
                         {slot.cards.length > 0 ? (
                           <section>
                             <h3 className="text-xs font-semibold tracking-wide text-eavi-primary-text uppercase">
-                              {semesterCopy.cardsHeading}
+                              {periodCopy.cardsHeading}
                             </h3>
                             <ul className="mt-1 space-y-1.5 text-sm">
                               {slot.cards.map((card) => (
@@ -505,22 +418,14 @@ export default async function CalendarPage({
                       </div>
                     )}
 
-                    {/* Adding is only offered on a semester that can still be changed. */}
+                    {/* Adding is only offered on a period that can still be changed. */}
                     {canEdit ? (
                       <div className="flex flex-wrap gap-2 border-t border-eavi-border pt-3">
                         <RowForm
-                          id={`new-intake-${semester.id}`}
-                          button={semesterCopy.intake.button}
-                          fields={semesterCopy.intake.fields}
-                          hidden={{ semesterId: semester.id }}
-                          action={createIntake}
-                          submitLabel={common.create}
-                        />
-                        <RowForm
-                          id={`new-event-${semester.id}`}
+                          id={`new-event-${period.id}`}
                           button={copy.events.create.button}
                           fields={copy.events.create.fields}
-                          hidden={{ semesterId: semester.id }}
+                          hidden={{ periodId: period.id }}
                           action={createEvent}
                           submitLabel={common.create}
                         />

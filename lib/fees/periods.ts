@@ -15,21 +15,24 @@ export type PeriodDraft = {
   dueOffsetDays: number;
 };
 
-/** A campus semester, as the academic calendar stores it. */
+/** A campus academic period, as the calendar stores it. */
 export type CalendarPeriod = {
   id: string;
   year: number;
-  semesterNo: number;
+  /** 1, 5 or 9 — the intake month. */
+  month: number;
+  /** Which of the year's three periods this is. */
+  sequence: number;
   name: string;
-  startDate: Date;
-  endDate: Date;
+  startsAt: Date;
+  endsAt: Date;
 };
 
 /** A period with the date and the calendar row it falls inside. */
 export type ResolvedPeriod = PeriodDraft & {
   sequence: number;
   dueDate: Date;
-  semesterId: string | null;
+  periodId: string | null;
   /**
    * The student's OWN year and semester for this period, counted from their intake. This is
    * what the bill is read against — not whichever calendar semester the due date happens in.
@@ -172,7 +175,7 @@ function semesterHolding(calendar: readonly CalendarPeriod[], date: Date): Calen
   const day = startOfDay(date).getTime();
   return (
     calendar.find(
-      (period) => startOfDay(period.startDate).getTime() <= day && day <= startOfDay(period.endDate).getTime(),
+      (period) => startOfDay(period.startsAt).getTime() <= day && day <= startOfDay(period.endsAt).getTime(),
     ) ?? null
   );
 }
@@ -197,7 +200,7 @@ export function resolvePeriods(
   semestersPerYear?: number,
 ): ResolvedPeriod[] {
   const perYear = periodsPerYear(semestersPerYear);
-  const ordered = [...calendar].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  const ordered = [...calendar].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const start = startOfDay(startDate);
 
   const calendarLinked = kind === "SEMESTER";
@@ -221,7 +224,7 @@ export function resolvePeriods(
       ...period,
       sequence: index + 1,
       dueDate,
-      semesterId: covered?.id ?? null,
+      periodId: covered?.id ?? null,
       // The student's own position, straight off the plan.
       periodYear: period.yearIndex,
       periodSemester: period.semesterNo,

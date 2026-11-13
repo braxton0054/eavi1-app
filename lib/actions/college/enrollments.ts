@@ -55,13 +55,13 @@ export async function createEnrollment(formData: FormData) {
     if (!program) throw new FieldError(fieldErrors.notOnCampus);
 
     if (intakeId) {
-      const intake = await prisma.intake.findUnique({
+      const period = await prisma.academicPeriod.findUnique({
         where: { id: intakeId },
         select: { id: true, campusId: true },
       });
-      if (!intake) throw new FieldError(fieldErrors.choice(fieldLabel("intakeId")));
-      // A cohort belongs to one campus; a student cannot join another campus's intake.
-      if (intake.campusId !== (scope.campusId ?? student.campusId)) {
+      if (!period) throw new FieldError(fieldErrors.choice(fieldLabel("intakeId")));
+      // A period belongs to one campus; a student cannot join another campus's intake.
+      if (period.campusId !== (scope.campusId ?? student.campusId)) {
         throw new FieldError(fieldErrors.notOnCampus);
       }
     }
@@ -80,7 +80,7 @@ export async function createEnrollment(formData: FormData) {
     const plan = await activePlanFor(programId);
     const invoiceNumbers = await nextInvoiceNumbers(plan?.periods.length ?? 0);
     const intake = intakeId
-      ? await prisma.intake.findUnique({
+      ? await prisma.academicPeriod.findUnique({
           where: { id: intakeId },
           select: { id: true, startsAt: true },
         })
@@ -95,7 +95,7 @@ export async function createEnrollment(formData: FormData) {
           data: {
             studentId,
             programId,
-            intakeId: intake.id,
+            periodId: intake.id,
             cohort,
             campusId,
             // The student starts at their intake's first period, not wherever the campus
@@ -115,7 +115,7 @@ export async function createEnrollment(formData: FormData) {
         programId,
         // Fees count from the intake's own Semester 1.
         startDate: intake.startsAt,
-        intakeId: intake.id,
+        periodId: intake.id,
         numbers: invoiceNumbers,
       });
 
@@ -184,11 +184,11 @@ export async function promoteEnrollment(formData: FormData) {
 
     // The campus calendar decides how many periods a year has, so the promotion uses the
     // same shape the student's own plan was built with.
-    const calendar = await prisma.semester.findMany({
+    const calendar = await prisma.academicPeriod.findMany({
       where: { campusId: enrollment.campusId },
-      select: { semesterNo: true },
+      select: { sequence: true },
     });
-    const semestersPerYear = new Set(calendar.map((row) => row.semesterNo)).size || undefined;
+    const semestersPerYear = new Set(calendar.map((row) => row.sequence)).size || undefined;
 
     const next = nextPeriod(
       { yearIndex: enrollment.yearIndex, semesterNo: enrollment.semesterNo },

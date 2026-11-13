@@ -100,45 +100,54 @@ async function main() {
   console.log(`Fees verification · ${tag}\n`);
 
   const campus = await prisma.campus.create({
-    data: { code: `T${Date.now() % 100000}`, name: `${tag} campus`, place: "Test", takesApplicants: true },
+    data: { code: `T${Date.now() % 100000}`, name: `${tag} campus`, place: "Test", takesApplicants: false },
     select: { id: true },
   });
 
-  const calendarSeeds = [
-    { year: 2027, semesterNo: 1, start: "2027-01-12", end: "2027-04-20" },
-    { year: 2027, semesterNo: 2, start: "2027-05-10", end: "2027-08-18" },
-    { year: 2027, semesterNo: 3, start: "2027-09-07", end: "2027-12-15" },
-    { year: 2028, semesterNo: 1, start: "2028-01-10", end: "2028-04-18" },
-    { year: 2028, semesterNo: 2, start: "2028-05-08", end: "2028-08-16" },
-    { year: 2028, semesterNo: 3, start: "2028-09-05", end: "2028-12-13" },
-  ];
-
-  for (const seed of calendarSeeds) {
-    await prisma.semester.create({
-      data: {
-        campusId: campus.id,
-        year: seed.year,
-        semesterNo: seed.semesterNo,
-        name: `Year ${seed.year} · Semester ${seed.semesterNo}`,
-        startDate: day(seed.start),
-        endDate: day(seed.end),
-      },
-    });
-  }
-
-  // Every enrolment belongs to an intake, which is what anchors the student's own Semester 1.
-  const intake = await prisma.intake.create({
+  /*
+    Every enrolment belongs to a period, which anchors the student's own Semester 1. The period
+    the test student joins is the January 2027 one, so it carries the window the student needs.
+  */
+  const intake = await prisma.academicPeriod.create({
     data: {
-      name: `${tag} January intake`,
+      name: `January intake 2027`,
       campusId: campus.id,
       year: 2027,
       month: 1,
+      sequence: 1,
       startsAt: day("2027-01-05"),
+      endsAt: day("2027-04-20"),
       applicationDeadline: day("2026-12-15"),
-      commenceAt: day("2027-01-05"),
     },
     select: { id: true },
   });
+
+  /*
+   * The rest of the campus calendar. A fee plan of kind SEMESTER reads how many periods the
+   * year is split into off the campus calendar, so this campus has to run its other two
+   * periods or the six-period plan below would be billed as if the year had one period.
+   */
+  for (const seed of [
+    { year: 2027, month: 5, sequence: 2, start: "2027-05-10", end: "2027-08-18" },
+    { year: 2027, month: 9, sequence: 3, start: "2027-09-07", end: "2027-12-15" },
+    { year: 2028, month: 1, sequence: 1, start: "2028-01-10", end: "2028-04-18" },
+    { year: 2028, month: 5, sequence: 2, start: "2028-05-08", end: "2028-08-16" },
+    { year: 2028, month: 9, sequence: 3, start: "2028-09-05", end: "2028-12-13" },
+  ]) {
+    await prisma.academicPeriod.create({
+      data: {
+        campusId: campus.id,
+        year: seed.year,
+        month: seed.month,
+        sequence: seed.sequence,
+        name: `${["January", "May", "September"][seed.sequence - 1]} intake ${seed.year}`,
+        startsAt: day(seed.start),
+        endsAt: day(seed.end),
+        // Applications close three weeks before the period opens.
+        applicationDeadline: new Date(day(seed.start).getTime() - 21 * 86_400_000),
+      },
+    });
+  }
 
   const department = await prisma.department.create({ data: { name: `${tag} dept` }, select: { id: true } });
   const body = await prisma.programBody.create({
@@ -217,7 +226,7 @@ async function main() {
       select: { id: true },
     });
     const enrollment = await prisma.enrollment.create({
-      data: { studentId: student.id, programId, campusId: campus.id, intakeId: intake.id, status: "ACTIVE" },
+      data: { studentId: student.id, programId, campusId: campus.id, periodId: intake.id, status: "ACTIVE" },
       select: { id: true },
     });
     return { studentId: student.id, enrollmentId: enrollment.id };
@@ -347,7 +356,7 @@ async function main() {
   const bInvoices = await prisma.invoice.findMany({
     where: { enrollmentId: b.enrollmentId },
     orderBy: { feePeriod: { sequence: "asc" } },
-    include: { semester: true, lines: true },
+    include: { period: true, lines: true },
   });
   // A semester plan is dated from the student's intake. Period 1 opens on day one of their
   // intake and every later period follows it, whatever the campus calendar is doing then.
@@ -467,8 +476,7 @@ async function main() {
   await prisma.invoice.deleteMany({ where: { campusId: campus.id } });
   await prisma.studentUnit.deleteMany({ where: { enrollment: { campusId: campus.id } } });
   await prisma.enrollment.deleteMany({ where: { campusId: campus.id } });
-  await prisma.intake.deleteMany({ where: { campusId: campus.id } });
-  await prisma.semester.deleteMany({ where: { campusId: campus.id } });
+  await prisma.academicPeriod.deleteMany({ where: { campusId: campus.id } });
   await prisma.campus.delete({ where: { id: campus.id } });
   await prisma.department.delete({ where: { id: department.id } });
   await prisma.programBody.delete({ where: { id: body.id } });

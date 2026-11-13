@@ -157,7 +157,7 @@ export default async function StudentProfilePage({
     id: enrollment.id,
     cells: {
       program: `${enrollment.program.name} (${enrollment.program.code})`,
-      intake: enrollment.intake?.name ?? common.notSet,
+      intake: enrollment.period?.name ?? common.notSet,
       cohort: enrollment.cohort ?? common.notSet,
       status: (
         <StatusChip tone={enrollmentTone[enrollment.status] ?? "neutral"}>
@@ -259,7 +259,7 @@ export default async function StudentProfilePage({
     id: row.invoice.id,
     cells: {
       period: periodLabel(row.invoice),
-      calendar: row.invoice.semester?.name ?? common.notSet,
+      calendar: row.invoice.period?.name ?? common.notSet,
       dueAt: formatDate(row.invoice.dueAt),
       amount: money(row.billed),
       paid: money(row.paid),
@@ -444,7 +444,7 @@ export default async function StudentProfilePage({
       ? `${activeEnrollment.program.name} (${activeEnrollment.program.code})`
       : common.notSet,
     enrolled: activeEnrollment
-      ? [formatDate(activeEnrollment.enrolledAt), activeEnrollment.intake?.name]
+      ? [formatDate(activeEnrollment.enrolledAt), activeEnrollment.period?.name]
           .filter(Boolean)
           .join(" · ")
       : common.notSet,
@@ -454,7 +454,7 @@ export default async function StudentProfilePage({
     guardian: asFacts(detailGroups[2].rows),
     enrollments: student.enrollments.map((enrollment) => [
       cell(`${enrollment.program.name} (${enrollment.program.code})`),
-      cell(enrollment.intake?.name),
+      cell(enrollment.period?.name),
       cell(enrollment.cohort),
       cell(labels.enrollmentStatus[enrollment.status]),
       cell(formatDate(enrollment.enrolledAt)),
@@ -607,8 +607,8 @@ export default async function StudentProfilePage({
                 <dt className="text-xs text-eavi-muted-text">{copy.profile.enrolled}</dt>
                 <dd className="text-sm font-medium">
                   {activeEnrollment ? formatDate(activeEnrollment.enrolledAt) : common.notSet}
-                  {activeEnrollment?.intake?.name ? (
-                    <span className="ml-1.5 text-eavi-muted-text">· {activeEnrollment.intake.name}</span>
+                  {activeEnrollment?.period?.name ? (
+                    <span className="ml-1.5 text-eavi-muted-text">· {activeEnrollment.period.name}</span>
                   ) : null}
                 </dd>
               </div>

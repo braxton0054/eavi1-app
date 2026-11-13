@@ -35,7 +35,7 @@ type Row = {
   programId: string;
   yearIndex: number;
   semesterNo: number;
-  intake: { startsAt: Date };
+  period: { startsAt: Date };
 };
 
 /**
@@ -48,9 +48,9 @@ async function totalPeriodsFor(programIds: string[]): Promise<Map<string, number
     select: { id: true, structure: true, durationMonths: true },
   });
 
-  const perYearRows = await prisma.semester.findMany({
-    select: { semesterNo: true },
-    distinct: ["semesterNo"],
+  const perYearRows = await prisma.academicPeriod.findMany({
+    select: { sequence: true },
+    distinct: ["sequence"],
   });
   const perYear = Math.max(1, perYearRows.length || 3);
 
@@ -71,11 +71,11 @@ async function totalPeriodsFor(programIds: string[]): Promise<Map<string, number
  * Exported so a screen can show the true position even before a sync has run.
  */
 export function expectedPeriod(
-  row: { yearIndex: number; semesterNo: number; intake: { startsAt: Date } },
+  row: { yearIndex: number; semesterNo: number; period: { startsAt: Date } },
   totalPeriods: number,
   options: { semestersPerYear?: number; monthsPerPeriod?: number; asOf?: Date } = {},
 ): AcademicPeriod {
-  const derived = currentPeriod(row.intake, options.asOf ?? new Date(), {
+  const derived = currentPeriod(row.period, options.asOf ?? new Date(), {
     totalPeriods,
     semestersPerYear: options.semestersPerYear,
     monthsPerPeriod: options.monthsPerPeriod ?? DEFAULT_PERIOD_MONTHS,
@@ -106,16 +106,16 @@ export async function syncProgression(campusId: number | null): Promise<Progress
       programId: true,
       yearIndex: true,
       semesterNo: true,
-      intake: { select: { startsAt: true } },
+      period: { select: { startsAt: true } },
     },
   });
 
   if (rows.length === 0) return { checked: 0, advanced: 0, billed: 0 };
 
   const totals = await totalPeriodsFor([...new Set(rows.map((row) => row.programId))]);
-  const perYearRows = await prisma.semester.findMany({
-    select: { semesterNo: true },
-    distinct: ["semesterNo"],
+  const perYearRows = await prisma.academicPeriod.findMany({
+    select: { sequence: true },
+    distinct: ["sequence"],
   });
   const semestersPerYear = Math.max(1, perYearRows.length || 3);
 
@@ -182,7 +182,7 @@ async function billNewlyReachedPeriods(enrollmentIds: string[]): Promise<number>
       programId: true,
       yearIndex: true,
       semesterNo: true,
-      intake: { select: { id: true, startsAt: true } },
+      period: { select: { id: true, startsAt: true } },
     },
   });
 
@@ -209,8 +209,8 @@ async function billNewlyReachedPeriods(enrollmentIds: string[]): Promise<number>
         enrollmentId: enrollment.id,
         campusId: enrollment.campusId,
         programId: enrollment.programId,
-        startDate: enrollment.intake.startsAt,
-        intakeId: enrollment.intake.id,
+        startDate: enrollment.period.startsAt,
+        periodId: enrollment.period.id,
         // Only the period the student has reached is billed now; the rest keep as they
         // advance, so nobody owes for a semester they have not begun.
         upTo: { yearIndex: enrollment.yearIndex, semesterNo: enrollment.semesterNo },

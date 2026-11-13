@@ -271,15 +271,15 @@ export async function semesterOnCampus(
   const value = text(formData, name);
   if (!value) return null;
 
-  const semester = await prisma.semester.findUnique({
+  const period = await prisma.academicPeriod.findUnique({
     where: { id: value },
     select: { id: true, campusId: true },
   });
-  if (!semester || (campusId !== null && semester.campusId !== campusId)) {
+  if (!period || (campusId !== null && period.campusId !== campusId)) {
     throw new FieldError(fieldErrors.notOnCampus);
   }
 
-  return semester.id;
+  return period.id;
 }
 
 /**

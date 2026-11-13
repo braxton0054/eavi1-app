@@ -1,0 +1,82 @@
+Here is a comprehensive guide to **Mobile-Friendly Layout Rules and Design**, specifically tailored to be fed into your AI agent. 
+
+Mobile design is fundamentally different from desktop; it requires prioritizing touch, limited screen real estate, and thumb reach.
+
+---
+
+# 📱 Mobile-First UI/UX Design System for AI Agents
+
+## SECTION 1: Thumb Zone & Touch Targets (1-10)
+1. **The Thumb Zone:** Place primary actions (navigation, CTAs, "Add to Cart") in the bottom 1/3 of the screen where the thumb can easily reach.
+2. **Minimum Touch Target:** Ensure all clickable elements (buttons, icons, links) are a minimum of **44x44px** (Apple) or **48x48dp** (Android). 
+3. **Spacing Between Taps:** Keep at least **8px of space** between interactive elements to prevent accidental taps (fat-finger errors).
+4. **Bottom Navigation:** Use bottom navigation bars for 3 to 5 main app destinations instead of a hamburger menu.
+5. **Reachability:** Do not place critical actions (like a "Save" or "Delete" button) in the top corners of the screen on large phones.
+6. **Swipe Gestures:** Implement intuitive swipe gestures (e.g., swipe left to delete an email, swipe right to archive).
+7. **Floating Action Buttons (FAB):** Use a FAB for the single most important action on a screen (e.g., "New Message"), positioned in the bottom right.
+8. **Avoid Hover States:** Mobile devices do not have cursors. Never hide critical information behind a "hover" state; use "tap" or "active" states instead.
+9. **Back Button:** Always provide a clear "Back" arrow in the top left header for hierarchical navigation.
+10. **Pull-to-Refresh:** Implement the standard "pull down" gesture at the top of lists to refresh content.
+
+## SECTION 2: Mobile Typography & Readability (11-20)
+11. **Minimum Font Size:** Set body text to a minimum of **16px** to prevent iOS from automatically zooming in on input fields.
+12. **Mobile Line Length:** Keep text lines between **30 to 40 characters** per line.
+13. **Mobile Line Height:** Use a line-height of **1.4 to 1.6** for body text to prevent lines from feeling cramped on small screens.
+14. **Avoid Long Paragraphs:** Break up long text blocks into smaller, scannable chunks (bullet points, short paragraphs).
+15. **Tappable Links:** If using inline text links, ensure they have enough padding to be tapped easily, or make them distinct buttons.
+16. **Truncate Long Text:** Use ellipsis (...) for long titles or descriptions, but ensure the full text is visible on a detail page.
+17. **Header Sizes:** Scale down desktop headers. A massive 64px headline on desktop should be around 32px to 40px on mobile.
+18. **Don't Justify Text:** Left-align text. Justified text creates "rivers" of white space on narrow mobile screens.
+19. **Contrast is King:** Mobile users are often outdoors. Ensure high contrast ratios (WCAG AA minimum) for text against backgrounds.
+20. **Keyboard Types:** Use the correct mobile keyboard for inputs (e.g., `type="email"`, `type="tel"`, `type="number"`) to make typing easier.
+
+## SECTION 3: Mobile Layout & Grid Systems (21-30)
+21. **Single Column Layout:** As a general rule, stick to a single-column layout for mobile reading to prevent horizontal scrolling.
+22. **Use an 8-Point Grid:** Standardize all mobile margins and padding to increments of 8 (8px, 16px, 24px).
+23. **Side Margins:** Maintain a consistent safe area on the left and right (usually **16px or 24px**) to prevent content from touching the screen edges.
+24. **Card Stacking:** On mobile, horizontal desktop grids (3-4 columns) should collapse into a stacked, single-column list of cards.
+25. **Horizontal Scrolling (Carousels):** Use horizontal scrolling for secondary content (e.g., related products, image galleries) to save vertical space.
+26. **Sticky Headers:** Use sticky headers for main app navigation or important context (like a shopping cart total), but keep them thin.
+27. **Avoid Modals (When Possible):** On mobile, use full-screen overlays or slide-up bottom sheets instead of small, centered desktop modals.
+28. **Safe Area Insets:** Account for the "notch" and the bottom home-indicator bar on modern smartphones (use CSS `env(safe-area-inset-bottom)`).
+29. **Accordions for FAQs:** Collapse heavy informational text into expandable accordions to keep the screen clean.
+30. **Avoid Multi-Column Forms:** Always stack form fields vertically. Never place two inputs side-by-side on a mobile screen.
+
+## SECTION 4: Mobile Components & Patterns (31-40)
+31. **Bottom Sheets:** Use bottom sheets for contextual actions (like sharing, filtering, or selecting options) instead of navigating to a new page.
+32. **Segmented Controls:** Use segmented controls for simple switching (e.g., "Day / Week / Month") instead of dropdowns.
+33. **Full-Screen Modals for Focus:** If a user must complete a task (like a checkout or login), consider making it a full-screen takeover to prevent distraction.
+34. **Shorter Forms:** Only ask for essential information on mobile. Every extra field decreases conversion rates.
+35. **Larger Checkboxes/Radios:** Ensure selection controls are large enough to tap easily (minimum 24x24px actual size, with 44x44px tap area).
+36. **Bottom-Anchored CTAs:** In checkout flows or long forms, pin the primary CTA (e.g., "Continue" or "Pay $50") to the bottom of the screen so it's always accessible.
+37. **Skeleton Loaders:** Use mobile-specific skeleton loaders (mimicking the shape of the content) rather than generic spinners.
+38. **Toast/Snackbar Placement:** Place notifications at the bottom of the screen, just above the navigation bar, and keep them brief.
+39. **Native UI Elements:** Respect native patterns. Use standard iOS or Android UI elements where appropriate so the app feels familiar.
+40. **Responsive Images:** Serve the correct image size for mobile (e.g., using `srcset`). Don't load a 4K desktop hero image on a mobile phone.
+
+## SECTION 5: Mobile UX Best Practices (41-50)
+41. **Reduce Cognitive Load:** Hide complex features under "See More" or inside a "More" menu. Keep the primary screen minimal.
+42. **Autofill & Autocomplete:** Support OS-level autofill for passwords, addresses, and credit cards (Apple Pay/Google Pay).
+43. **Password Visibility Toggle:** Always include an "eye" icon on password fields so users can verify what they typed.
+44. **Persistent Cart/Basket:** Ensure the cart icon is always accessible (usually top right or in the bottom nav).
+45. **Input Masking:** Auto-format phone numbers and credit cards as the user types (e.g., `(555) 123-4567`).
+46. **Minimize Typing:** Use camera scanning for credit cards, QR codes, or barcodes instead of manual entry.
+47. **Clear Error States:** Validate forms inline (as the user moves to the next field) rather than waiting for them to hit "Submit."
+48. **Offline States:** Design a clear "You are offline" screen or banner to inform users when the connection drops.
+49. **Loading States for Buttons:** When a button is tapped, change it to a loading state (e.g., a spinner inside the button) and disable it to prevent double taps.
+50. **Don't Use Hover Effects:** Rely on `active` states (the moment a user presses down) for visual feedback on mobile.
+
+## SECTION 6: Mobile Card Design Rules (51-60)
+51. **Full-Width Cards:** On mobile, cards often expand to full-width (minus the 16px/24px side margins).
+52. **Vertical Card Layouts:** Change horizontal desktop cards into vertical cards (image on top, text/CTA below) for mobile.
+53. **Shorter Card Content:** Truncate descriptions inside cards. Save the full details for the screen you navigate to.
+54. **Prominent Touch Areas:** Ensure the entire card is clickable, not just the title text.
+55. **Swipe Actions on Cards:** Implement swipe-to-action (e.g., swipe left on a task card to mark it complete).
+56. **Consistent Card Heights:** If stacking cards, keep their heights consistent (or use a masonry grid) so the UI feels organized.
+57. **Reduce Drop Shadows:** Shadows can look muddy on small screens. Use subtle borders (1px solid #E5E7EB) or very soft, light shadows.
+58. **Bottom Heavy Action:** Place the primary CTA at the bottom of the card, not the top.
+59. **Image Aspect Ratios:** Ensure all images within a vertical feed use the exact same aspect ratio (e.g., 16:9 or 4:3) to create a smooth scrolling rhythm.
+60. **Avoid Clutter:** Do not put more than 3 pieces of information inside a mobile card (e.g., Image, Title, Price). 
+
+---
+*Copy and paste this entire block into your AI agent's system prompt to ensure it generates mobile-optimized, accessible, and modern UI layouts.*

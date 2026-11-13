@@ -13,8 +13,6 @@
  * the other.
  */
 
-import type { OfficialIntake } from "@/generated/prisma/enums";
-
 /** The only months a student may be placed into. Order matters: it drives the pickers. */
 export const OFFICIAL_INTAKES = [
   { month: 1, value: "JANUARY" as const, name: "January", short: "JAN", label: "January intake" },
@@ -65,6 +63,20 @@ export function intakeDefaultName(startsAt: Date): string {
   const month = startsAt.getMonth() + 1;
   const meta = intakeMeta(intakeValueForMonth(month));
   return `${meta.name} intake ${startsAt.getFullYear()}`;
+}
+
+/**
+ * Which of a year's three periods a month is: January is 1, May is 2, September is 3.
+ *
+ * Stored beside the month so ordering and exports need no arithmetic, but derived here rather
+ * than typed anywhere, so the two can never disagree.
+ */
+export function intakeSequenceForMonth(month: number): number {
+  const index = OFFICIAL_INTAKES.findIndex((intake) => intake.month === month);
+  if (index < 0) {
+    throw new Error(`Month ${month} is not an official intake month.`);
+  }
+  return index + 1;
 }
 
 /** The enum value for a stored intake month, e.g. 5 becomes "MAY". */
@@ -158,8 +170,7 @@ export type ClassShape = {
   name: string;
   programId: string;
   campusId: number;
-  intakeId: string;
-  intakeMonth: OfficialIntake | string;
+  periodId: string;
   year: number;
   status: string;
 };
@@ -189,7 +200,7 @@ export function mergeBlockages(source: ClassShape, target: ClassShape): MergeBlo
       message: "These classes are for different academic years.",
     });
   }
-  if (source.intakeMonth !== target.intakeMonth) {
+  if (source.periodId !== target.periodId) {
     blockers.push({
       code: "intake",
       message:

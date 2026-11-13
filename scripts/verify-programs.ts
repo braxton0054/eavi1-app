@@ -36,37 +36,22 @@ async function main() {
   console.log(`Programme structure verification · ${tag}\n`);
 
   const campus = await prisma.campus.create({
-    data: { code: `TP${Date.now() % 100000}`, name: `${tag} campus`, place: "Test", takesApplicants: true },
+    data: { code: `TP${Date.now() % 100000}`, name: `${tag} campus`, place: "Test", takesApplicants: false },
     select: { id: true },
   });
 
-  for (const seed of [
-    { year: 2027, semesterNo: 1, start: "2027-01-12", end: "2027-04-20" },
-    { year: 2027, semesterNo: 2, start: "2027-05-10", end: "2027-08-18" },
-    { year: 2027, semesterNo: 3, start: "2027-09-07", end: "2027-12-15" },
-  ]) {
-    await prisma.semester.create({
-      data: {
-        campusId: campus.id,
-        year: seed.year,
-        semesterNo: seed.semesterNo,
-        name: `Year ${seed.year} · Semester ${seed.semesterNo}`,
-        startDate: day(seed.start),
-        endDate: day(seed.end),
-      },
-    });
-  }
-
-  // The cohort the test student joins; their Semester 1 begins on this date.
-  const intake = await prisma.intake.create({
+  // The cohort the test student joins; their Semester 1 begins on this date. It is also the
+  // campus's January period, because an intake IS the period it opens.
+  const intake = await prisma.academicPeriod.create({
     data: {
-      name: `${tag} January intake`,
+      name: `January intake 2027`,
       campusId: campus.id,
       year: 2027,
       month: 1,
+      sequence: 1,
       startsAt: day("2027-01-12"),
+      endsAt: day("2027-04-20"),
       applicationDeadline: day("2026-12-20"),
-      commenceAt: day("2027-01-12"),
     },
     select: { id: true },
   });
@@ -176,7 +161,7 @@ async function main() {
     select: { id: true },
   });
   const enrollment = await prisma.enrollment.create({
-    data: { studentId: student.id, programId: semesterProgram.id, campusId: campus.id, intakeId: intake.id, status: "ACTIVE" },
+    data: { studentId: student.id, programId: semesterProgram.id, campusId: campus.id, periodId: intake.id, status: "ACTIVE" },
     select: { id: true },
   });
 
@@ -395,8 +380,7 @@ async function main() {
   await prisma.invoice.deleteMany({ where: { campusId: campus.id } });
   await prisma.studentUnit.deleteMany({ where: { enrollment: { campusId: campus.id } } });
   await prisma.enrollment.deleteMany({ where: { campusId: campus.id } });
-  await prisma.intake.deleteMany({ where: { campusId: campus.id } });
-  await prisma.semester.deleteMany({ where: { campusId: campus.id } });
+  await prisma.academicPeriod.deleteMany({ where: { campusId: campus.id } });
   await prisma.campus.delete({ where: { id: campus.id } });
   await prisma.department.delete({ where: { id: department.id } });
   await prisma.programBody.delete({ where: { id: body.id } });

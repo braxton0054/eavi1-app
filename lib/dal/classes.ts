@@ -52,13 +52,12 @@ export async function getClasses(filters: {
       note: true,
       status: true,
       year: true,
-      intakeMonth: true,
       programId: true,
       campusId: true,
-      intakeId: true,
+      periodId: true,
       program: { select: { name: true, code: true, structure: true } },
       campus: { select: { name: true } },
-      intake: { select: { name: true, year: true, month: true } },
+      period: { select: { name: true, year: true, month: true } },
       memberships: {
         select: { leftAt: true, enrollment: { select: { yearIndex: true, semesterNo: true } } },
       },
@@ -79,14 +78,16 @@ export async function getClasses(filters: {
       note: row.note,
       status: row.status,
       year: row.year,
-      intakeMonth: row.intakeMonth,
+      // Derived from the period rather than stored, so a class can never advertise an intake the
+      // period disagrees with.
+      intakeMonth: row.period.name,
       programId: row.programId,
       programName: row.program.name,
       programCode: row.program.code,
       campusId: row.campusId,
       campusName: row.campus.name,
-      intakeId: row.intakeId,
-      intakeName: `${row.intake.name} · ${row.intake.year}`,
+      intakeId: row.periodId,
+      intakeName: `${row.period.name} · ${row.period.year}`,
       students: open.length,
       placements: stages.length === 0 ? "No students yet" : stages.join(" · "),
       // Memberships that were moved into this class from another one, for the audit trail.
@@ -114,7 +115,7 @@ export async function getClassOptions(campusId: number | null, programId?: strin
       ...(programId ? { programId } : {}),
     },
     orderBy: [{ year: "desc" }, { name: "asc" }],
-    select: { id: true, name: true, year: true, programId: true, intakeId: true },
+    select: { id: true, name: true, year: true, programId: true, periodId: true },
   });
 
   return rows.map((row) => ({
@@ -122,7 +123,7 @@ export async function getClassOptions(campusId: number | null, programId?: strin
     label: row.name,
     // A class belongs to one programme; the admission form shows only its own programme's.
     programId: row.programId,
-    intakeId: row.intakeId,
+    intakeId: row.periodId,
     year: row.year,
   }));
 }
@@ -158,7 +159,7 @@ export async function getClassMembers(classId: string): Promise<ClassMember[]> {
           yearIndex: true,
           semesterNo: true,
           status: true,
-          intake: { select: { name: true, year: true, month: true } },
+          period: { select: { name: true, year: true, month: true } },
           program: { select: { structure: true } },
           student: {
             select: {
@@ -195,8 +196,8 @@ export async function getClassMembers(classId: string): Promise<ClassMember[]> {
       admissionNo: enrollment.student.admissionNo,
       phone: enrollment.student.user.phone,
       admissionDate: enrollment.student.admissionDate,
-      intakeName: `${enrollment.intake.name} · ${enrollment.intake.year}`,
-      intakeMonth: enrollment.intake.name,
+      intakeName: `${enrollment.period.name} · ${enrollment.period.year}`,
+      intakeMonth: enrollment.period.name,
       placement: placementLabel(
         { yearIndex: enrollment.yearIndex, semesterNo: enrollment.semesterNo },
         enrollment.program.structure,
@@ -293,8 +294,7 @@ async function loadClassShape(id: string, campusId: number | null): Promise<Clas
       name: true,
       programId: true,
       campusId: true,
-      intakeId: true,
-      intakeMonth: true,
+      periodId: true,
       year: true,
       status: true,
     },
@@ -307,9 +307,9 @@ export function mergeSummary(preview: MergePreview): string {
   return describeMerge(preview);
 }
 
-/** Intakes that a new class may be attached to, newest first. */
+/** Periods that a new class may be attached to, newest first. */
 export async function getIntakeChoices(campusId: number | null) {
-  const rows = await prisma.intake.findMany({
+  const rows = await prisma.academicPeriod.findMany({
     where: campusWhere(campusId),
     orderBy: [{ year: "desc" }, { startsAt: "desc" }],
     select: { id: true, name: true, year: true, month: true, startsAt: true },

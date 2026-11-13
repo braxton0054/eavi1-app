@@ -28,7 +28,7 @@ async function cleanup(campusId: number) {
   await prisma.studentProfile.deleteMany({ where: { campusId } });
   await prisma.user.deleteMany({ where: { campusId } });
   await prisma.academicClass.deleteMany({ where: { campusId } });
-  await prisma.intake.deleteMany({ where: { campusId } });
+  await prisma.academicPeriod.deleteMany({ where: { campusId } });
   await prisma.$executeRawUnsafe(`DELETE FROM "_ProgramCampuses" WHERE "A" = ${campusId}`).catch(() => {});
   await prisma.campus.delete({ where: { id: campusId } }).catch(() => {});
 }
@@ -68,13 +68,13 @@ async function main() {
 
   // The database itself must reject a fourth intake month, whatever the client sends.
   const campus = await prisma.campus.create({
-    data: { code: tag, name: `${tag} campus`, place: "Test", phone: "+254700000000" },
+    data: { code: tag, name: `${tag} campus`, place: "Test", phone: "+254700000000", takesApplicants: false },
   });
   campusIdForCleanup = campus.id;
   let rejected = false;
   try {
     await prisma.$executeRawUnsafe(
-      `INSERT INTO intakes (id, name, "campusId", year, month, "startsAt", "applicationDeadline", "commenceAt") VALUES (gen_random_uuid()::text, 'March intake', ${campus.id}, 2027, 3, now(), now(), now())`,
+      `INSERT INTO academic_periods (id, name, "campusId", year, month, sequence, "startsAt", "endsAt", "applicationDeadline", "updatedAt") VALUES (gen_random_uuid()::text, 'March intake', ${campus.id}, 2027, 3, 4, now() + interval '30 days', now() + interval '120 days', now(), now())`,
     );
   } catch {
     rejected = true;
@@ -94,26 +94,28 @@ async function main() {
     `INSERT INTO "_ProgramCampuses" ("A", "B") VALUES (${campus.id}, '${program.id}') ON CONFLICT DO NOTHING`,
   );
 
-  const januaryIntake = await prisma.intake.create({
+  const januaryIntake = await prisma.academicPeriod.create({
     data: {
-      name: "January intake",
+      name: "January intake 2027",
       campusId: campus.id,
       year: 2027,
       month: 1,
+      sequence: 1,
       startsAt: new Date(Date.UTC(2027, 0, 5)),
+      endsAt: new Date(Date.UTC(2027, 3, 30)),
       applicationDeadline: new Date(Date.UTC(2026, 11, 20)),
-      commenceAt: new Date(Date.UTC(2027, 0, 5)),
     },
   });
-  const mayIntake = await prisma.intake.create({
+  const mayIntake = await prisma.academicPeriod.create({
     data: {
-      name: "May intake",
+      name: "May intake 2027",
       campusId: campus.id,
       year: 2027,
       month: 5,
+      sequence: 2,
       startsAt: new Date(Date.UTC(2027, 4, 4)),
+      endsAt: new Date(Date.UTC(2027, 7, 31)),
       applicationDeadline: new Date(Date.UTC(2027, 3, 20)),
-      commenceAt: new Date(Date.UTC(2027, 4, 4)),
     },
   });
 
@@ -121,8 +123,7 @@ async function main() {
     data: {
       campusId: campus.id,
       programId: program.id,
-      intakeId: januaryIntake.id,
-      intakeMonth: "JANUARY",
+      periodId: januaryIntake.id,
       year: 2027,
       name: `${tag}/JAN/2027`,
     },
@@ -131,8 +132,7 @@ async function main() {
     data: {
       campusId: campus.id,
       programId: program.id,
-      intakeId: januaryIntake.id,
-      intakeMonth: "JANUARY",
+      periodId: januaryIntake.id,
       year: 2027,
       name: `${tag}/JAN-FEB/2027`,
       note: "Late January joiners",
@@ -176,7 +176,7 @@ async function main() {
         studentId: profile.id,
         programId: program.id,
         campusId: campus.id,
-        intakeId: januaryIntake.id,
+        periodId: januaryIntake.id,
         yearIndex: stage.yearIndex,
         semesterNo: stage.semesterNo,
       },
@@ -204,8 +204,7 @@ async function main() {
     name: "X/JAN/2027",
     programId: otherProgram?.id ?? "nope",
     campusId: campus.id,
-    intakeId: januaryIntake.id,
-    intakeMonth: "JANUARY",
+    periodId: januaryIntake.id,
     year: 2027,
     status: "ACTIVE",
   };
@@ -222,8 +221,8 @@ async function main() {
   check(
     "a class for another intake cannot be merged",
     mergeBlockages(
-      { ...tempClass, intakeMonth: "JANUARY" },
-      { ...tempClass, id: "x", intakeMonth: "SEPTEMBER" },
+      { ...tempClass, periodId: januaryIntake.id },
+      { ...tempClass, id: "x", periodId: mayIntake.id },
     ).some((b) => b.code === "intake"),
   );
   check(
@@ -292,9 +291,9 @@ async function main() {
 
   const intakesKept = await prisma.enrollment.findMany({
     where: { id: { in: students.map((s) => s.enrollment.id) } },
-    select: { intakeId: true },
+    select: { periodId: true },
   });
-  check("official intakes are untouched", intakesKept.every((row) => row.intakeId === januaryIntake.id));
+  check("official intakes are untouched", intakesKept.every((row) => row.periodId === januaryIntake.id));
 
   const admissionDates = await prisma.studentProfile.findMany({
     where: { id: { in: students.map((s) => s.profile.id) } },
@@ -330,11 +329,11 @@ async function main() {
   });
   const mantis = await prisma.enrollment.findUnique({
     where: { id: mover.enrollment.id },
-    select: { yearIndex: true, semesterNo: true, intakeId: true },
+    select: { yearIndex: true, semesterNo: true, periodId: true },
   });
   const invoicesAfter = await prisma.invoice.count({ where: { enrollmentId: mover.enrollment.id } });
   check("a class change does not move the academic stage", mantis?.yearIndex === mover.stage.yearIndex && mantis?.semesterNo === mover.stage.semesterNo);
-  check("a class change does not change the intake", mantis?.intakeId === januaryIntake.id);
+  check("a class change does not change the intake", mantis?.periodId === januaryIntake.id);
   check("a class change does not raise or remove a bill", invoicesAfter === invoicesBefore, `${invoicesBefore} -> ${invoicesAfter}`);
   check(
     "the previous membership is retained",
@@ -366,8 +365,7 @@ async function main() {
       data: {
         campusId: campus.id,
         programId: program.id,
-        intakeId: mayIntake.id,
-        intakeMonth: "MAY",
+        periodId: mayIntake.id,
         year: 2027,
         name: janClass.name,
       },
@@ -386,8 +384,7 @@ async function main() {
       data: {
         campusId: campus.id,
         programId: program.id,
-        intakeId: januaryIntake.id,
-        intakeMonth: "JANUARY",
+        periodId: januaryIntake.id,
         year: 2027,
         name: janClass.name,
       },
@@ -405,16 +402,17 @@ async function main() {
    * is already running or over: a transfer placed into the intake matching what they have already
    * studied, and a returning student resuming with the group they began in.
    */
-  const closedIntake = await prisma.intake.create({
+  const closedIntake = await prisma.academicPeriod.create({
     data: {
-      name: "Closed January intake",
+      name: "January intake 2025",
       campusId: campus.id,
       year: 2025,
       month: 1,
+      sequence: 1,
       startsAt: new Date(Date.UTC(2025, 0, 6)),
+      endsAt: new Date(Date.UTC(2025, 3, 30)),
       // Deliberately in the past: this cohort has already started and its applications closed.
       applicationDeadline: new Date(Date.UTC(2024, 11, 20)),
-      commenceAt: new Date(Date.UTC(2025, 0, 6)),
     },
   });
   check(
@@ -423,7 +421,7 @@ async function main() {
   );
 
   // The picker must now return it. Mirrors getIntakeOptions without needing a request scope.
-  const listed = await prisma.intake.findMany({
+  const listed = await prisma.academicPeriod.findMany({
     where: { campusId: campus.id },
     orderBy: [{ year: "desc" }, { month: "desc" }],
     select: { id: true, month: true, year: true, applicationDeadline: true },
@@ -486,7 +484,7 @@ async function main() {
       id: maySameName?.id ?? "none",
       campusId: campus.id,
       programId: program.id,
-      intakeId: januaryIntake.id,
+      periodId: januaryIntake.id,
       year: januaryIntake.year,
       status: "ACTIVE",
     },
@@ -503,7 +501,7 @@ async function main() {
       id: janClass.id,
       campusId: campus.id,
       programId: program.id,
-      intakeId: januaryIntake.id,
+      periodId: januaryIntake.id,
       year: januaryIntake.year,
       status: "ACTIVE",
     },
@@ -522,7 +520,7 @@ async function main() {
         id: janClass.id,
         campusId: campus.id,
         programId: foreignProgram.id,
-        intakeId: januaryIntake.id,
+        periodId: januaryIntake.id,
         year: januaryIntake.year,
         status: "ACTIVE",
       },

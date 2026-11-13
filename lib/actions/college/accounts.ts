@@ -64,7 +64,7 @@ export async function createInvoice(formData: FormData) {
 
     const studentId = requiredText(formData, "studentId", fieldLabel("studentId"));
     // The bill is raised against this campus's semester, so a foreign semester id is refused here.
-    const semesterId = await semesterOnCampus(formData, "semesterId", campusId);
+    const periodId = await semesterOnCampus(formData, "periodId", campusId);
     const dueAt = dateField(formData, "dueAt");
     const note = text(formData, "note");
 
@@ -86,7 +86,7 @@ export async function createInvoice(formData: FormData) {
           where: {
             programId: enrollment.programId,
             isOptional: false,
-            semesterId,
+            periodId,
           },
           orderBy: { label: "asc" },
           select: { label: true, amount: true },
@@ -102,7 +102,7 @@ export async function createInvoice(formData: FormData) {
             number,
             studentId,
             campusId,
-            semesterId,
+            periodId,
             programId: enrollment?.programId ?? null,
             dueAt,
             note,
@@ -235,7 +235,7 @@ export async function generateEnrollmentFees(formData: FormData) {
       programId: true,
       campusId: true,
       enrolledAt: true,
-      intake: { select: { commenceAt: true } },
+      period: { select: { startsAt: true } },
     },
   });
   if (!enrollment || (scope.campusId !== null && enrollment.campusId !== scope.campusId)) {
@@ -256,7 +256,7 @@ export async function generateEnrollmentFees(formData: FormData) {
         enrollmentId: enrollment.id,
         campusId: enrollment.campusId,
         programId: enrollment.programId,
-        startDate: enrollment.intake?.commenceAt ?? enrollment.enrolledAt,
+        startDate: enrollment.period?.startsAt ?? enrollment.enrolledAt,
         numbers,
       });
     });

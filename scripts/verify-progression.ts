@@ -52,7 +52,7 @@ async function main() {
   }
 
   console.log("\n4. The sync moves forward but never undoes a hold-back");
-  const stored = { intake: { startsAt: may } };
+  const stored = { period: { startsAt: may } };
   // Four-month periods from 4 May: Y1S2 from 4 Sep, Y1S3 from 4 Jan 2027.
   const ahead = expectedPeriod({ ...stored, yearIndex: 1, semesterNo: 1 }, 9, { ...opts, asOf: new Date(Date.UTC(2027, 0, 10)) });
   check("a stale period is advanced", ahead.yearIndex === 1 && ahead.semesterNo === 3, `${ahead.yearIndex}/${ahead.semesterNo}`);
@@ -98,7 +98,7 @@ async function checkBilling() {
 
   const enrollment = await prisma.enrollment.findFirst({
     where: { status: "ACTIVE", programId: planRow.programId },
-    include: { intake: true },
+    include: { period: true },
   });
   if (!enrollment) {
     console.log("  skip no enrolled student on the billed programme");
@@ -122,8 +122,8 @@ async function checkBilling() {
         enrollmentId: enrollment.id,
         campusId: enrollment.campusId,
         programId: enrollment.programId,
-        startDate: enrollment.intake.startsAt,
-        intakeId: enrollment.intake.id,
+        startDate: enrollment.period.startsAt,
+        periodId: enrollment.period.id,
         upTo: { yearIndex: 1, semesterNo: 1 },
         numbers,
       });
