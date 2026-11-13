@@ -186,11 +186,12 @@ export function EnrolmentForm({
     const errors: Record<string, string> = {};
     const fullName = String(fd.get("fullName") ?? "").trim();
     const email = String(fd.get("email") ?? "").trim();
-    const program = String(fd.get("programId") ?? "").trim();
-    const intake = String(fd.get("intakeId") ?? "").trim();
+    const program = String(fd.get("programId") ?? programId ?? "").trim();
+    const intake = String(fd.get("intakeId") ?? intakeId ?? "").trim();
     const password = String(fd.get("password") ?? "");
     if (!fullName) errors.fullName = "Enter the student's full name.";
     if (!email) errors.email = "Enter the sign-in email address.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Enter a valid email address.";
     if (!program) errors.programId = "Choose a programme.";
     if (!intake) errors.intakeId = "Choose the official intake.";
     if (!password) errors.password = "Enter a temporary password.";
@@ -206,6 +207,7 @@ export function EnrolmentForm({
 
   function goToFamily() {
     if (validateStepOne()) {
+      setStepErrors({});
       setStep(2);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -234,7 +236,13 @@ export function EnrolmentForm({
           <li key={s.n} className="flex min-w-0 flex-1 items-center gap-2">
             <button
               type="button"
-              onClick={() => setStep(s.n)}
+              onClick={() => {
+                if (s.n === 2) {
+                  goToFamily();
+                } else {
+                  setStep(1);
+                }
+              }}
               className={
                 "flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors " +
                 (step === s.n ? "bg-eavi-primary-soft" : "hover:bg-eavi-muted")
@@ -292,10 +300,25 @@ export function EnrolmentForm({
       <div className={step === 1 ? "space-y-5" : "hidden"}>
         <Section step="A" title="Student identity" hint="From the application — review and edit.">
           <Field label="Full name" error={stepErrors.fullName}>
-            <input name="fullName" defaultValue={selectedApp?.fullName ?? ""} required className={inputCls} aria-invalid={stepErrors.fullName ? true : undefined} />
+            <input
+              name="fullName"
+              defaultValue={selectedApp?.fullName ?? ""}
+              required
+              className={inputCls}
+              aria-invalid={stepErrors.fullName ? true : undefined}
+              onChange={() => { if (stepErrors.fullName) setStepErrors((e) => ({ ...e, fullName: "" })); }}
+            />
           </Field>
           <Field label="Email (sign-in)" error={stepErrors.email}>
-            <input name="email" type="email" defaultValue={selectedApp?.email ?? ""} required className={inputCls} aria-invalid={stepErrors.email ? true : undefined} />
+            <input
+              name="email"
+              type="email"
+              defaultValue={selectedApp?.email ?? ""}
+              required
+              className={inputCls}
+              aria-invalid={stepErrors.email ? true : undefined}
+              onChange={() => { if (stepErrors.email) setStepErrors((e) => ({ ...e, email: "" })); }}
+            />
           </Field>
           <Field label="Phone">
             <input name="phone" defaultValue={selectedApp?.phone ?? ""} className={inputCls} />
