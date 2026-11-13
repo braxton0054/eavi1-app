@@ -2,7 +2,7 @@
 
 import { ChevronLeftIcon, ChevronRightIcon, QuoteIcon } from "lucide-react";
 import { useState } from "react";
-import { ShimmerButton } from "@/components/magicui/shimmer-button";
+import { Button } from "@/components/ui/button";
 import { ContentPlaceholder } from "@/components/home/content-placeholder";
 import { Section, SectionHeader } from "@/components/home/section";
 import { pending, testimonialsSection } from "@/lib/content/home";
@@ -56,23 +56,27 @@ export function TestimonialsSection() {
             </figcaption>
           </figure>
 
+          {/* Carousel controls are controls, not CTAs — quiet outline icon buttons at
+              the 44px floor instead of shimmering accent pills. */}
           <div className="flex items-center gap-3">
-            <ShimmerButton
+            <Button
               type="button"
+              variant="outline"
+              size="icon"
               onClick={() => step(-1)}
               aria-label={testimonialsSection.previous}
-              className="size-11 px-0"
             >
               <ChevronLeftIcon />
-            </ShimmerButton>
-            <ShimmerButton
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="icon"
               onClick={() => step(1)}
               aria-label={testimonialsSection.next}
-              className="size-11 px-0"
             >
               <ChevronRightIcon />
-            </ShimmerButton>
+            </Button>
             <p className="text-xs font-medium text-muted-foreground tabular-nums">
               {testimonialsSection.slidePosition(index + 1, total)}
             </p>

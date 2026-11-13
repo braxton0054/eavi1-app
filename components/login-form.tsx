@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import { BorderBeam } from "@/components/magicui/border-beam";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import {
   Card,
@@ -14,8 +13,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Spinner } from "@/components/ui/spinner";
 import { isEmail } from "@/lib/validation";
 
@@ -118,10 +119,9 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
 
             <div className="flex flex-col space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
                 name="password"
-                type="password"
                 autoComplete="current-password"
                 placeholder="Enter your password"
                 value={password}
@@ -146,21 +146,16 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       </CardContent>
 
       <CardFooter className="flex justify-between">
-        <ShimmerButton asChild>
+        {/* CMP-11 hierarchy: signing in is the one primary action; reaching the register
+            page is a quiet outline link beside it. */}
+        <Button asChild variant="outline">
           <Link href="/register">Register</Link>
-        </ShimmerButton>
+        </Button>
         <ShimmerButton type="submit" form="login-form" disabled={busy}>
           {busy && <Spinner data-icon="inline-start" />}
-          {busy ? "Signing in" : "Login"}
+          {busy ? "Signing in" : "Sign in"}
         </ShimmerButton>
       </CardFooter>
-
-      <BorderBeam
-        duration={4}
-        size={300}
-        reverse
-        className="from-transparent via-green-500 to-transparent"
-      />
     </Card>
   );
 }

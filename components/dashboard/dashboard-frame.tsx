@@ -68,6 +68,13 @@ export function DashboardFrame({
   // ships without the matching provider, which fails every portal navigation.
   return (
     <SidebarProvider className={fill ? "h-dvh overflow-hidden bg-eavi-bg" : "min-h-dvh bg-eavi-bg"}>
+      {/* NAV-16/A11-21: keyboard users reach the content without tabbling the whole menu. */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-60 focus:rounded-lg focus:bg-eavi-fill focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-eavi-on-fill"
+      >
+        Skip to content
+      </a>
       <TooltipProvider delayDuration={0}>
         <Sidebar collapsible="offcanvas" className="border-eavi-border">
           <SidebarHeader className="border-b border-eavi-border">

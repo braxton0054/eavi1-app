@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRightIcon, DownloadIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { ContentPlaceholder } from "@/components/home/content-placeholder";
 import { Reveal } from "@/components/home/reveal";
@@ -42,13 +43,16 @@ export function AdmissionsSection() {
                   </p>
                 </div>
                 <p className="text-sm leading-6 text-muted-foreground">{step.line}</p>
+                {/* Step actions stay quiet: the section's one shimmer CTA is the header
+                    Apply button, so the steps don't compete with it. */}
                 {"href" in step && step.href && (
-                  <ShimmerButton
+                  <Button
                     asChild
-                    className="mt-auto self-start"
+                    variant="outline"
+                    className="mt-auto self-start border-eavi-border/70 bg-transparent text-eavi-on-bg hover:bg-eavi-primary-soft hover:text-eavi-on-bg"
                   >
                     <Link href={step.href}>{step.action}</Link>
-                  </ShimmerButton>
+                  </Button>
                 )}
               </div>
             </Reveal>
@@ -58,12 +62,16 @@ export function AdmissionsSection() {
 
       <div className="mt-6 sm:mt-8">
         {admissionsSection.requirements.href ? (
-          <ShimmerButton asChild>
+          <Button
+            asChild
+            variant="outline"
+            className="border-eavi-border/70 bg-transparent text-eavi-on-bg hover:bg-eavi-primary-soft hover:text-eavi-on-bg"
+          >
             <a href={admissionsSection.requirements.href} download>
               <DownloadIcon data-icon="inline-start" />
               {admissionsSection.requirements.label}
             </a>
-          </ShimmerButton>
+          </Button>
         ) : (
           <ContentPlaceholder
             className="sm:max-w-md"

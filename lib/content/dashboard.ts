@@ -168,7 +168,10 @@ export const superNavGroups: NavGroup[] = [
     id: "administration",
     label: "Administration",
     items: [
-      { href: "/dashboard/scope?campus=all", label: "College overview", icon: "overview" },
+      // The overview lives at /dashboard for a super admin; the campus scope itself is
+      // switched from the header picker. Pointing this link at the scope route left the
+      // sidebar with no active item on the screen it opens (NAV-01).
+      { href: "/dashboard", label: "College overview", icon: "overview" },
       { href: "/dashboard/campuses", label: "Campuses", icon: "programs" },
       { href: "/dashboard/staff", label: "Staff approvals", icon: "tutors" },
       { href: "/dashboard/profile", label: shell.account.profile, icon: "profile" },

@@ -4,6 +4,7 @@ import {
   MessageCircleIcon,
   PhoneIcon,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import {
   Card,
@@ -85,6 +86,8 @@ export function CampusCard({ campus }: { campus: Campus }) {
       </CardContent>
 
       <CardFooter className="flex-col items-stretch gap-2">
+        {/* One primary action per card (rule 75): Call shimmers, WhatsApp is the
+            quiet outline pill beside it. */}
         <div className="flex w-full gap-2">
           <ShimmerButton asChild className="flex-1">
             <a href={`tel:${campus.tel}`}>
@@ -93,7 +96,11 @@ export function CampusCard({ campus }: { campus: Campus }) {
             </a>
           </ShimmerButton>
           {onWhatsApp && (
-            <ShimmerButton asChild className="flex-1">
+            <Button
+              asChild
+              variant="outline"
+              className="flex-1 border-eavi-border/70 bg-transparent text-eavi-on-bg hover:bg-eavi-primary-soft hover:text-eavi-on-bg"
+            >
               <a
                 href={`https://wa.me/${campus.tel.replace(/[^0-9]/g, "")}`}
                 target="_blank"
@@ -102,7 +109,7 @@ export function CampusCard({ campus }: { campus: Campus }) {
                 <MessageCircleIcon data-icon="inline-start" />
                 {campusesSection.whatsapp}
               </a>
-            </ShimmerButton>
+            </Button>
           )}
         </div>
         <a

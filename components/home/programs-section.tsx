@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { cn } from "cn";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -14,8 +15,6 @@ import {
 import { ContentPlaceholder } from "@/components/home/content-placeholder";
 import { Section, SectionHeader } from "@/components/home/section";
 import { pending, programsSection } from "@/lib/content/home";
-
-const filterClass = "px-5";
 
 export function ProgramsSection() {
   const levels = useMemo(
@@ -61,21 +60,29 @@ export function ProgramsSection() {
         </div>
       ) : (
         <>
+          {/* Filter chips are quiet toggles, not shimmer CTAs — the accent belongs to the
+              apply buttons. The active chip fills so the state is visible, not just
+              announced (rule 80), and every chip keeps a 44px touch target. */}
           <div
             role="group"
             aria-label={programsSection.filterLabel}
             className="mt-6 flex flex-wrap gap-2"
           >
             {levels.map((level) => (
-              <ShimmerButton
+              <button
                 key={level}
                 type="button"
                 aria-pressed={level === active}
                 onClick={() => setActive(level)}
-                className={cn(filterClass)}
+                className={cn(
+                  "flex min-h-11 items-center rounded-full border px-5 text-sm font-medium transition-colors",
+                  level === active
+                    ? "border-transparent bg-eavi-fill text-eavi-on-fill"
+                    : "border-border bg-card text-eavi-on-bg hover:bg-eavi-primary-soft",
+                )}
               >
                 {level}
-              </ShimmerButton>
+              </button>
             ))}
           </div>
 
@@ -93,15 +100,22 @@ export function ProgramsSection() {
                     <p className="text-sm leading-6 text-muted-foreground">
                       {program.description}
                     </p>
-                    <div className="mt-auto flex gap-2">
+                    {/* One primary action per card (rule 75): Apply shimmers, Learn more
+                        is the quiet outline pill. */}
+                    <div className="mt-auto flex flex-wrap gap-2">
                       <ShimmerButton asChild>
                         <Link href="/apply">{programsSection.apply}</Link>
                       </ShimmerButton>
-                      <ShimmerButton asChild>
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="lg"
+                        className="border-eavi-border/70 bg-transparent text-eavi-on-bg hover:bg-eavi-primary-soft hover:text-eavi-on-bg"
+                      >
                         <Link href={programsSection.learnMoreHref}>
                           {programsSection.learnMore}
                         </Link>
-                      </ShimmerButton>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

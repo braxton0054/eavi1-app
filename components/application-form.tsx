@@ -258,20 +258,34 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
           </Field>
 
           <Field>
-            <FieldLabel htmlFor="apply-gender">{copy.gender.label}</FieldLabel>
-            <Select value={values.gender || undefined} onValueChange={(next) => set("gender", next)}>
-              <SelectTrigger id="apply-gender" className="w-full">
-                <SelectValue placeholder={copy.gender.placeholder} />
-              </SelectTrigger>
-              <SelectContent>
+            {/* FRM-02: two choices are never hidden in a dropdown — they render as a radio
+                group with clickable labels (FRM-21/24) and a visible checked state. */}
+            <fieldset>
+              <legend className="text-sm font-medium">{copy.gender.label}</legend>
+              <div className="mt-1.5 flex gap-2">
                 {genderChoices.map((choice) => (
-                  <SelectItem key={choice.value} value={choice.value}>
+                  <label
+                    key={choice.value}
+                    className="flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-input bg-eavi-card px-4 text-sm font-medium text-eavi-on-bg transition-colors has-[:checked]:border-eavi-fill has-[:checked]:bg-eavi-primary-soft has-[:checked]:text-eavi-primary-text has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring"
+                  >
+                    <input
+                      type="radio"
+                      name="gender"
+                      value={choice.value}
+                      checked={values.gender === choice.value}
+                      onChange={(event) => set("gender", event.target.value)}
+                      className="size-5 accent-eavi-fill"
+                    />
                     {choice.label}
-                  </SelectItem>
+                  </label>
                 ))}
-              </SelectContent>
-            </Select>
-            <FieldError id="apply-gender-error">{errors.gender}</FieldError>
+              </div>
+              {errors.gender ? (
+                <p id="apply-gender-error" className="mt-1.5 text-sm font-medium text-destructive">
+                  {errors.gender}
+                </p>
+              ) : null}
+            </fieldset>
           </Field>
 
           <Field>

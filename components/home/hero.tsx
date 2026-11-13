@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRightIcon, ImagesIcon, LogInIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { CountUp } from "@/components/home/count-up";
 import { Reveal } from "@/components/home/reveal";
@@ -25,6 +26,8 @@ export function Hero() {
             {hero.subheading}
           </p>
 
+          {/* One primary action per view (rule 75): Apply carries the shimmer; the portal
+              link stays a quiet outline pill so the eye lands on the apply button first. */}
           <div className="flex w-full flex-col gap-3 pt-1 sm:w-auto sm:flex-row">
             <ShimmerButton
               asChild
@@ -35,15 +38,16 @@ export function Hero() {
                 <ArrowRightIcon data-icon="inline-end" />
               </Link>
             </ShimmerButton>
-            <ShimmerButton
+            <Button
               asChild
-              className="w-full px-8 py-4 text-base sm:w-auto"
+              variant="outline"
+              className="h-14 w-full border-eavi-border/70 bg-eavi-primary-soft px-8 text-base text-eavi-on-bg hover:bg-eavi-info-soft hover:text-eavi-on-bg sm:w-auto"
             >
               <Link href="/login">
                 <LogInIcon data-icon="inline-start" />
                 {hero.portal}
               </Link>
-            </ShimmerButton>
+            </Button>
           </div>
         </Reveal>
 

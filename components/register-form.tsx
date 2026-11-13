@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BorderBeam } from "@/components/magicui/border-beam";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import {
   Card,
@@ -15,7 +14,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Select,
   SelectContent,
@@ -64,6 +65,10 @@ export function RegisterForm() {
     null,
   );
   const [failure, setFailure] = useState("");
+  /* FRM-20: three short steps — account type, details, password — so no screen is a long
+     list, and the password step gets the focused, spacious treatment. Values stay mounted
+     across steps, so going back never loses input. */
+  const [step, setStep] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -85,10 +90,24 @@ export function RegisterForm() {
   function update(key: keyof typeof values) {
     return (event: React.ChangeEvent<HTMLInputElement>) => {
       setValues((current) => ({ ...current, [key]: event.target.value }));
+      // FRM-09: a field's error clears as soon as the person edits it, instead of
+      // nagging while they are already fixing it.
+      setErrors((current) => ({ ...current, [key]: undefined }));
     };
   }
 
-  function validate(): boolean {
+  function validateStep1(): boolean {
+    const nextErrors: Errors = {};
+
+    if (needsCampus && campusId === null) {
+      nextErrors.campusId = "Choose which campus you belong to.";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  function validateStep2(): boolean {
     const nextErrors: Errors = {};
 
     if (values.fullName.trim().length < 2) {
@@ -102,14 +121,19 @@ export function RegisterForm() {
     } else if (!normalizeKenyanPhone(values.phone)) {
       nextErrors.phone = "Use a Kenyan number, for example 0712 345 678.";
     }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  function validateStep3(): boolean {
+    const nextErrors: Errors = {};
+
     if (values.password.length < 8) {
       nextErrors.password = "Use at least 8 characters.";
     }
     if (values.confirm !== values.password) {
       nextErrors.confirm = "The two passwords do not match.";
-    }
-    if (needsCampus && campusId === null) {
-      nextErrors.campusId = "Choose which campus you belong to.";
     }
 
     setErrors(nextErrors);
@@ -119,7 +143,16 @@ export function RegisterForm() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFailure("");
-    if (!validate()) return;
+    // Enter inside a field advances the current step instead of submitting early.
+    if (step === 1) {
+      if (validateStep1()) setStep(2);
+      return;
+    }
+    if (step === 2) {
+      if (validateStep2()) setStep(3);
+      return;
+    }
+    if (!validateStep3()) return;
 
     setBusy(true);
     try {
@@ -135,7 +168,11 @@ export function RegisterForm() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        if (data.fieldErrors) setErrors({ ...EMPTY, ...data.fieldErrors });
+        if (data.fieldErrors) {
+          setErrors({ ...EMPTY, ...data.fieldErrors });
+          // A campus rejection belongs to step 1, so take the person back to it.
+          if (data.fieldErrors.campusId) setStep(1);
+        }
         setFailure(
           data.error ?? data.fieldErrors?.email ?? "We could not save that. Try again.",
         );
@@ -167,31 +204,56 @@ export function RegisterForm() {
           </Alert>
         ) : (
           <form id="register-form" onSubmit={handleSubmit} noValidate>
-            <div className="grid w-full items-center gap-4">
-              <div className="flex flex-col space-y-1.5">
-                <Label htmlFor="reg-role">I am registering as</Label>
-                <Select
-                  value={role}
-                  onValueChange={(next) => {
-                    setRole(next);
-                    setErrors((current) => ({ ...current, campusId: undefined }));
-                  }}
-                >
-                  <SelectTrigger id="reg-role" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROLES.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {/* NAV-17/CMP-04: progress with labels, exposed to assistive tech. */}
+            <div className="mb-4">
+              <p aria-live="polite" className="text-xs font-medium text-eavi-muted-text">
+                Step {step} of 3 · {step === 1 ? "Account type" : step === 2 ? "Your details" : "Choose a password"}
+              </p>
+              <div
+                role="progressbar"
+                aria-valuemin={1}
+                aria-valuemax={3}
+                aria-valuenow={step}
+                aria-label="Registration progress"
+                className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-eavi-muted"
+              >
+                <div
+                  className="h-full rounded-full bg-eavi-fill transition-[width] duration-300"
+                  style={{ width: step === 1 ? "33%" : step === 2 ? "66%" : "100%" }}
+                />
+              </div>
+            </div>
+
+            <div className={step === 1 ? "grid w-full items-center gap-4" : "hidden"}>
+              {/* FRM-02: the account type is the step's one decision, so all four options sit
+                  visible as radios instead of hidden behind a dropdown tap. */}
+              <fieldset className="flex flex-col space-y-1.5">
+                <legend className="text-sm font-medium">I am registering as</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  {ROLES.map((option) => (
+                    <label
+                      key={option.value}
+                      className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-input bg-eavi-card px-3 text-sm font-medium text-eavi-on-bg transition-colors has-[:checked]:border-eavi-fill has-[:checked]:bg-eavi-primary-soft has-[:checked]:text-eavi-primary-text has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring"
+                    >
+                      <input
+                        type="radio"
+                        name="role"
+                        value={option.value}
+                        checked={role === option.value}
+                        onChange={() => {
+                          setRole(option.value);
+                          setErrors((current) => ({ ...current, campusId: undefined }));
+                        }}
+                        className="size-5 accent-eavi-fill"
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
                 {errors.role && (
                   <p className="text-sm font-medium text-destructive">{errors.role}</p>
                 )}
-              </div>
+              </fieldset>
 
               {needsCampus && (
                 <div className="flex flex-col space-y-1.5">
@@ -224,7 +286,10 @@ export function RegisterForm() {
                   )}
                 </div>
               )}
+            </div>
 
+            {/* Step 2 stays mounted but hidden, so nothing the person typed is lost on Back. */}
+            <div className={step === 2 ? "grid w-full items-center gap-4" : "hidden"}>
               <div className="flex flex-col space-y-1.5">
                 <Label htmlFor="name">Full name</Label>
                 <Input
@@ -285,20 +350,28 @@ export function RegisterForm() {
                   </p>
                 )}
               </div>
+            </div>
 
+            {/* Step 3 is the focused password screen: two fields, generous space, nothing
+                else competing for attention. Still mounted while hidden, so Back keeps
+                everything. */}
+            <div className={step === 3 ? "grid w-full items-center gap-4" : "hidden"}>
               <div className="flex flex-col space-y-1.5">
                 <Label htmlFor="reg-password">Password</Label>
-                <Input
+                <PasswordInput
                   id="reg-password"
                   name="password"
-                  type="password"
                   autoComplete="new-password"
                   placeholder="Enter your password"
                   value={values.password}
                   onChange={update("password")}
                   aria-invalid={errors.password ? true : undefined}
-                  aria-describedby={errors.password ? "reg-password-error" : undefined}
+                  aria-describedby={errors.password ? "reg-password-error" : "reg-password-hint"}
                 />
+                {/* FRM-17/19: the rule is visible before typing, not only after a failed submit. */}
+                <p id="reg-password-hint" className="text-xs text-eavi-muted-text">
+                  Use at least 8 characters.
+                </p>
                 {errors.password && (
                   <p id="reg-password-error" className="text-sm font-medium text-destructive">
                     {errors.password}
@@ -308,10 +381,9 @@ export function RegisterForm() {
 
               <div className="flex flex-col space-y-1.5">
                 <Label htmlFor="confirm">Confirm password</Label>
-                <Input
+                <PasswordInput
                   id="confirm"
                   name="confirm"
-                  type="password"
                   autoComplete="new-password"
                   placeholder="Repeat your password"
                   value={values.confirm}
@@ -338,22 +410,51 @@ export function RegisterForm() {
 
       {!result && (
         <CardFooter className="flex justify-between">
-          <ShimmerButton asChild>
-            <Link href="/login">Login</Link>
-          </ShimmerButton>
-          <ShimmerButton type="submit" form="register-form" disabled={busy}>
-            {busy && <Spinner data-icon="inline-start" />}
-            {busy ? "Creating account" : "Register"}
-          </ShimmerButton>
+          {step === 1 ? (
+            <>
+              {/* CMP-11: the step's action is primary; reaching the login page is quiet. */}
+              <Button asChild variant="outline">
+                <Link href="/login">Sign in</Link>
+              </Button>
+              <ShimmerButton
+                type="button"
+                onClick={() => {
+                  if (validateStep1()) setStep(2);
+                }}
+                disabled={busy}
+              >
+                Continue
+              </ShimmerButton>
+            </>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep(step - 1)}
+              >
+                ← Back
+              </Button>
+              {step === 2 ? (
+                <ShimmerButton
+                  type="button"
+                  onClick={() => {
+                    if (validateStep2()) setStep(3);
+                  }}
+                  disabled={busy}
+                >
+                  Continue
+                </ShimmerButton>
+              ) : (
+                <ShimmerButton type="submit" form="register-form" disabled={busy}>
+                  {busy && <Spinner data-icon="inline-start" />}
+                  {busy ? "Creating account" : "Create account"}
+                </ShimmerButton>
+              )}
+            </>
+          )}
         </CardFooter>
       )}
-
-      <BorderBeam
-        duration={4}
-        size={300}
-        reverse
-        className="from-transparent via-green-500 to-transparent"
-      />
     </Card>
   );
 }

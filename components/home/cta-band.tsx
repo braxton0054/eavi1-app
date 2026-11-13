@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRightIcon, MessageCircleIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { Reveal } from "@/components/home/reveal";
 import { ctaSection, contactSection, mainCampus, site } from "@/lib/content/home";
@@ -34,9 +35,11 @@ export function CtaBand() {
                 <ArrowRightIcon data-icon="inline-end" />
               </Link>
             </ShimmerButton>
-            <ShimmerButton
+            {/* Apply is the one primary action here; WhatsApp stays a quiet outline pill. */}
+            <Button
               asChild
-              className="w-full border-eavi-band-muted/50 px-8 py-4 text-base sm:w-auto"
+              variant="outline"
+              className="h-14 w-full border-eavi-band-muted/50 bg-transparent px-8 text-base text-eavi-band-foreground hover:bg-eavi-band-muted/15 hover:text-eavi-band-foreground sm:w-auto"
             >
               <a
                 href={site.whatsapp.href}
@@ -46,7 +49,7 @@ export function CtaBand() {
                 <MessageCircleIcon data-icon="inline-start" />
                 {ctaSection.whatsapp(mainCampus.name)}
               </a>
-            </ShimmerButton>
+            </Button>
           </div>
         </Reveal>
       </div>

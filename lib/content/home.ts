@@ -51,12 +51,14 @@ export const nav = {
   skipToContent: "Skip to content",
   ariaLabel: "Primary",
   links: [
-    { label: "Programs", href: "#programs" },
-    { label: "Campuses", href: "#campuses" },
-    { label: "Admissions", href: "#admissions" },
-    { label: "Fees", href: "#fees" },
-    { label: "About", href: "#about" },
-    { label: "Contact", href: "#contact" },
+    // Root-absolute anchors: the header and footer render on every public page, so a
+    // bare #hash would look for the section on the page you are on and do nothing.
+    { label: "Programs", href: "/#programs" },
+    { label: "Campuses", href: "/#campuses" },
+    { label: "Admissions", href: "/#admissions" },
+    { label: "Fees", href: "/#fees" },
+    { label: "About", href: "/#about" },
+    { label: "Contact", href: "/#contact" },
   ] satisfies NavLink[],
   portalLogin: "Portal Login",
   apply: "Apply Now",

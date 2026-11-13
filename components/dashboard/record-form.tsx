@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { SubmitButton } from "@/components/dashboard/submit-button";
 import { Textarea } from "@/components/ui/textarea";
 import { common } from "@/lib/content/dashboard";
@@ -30,6 +31,20 @@ function Control({
   const choices = field.options ?? (field.optionKey ? (options[field.optionKey] ?? []) : []);
 
   if (field.type === "select") {
+    // FRM-03/40: a list longer than seven options must be searchable — type to filter
+    // AND scroll. Short lists stay on the plain select, which is one tap on mobile.
+    if (choices.length > 7) {
+      return (
+        <SearchableSelect
+          id={htmlId}
+          name={field.name}
+          options={choices}
+          defaultValue={value}
+          placeholder={field.placeholder ?? "Search…"}
+          required={field.required}
+        />
+      );
+    }
     return (
       <select
         id={htmlId}

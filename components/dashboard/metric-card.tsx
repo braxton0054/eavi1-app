@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 import { icons } from "@/components/dashboard/icons";
@@ -65,7 +66,9 @@ export function MetricCard({
   );
 
   if (!href) return body;
-  return <a href={href}>{body}</a>;
+  // Dashboard routes are internal, so the card navigates with the router instead of a
+  // full document reload — the sidebar, scope picker and scroll position all survive.
+  return <Link href={href}>{body}</Link>;
 }
 
 /** One figure beside a caption, used inside a card that already carries a title. */

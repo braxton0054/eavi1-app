@@ -2,70 +2,66 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* One theme: #800080 everywhere the surface shows — page and cards are the same
-   purple, so cards read as bordered panels rather than a second colour, and nothing
-   emits white light. #800080 is dark enough (relative luminance .0615) that every text
-   token has room: AA needs .4516, and the lightest token in use sits at .89. Ratios
-   below are measured on the purple. It lives on :root so that Radix dialogs, sheets,
-   menus and tooltips — which mount on <body>, outside every layout wrapper —
-   inherit it too. */
+/* One system: light surfaces, dark ink, one purple accent. Cards are white panels with a
+   1px border and a soft shadow, so hierarchy comes from surface contrast instead of tone-on-
+   tone purple. Every token below is contrast-checked on its own surface (ratios in the
+   comments). Tokens live on :root so that Radix dialogs, sheets, menus and tooltips — which
+   mount on <body>, outside every layout wrapper — inherit them too. */
 :root {
-  --eavi-bg: #800080;
-  --eavi-card: #800080;
-  --eavi-text: #f5f1f8; /* 8.44 */
-  --eavi-muted: #891289; /* raised surface: table heads, ghost chips — text 7.49 */
-  --eavi-border: #9e3d9e;
-  --eavi-primary: #9c3f9c;
-  --eavi-secondary: #5c9b78;
+  color-scheme: light;
+  --eavi-bg: #f7f5fa; /* page: soft lilac-grey off-white */
+  --eavi-card: #ffffff;
+  --eavi-text: #241a2e; /* 14.9 on bg and card */
+  --eavi-muted: #efeaf5; /* raised surface: table heads, ghost chips — text 5.6 */
+  --eavi-border: #e2dcea;
+  --eavi-primary: #800080;
+  --eavi-secondary: #2e7d52;
 
-  --eavi-primary-text: #eadaf2; /* links, accents, focus ring — 7.09 */
-  --eavi-secondary-text: #adeec9; /* 7.11 */
-  --eavi-fill: #c3b0cf;
-  --eavi-fill-hover: #d0bfd9;
-  --eavi-on-fill: #2c1b38; /* 7.90 on fill */
-  --eavi-on-bg: #f5f1f8;
-  --eavi-muted-text: #dccfe4; /* 6.32 */
-  --eavi-destructive: #ffd0cb; /* 6.79 */
+  --eavi-primary-text: #800080; /* links, accents, focus ring — 9.4 on white */
+  --eavi-secondary-text: #1f6b44; /* 6.1 */
+  --eavi-fill: #800080; /* primary button face */
+  --eavi-fill-hover: #6b006b;
+  --eavi-on-fill: #ffffff; /* 9.4 on fill */
+  --eavi-on-bg: #241a2e;
+  --eavi-muted-text: #63566f; /* 5.9 on card, 5.3 on muted */
+  --eavi-destructive: #b3261e; /* 5.9 */
 
   /* Tinted surface for chips, icon badges and section panels: the accent dropped into
-     the page purple, so tints stay one hue and light text keeps clearing AA. */
-  --eavi-primary-soft: color-mix(in oklab, var(--eavi-primary-text) 20%, var(--eavi-card));
-  --eavi-success-fill: #a7d8bc;
-  --eavi-on-success: #14301f; /* 8.96 on the success fill */
-  /* Status hues. Slate-teal and blush are accents and stay text-only — they never
-     become fills. Ratios measured on --eavi-card and the soft tints. */
-  --eavi-info-text: #bbdfe1; /* 6.62 */
-  --eavi-warn-text: #f5cfd2; /* 6.61 */
-  --eavi-info-soft: color-mix(in oklab, var(--eavi-info-text) 20%, var(--eavi-card));
-  --eavi-warn-soft: color-mix(in oklab, var(--eavi-warn-text) 20%, var(--eavi-card));
-  --eavi-success-soft: color-mix(in oklab, var(--eavi-secondary-text) 20%, var(--eavi-card));
-  --eavi-danger-soft: color-mix(in oklab, var(--eavi-destructive) 20%, var(--eavi-card));
-  --eavi-mesh-primary: color-mix(in oklab, var(--eavi-primary) 26%, transparent);
-  --eavi-mesh-secondary: color-mix(in oklab, var(--eavi-secondary) 18%, transparent);
-  --eavi-band: #5c005c;
-  --eavi-band-foreground: #f5f1f8;
-  --eavi-band-muted: #dccfe4;
+     the white card, so tints stay one hue and dark ink keeps clearing AA. */
+  --eavi-primary-soft: color-mix(in oklab, var(--eavi-primary-text) 12%, var(--eavi-card));
+  --eavi-success-fill: #2e7d52;
+  --eavi-on-success: #ffffff; /* 4.9 on the success fill */
+  /* Status hues. Each is a dark, AA-safe ink on white and on its own soft tint. */
+  --eavi-info-text: #1f6474; /* 5.8 */
+  --eavi-warn-text: #8a5600; /* 5.0 */
+  --eavi-info-soft: color-mix(in oklab, var(--eavi-info-text) 12%, var(--eavi-card));
+  --eavi-warn-soft: color-mix(in oklab, var(--eavi-warn-text) 12%, var(--eavi-card));
+  --eavi-success-soft: color-mix(in oklab, var(--eavi-secondary-text) 12%, var(--eavi-card));
+  --eavi-danger-soft: color-mix(in oklab, var(--eavi-destructive) 12%, var(--eavi-card));
+  --eavi-mesh-primary: color-mix(in oklab, var(--eavi-primary) 10%, transparent);
+  --eavi-mesh-secondary: color-mix(in oklab, var(--eavi-secondary) 8%, transparent);
+  --eavi-band: #4a0a4a; /* the one dark band: CTA and footer sections */
+  --eavi-band-foreground: #f7f5fa;
+  --eavi-band-muted: #d9c3dd;
   /* Verified ticks. The badge is never colour alone — it carries a glyph, a tooltip and an
-     accessible name — but each hue still clears AA on the card as large graphic text. Blue for
+     accessible name — and each hue clears 3:1 as a graphic on the white card. Blue for
      administrators, gold for tutors, mint for students. */
-  --eavi-tick-admin: #a8cfff; /* 8.06 on --eavi-card */
-  --eavi-tick-tutor: #f2d08a; /* 9.12 */
-  --eavi-tick-student: #a9e6bf; /* 9.31 */
-  /* Tooltips and their arrows need a surface that separates from a same-colour page,
-     so they keep a deep ink chip rather than a tint of the palette. */
+  --eavi-tick-admin: #2e6db4; /* 4.6 on --eavi-card */
+  --eavi-tick-tutor: #8a6a00; /* 4.8 */
+  --eavi-tick-student: #1f7a4d; /* 4.9 */
+  /* Tooltips keep a deep ink chip: they must separate from white cards, not blend in. */
   --eavi-tooltip: #2e0b33;
-  --eavi-tooltip-foreground: #f5f1f8; /* 15.53 */
+  --eavi-tooltip-foreground: #f7f5fa; /* 14.6 */
   /* The logo artwork assumes a light plate, so it always keeps one. */
   --eavi-plate: #ffffff;
-  /* Text on a white plate. The page colours are tuned for the purple background, so a white
-     card needs its own ink or it inherits near-white and becomes unreadable. */
+  /* Text on a white plate. */
   --eavi-plate-ink: #2b1b33;
   --eavi-plate-muted: #5d4a66;
-  /* Neumorphic lighting. With one purple on every surface, depth has to come from the
-     edges: a lit top-left rim and a cast shadow to the bottom-right, so a card reads as
-     extruded from the page rather than printed on it. */
-  --eavi-neum-hi: #a95aa9;
-  --eavi-neum-lo: #40003f;
+
+  /* Soft neutral lighting. Depth on light surfaces comes from a hairline border plus a
+     low, wide shadow — never from bevels, which read as dirt on white. */
+  --eavi-neum-hi: #ffffff;
+  --eavi-neum-lo: #3b2547;
 
   /* shadcn/ui semantic tokens, pointed at the brand palette above. */
   --background: var(--eavi-bg);
@@ -83,15 +79,15 @@
   --accent: var(--eavi-muted);
   --accent-foreground: var(--eavi-text);
   --destructive: var(--eavi-destructive);
-  --destructive-foreground: #3a1e24;
+  --destructive-foreground: #ffffff;
   --border: var(--eavi-border);
   --input: var(--eavi-border);
   --ring: var(--eavi-primary-text);
-  --chart-1: #eadaf2;
-  --chart-2: #adeec9;
-  --chart-3: #c3b0cf;
-  --chart-4: #ffd0cb;
-  --chart-5: #bbdfe1;
+  --chart-1: #800080;
+  --chart-2: #2e7d52;
+  --chart-3: #2e6db4;
+  --chart-4: #8a5600;
+  --chart-5: #b3261e;
   --radius: 0.75rem;
   --sidebar: var(--eavi-card);
   --sidebar-foreground: var(--eavi-text);
@@ -282,11 +278,12 @@ body {
 }
 
 /* Recessed wells: fields and trays sit *into* the surface instead of on it, which is
-   what tells them apart from the cards that hold them. */
+   what tells them apart from the cards that hold them. Kept faint on light surfaces —
+   a heavy inset reads as dirt on white. */
 @utility eavi-carved {
   box-shadow:
-    inset 0 2px 6px color-mix(in oklab, var(--eavi-neum-lo) 80%, transparent),
-    inset 0 -1px 0 color-mix(in oklab, var(--eavi-neum-hi) 38%, transparent);
+    inset 0 2px 4px color-mix(in oklab, var(--eavi-neum-lo) 32%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, var(--eavi-neum-hi) 70%, transparent);
 }
 
 /* Hover lift for cards; visitors who ask for reduced motion get no movement. */
@@ -303,18 +300,16 @@ body {
 }
 
 @theme {
-  /* Cast pair plus bevel: the outer blur separates a card from an identical page,
-     the inner rim catches the light along the top edge and darkens the bottom one. */
+  /* Hairline border plus one soft, wide cast: on light surfaces this is what separates
+     a white card from an off-white page without any bevel. */
   --shadow-eavi-card:
-    inset 0 1px 0 color-mix(in oklab, var(--eavi-neum-hi) 75%, transparent),
-    inset 0 -2px 3px color-mix(in oklab, var(--eavi-neum-lo) 55%, transparent),
-    14px 18px 34px -16px color-mix(in oklab, var(--eavi-neum-lo) 95%, transparent),
-    -10px -10px 28px -12px color-mix(in oklab, var(--eavi-neum-hi) 55%, transparent);
+    inset 0 1px 0 color-mix(in oklab, var(--eavi-neum-hi) 80%, transparent),
+    0 1px 2px color-mix(in oklab, var(--eavi-neum-lo) 6%, transparent),
+    0 8px 24px -12px color-mix(in oklab, var(--eavi-neum-lo) 18%, transparent);
   --shadow-eavi-lift:
-    inset 0 1px 0 color-mix(in oklab, var(--eavi-neum-hi) 65%, transparent),
-    inset 0 -1px 0 color-mix(in oklab, var(--eavi-neum-lo) 50%, transparent),
-    16px 20px 38px -16px color-mix(in oklab, var(--eavi-neum-lo) 92%, transparent),
-    -10px -10px 26px -12px color-mix(in oklab, var(--eavi-neum-hi) 48%, transparent);
+    inset 0 1px 0 color-mix(in oklab, var(--eavi-neum-hi) 80%, transparent),
+    0 2px 4px color-mix(in oklab, var(--eavi-neum-lo) 8%, transparent),
+    0 16px 32px -12px color-mix(in oklab, var(--eavi-neum-lo) 24%, transparent);
 
   --animate-eavi-load: eavi-load 1.5s cubic-bezier(0.65, 0.05, 0.36, 0.95) infinite;
   --animate-eavi-rise: eavi-rise 0.5s ease-out both;
