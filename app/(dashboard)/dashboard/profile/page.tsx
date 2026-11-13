@@ -15,9 +15,9 @@ const copy = pages.profile;
 export default async function ProfilePage({
   searchParams,
 }: {
-  searchParams: Promise<{ invalid?: string }>;
+  searchParams: Promise<{ invalid?: string; reason?: string }>;
 }) {
-  const { invalid } = await searchParams;
+  const { invalid, reason } = await searchParams;
   const scope = await requireCollegeAdmin();
 
   return (
@@ -32,7 +32,11 @@ export default async function ProfilePage({
         }
       />
 
-      {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
+      {/* onSave names the exact refusal in `reason`; the generic sentence is only the
+          fallback for a refusal that came with no message of its own. */}
+      {invalid ? (
+        <Notice tone="warning" title={common.errorTitle} body={reason || common.invalidSubmit} />
+      ) : null}
 
       <Panel title={copy.photo.heading} description={copy.photo.description}>
         <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start">

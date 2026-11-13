@@ -297,7 +297,8 @@ export const fieldErrors = {
   semesterAlreadyActive: (name: string) =>
     `${name} is still marked active. Mark it completed before making another semester active.`,
   pdf: (label: string) => `${label} must be a PDF file.`,
-  image: (label: string) => `${label} must be a JPG or PNG picture.`,
+  image: (label: string) =>
+    `${label} must be a JPG or PNG picture. Photos from some phones are HEIC — re-save it as JPG first.`,
   fileSize: (label: string, maxMb: number) => `${label} must be smaller than ${maxMb} MB.`,
   storageOff: "File storage is not configured, so the college office must enable it first.",
   currentPassword: "That is not your current password.",
@@ -2121,7 +2122,7 @@ export const pages = {
           name: "photo",
           label: profilePhoto.file,
           type: "file",
-          accept: "image/*",
+          accept: "image/jpeg,image/png,.jpg,.jpeg,.png",
           required: true,
           hint: profilePhoto.hint,
           wide: true,

@@ -358,7 +358,7 @@ export function EnrolmentForm({
                 id="profile-photo"
                 name="profilePhoto"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,.jpg,.jpeg,.png"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) setPhotoPreview(URL.createObjectURL(f));
