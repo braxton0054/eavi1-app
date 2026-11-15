@@ -1,0 +1,47 @@
+@layer components {
+  .card {
+    width: 100%;
+  }
+
+  .form {
+    display: grid;
+    gap: var(--field-gap);
+  }
+
+  .alert {
+    margin-block-start: var(--space-4);
+  }
+
+  .actions {
+    display: grid;
+    gap: var(--space-3);
+    margin-block-start: var(--space-6);
+  }
+
+  .submit {
+    width: 100%;
+  }
+
+  .footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    width: 100%;
+  }
+
+  .footerText {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+
+  .legal {
+    margin-block-start: var(--space-6);
+    font-size: var(--text-xs);
+    line-height: var(--leading-normal);
+    color: var(--text-muted);
+    text-align: center;
+    max-width: none;
+  }
+}

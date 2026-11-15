@@ -1,0 +1,138 @@
+@layer components {
+  .root {
+    display: flex;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .root[data-orientation="horizontal"] {
+    flex-direction: column;
+  }
+
+  .list {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+  }
+
+  .list[data-orientation="horizontal"] {
+    height: 2rem;
+  }
+
+  .list[data-orientation="vertical"] {
+    height: fit-content;
+    flex-direction: column;
+  }
+
+  .list[data-variant="default"] {
+    background: var(--surface-2);
+  }
+
+  .list[data-variant="line"] {
+    gap: var(--space-1);
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .trigger {
+    position: relative;
+    display: inline-flex;
+    height: calc(100% - 1px);
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    padding: 2px var(--space-1);
+    border: 1px solid transparent;
+    border-radius: var(--radius-xs);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    white-space: nowrap;
+    color: var(--text-muted);
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out);
+  }
+
+  .trigger:hover:not(:disabled) {
+    color: var(--text);
+  }
+
+  .trigger:focus-visible {
+    border-color: var(--focus);
+    outline: 1px solid var(--focus);
+    outline-offset: 0;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--focus) 22%, transparent);
+  }
+
+  .trigger:disabled {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  .trigger > svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+
+  .trigger > svg:not([class*="size-"]) {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .trigger[data-state="active"] {
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  /* The default variant lifts the active tab off the track with a soft shadow. */
+  .list[data-variant="default"] .trigger[data-state="active"] {
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* The line variant marks the active tab with an underline instead of a fill. */
+  .list[data-variant="line"] .trigger[data-state="active"] {
+    background: transparent;
+  }
+
+  .list[data-variant="line"] .trigger::after {
+    content: "";
+    position: absolute;
+    background: var(--text);
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
+
+  .list[data-variant="line"][data-orientation="horizontal"] .trigger::after {
+    inset-inline: 0;
+    inset-block-end: -5px;
+    height: 2px;
+  }
+
+  .list[data-variant="line"][data-orientation="vertical"] .trigger::after {
+    inset-block: 0;
+    inset-inline-end: -4px;
+    width: 2px;
+  }
+
+  .list[data-variant="line"] .trigger[data-state="active"]::after {
+    opacity: 1;
+  }
+
+  .content {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--text-sm);
+  }
+
+  .content:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}

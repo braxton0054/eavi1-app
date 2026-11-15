@@ -1,0 +1,45 @@
+@layer components {
+  .root {
+    display: block;
+    field-sizing: content;
+    width: 100%;
+    min-height: 5rem;
+    padding: var(--space-3);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-xs);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    resize: vertical;
+    transition:
+      border-color var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out);
+  }
+
+  .root:hover:not(:disabled) {
+    border-color: var(--gray-600);
+  }
+
+  .root:focus,
+  .root:focus-visible {
+    border-color: var(--primary);
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+  }
+
+  .root[aria-invalid="true"] {
+    border-color: var(--danger);
+  }
+
+  .root[aria-invalid="true"]:focus-visible {
+    outline-color: var(--danger);
+  }
+
+  .root:disabled {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+}

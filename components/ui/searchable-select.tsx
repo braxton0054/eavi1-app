@@ -4,9 +4,14 @@ import * as React from "react";
 import { Combobox } from "@base-ui/react/combobox";
 import { CheckIcon, ChevronsUpDownIcon } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cx } from "@/lib/cx";
+
+import styles from "./searchable-select.module.css";
 
 export type SearchOption = { value: string; label: string };
+
+const NO_MATCHES = "No matches.";
+const SEARCH_PLACEHOLDER = "Search…";
 
 /**
  * A select for long lists (more than ~7 options): type to filter AND scroll (FRM-03/40).
@@ -49,47 +54,33 @@ export function SearchableSelect({
       {/* The library's own hidden input is not relied on: this one is deterministic and
           keeps the server action contract identical to the <select> it replaces. */}
       <input type="hidden" name={name} value={selected?.value ?? ""} />
-      <Combobox.InputGroup
-        className={cn(
-          "flex h-11 w-full min-w-0 items-center gap-1 rounded-lg border border-input bg-eavi-card px-3 py-2 text-base transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 md:text-sm",
-          className,
-        )}
-      >
+      <Combobox.InputGroup className={cx(styles.group, className)}>
         <Combobox.Input
           id={id}
           required={required}
-          placeholder={placeholder ?? "Search…"}
+          placeholder={placeholder ?? SEARCH_PLACEHOLDER}
           autoComplete="off"
           spellCheck={false}
-          className="h-full w-full min-w-0 border-0 bg-transparent p-0 text-base outline-none placeholder:text-eavi-muted-text md:text-sm"
+          className={styles.input}
         />
-        <Combobox.Trigger
-          aria-label="Open options"
-          className="flex size-6 shrink-0 items-center justify-center rounded-md text-eavi-muted-text hover:bg-eavi-primary-soft hover:text-eavi-primary-text"
-        >
-          <ChevronsUpDownIcon className="size-4" />
+        <Combobox.Trigger aria-label="Open options" className={styles.trigger}>
+          <ChevronsUpDownIcon />
         </Combobox.Trigger>
       </Combobox.InputGroup>
 
       <Combobox.Portal>
-        <Combobox.Positioner sideOffset={4} className="outline-none">
-          <Combobox.Popup
-            className="w-[var(--anchor-width)] max-w-[var(--available-width)] origin-[var(--transform-origin)] rounded-lg border border-eavi-border bg-popover text-popover-foreground shadow-md transition-[scale,opacity] duration-100 data-starting-style:scale-95 data-starting-style:opacity-0 data-ending-style:scale-95 data-ending-style:opacity-0"
-          >
+        <Combobox.Positioner sideOffset={4} className={styles.positioner}>
+          <Combobox.Popup className={styles.popup}>
             <Combobox.Empty>
-              <p className="px-3 py-3 text-sm text-eavi-muted-text">No matches.</p>
+              <p className={styles.empty}>{NO_MATCHES}</p>
             </Combobox.Empty>
-            <Combobox.List className="max-h-[min(20rem,var(--available-height))] overflow-y-auto overscroll-contain py-1 outline-none">
+            <Combobox.List className={styles.list}>
               {(option: SearchOption) => (
-                <Combobox.Item
-                  key={option.value}
-                  value={option}
-                  className="cn-menu-target grid cursor-pointer grid-cols-[1.25rem_1fr] items-center gap-1 rounded-md px-2 py-2 text-sm outline-none data-highlighted:bg-eavi-primary-soft"
-                >
-                  <Combobox.ItemIndicator className="col-start-1 text-eavi-primary-text">
-                    <CheckIcon className="size-4" />
+                <Combobox.Item key={option.value} value={option} className={styles.item}>
+                  <Combobox.ItemIndicator className={styles.itemIndicator}>
+                    <CheckIcon />
                   </Combobox.ItemIndicator>
-                  <span className="col-start-2 truncate">{option.label}</span>
+                  <span className={styles.itemLabel}>{option.label}</span>
                 </Combobox.Item>
               )}
             </Combobox.List>

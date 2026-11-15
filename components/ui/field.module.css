@@ -1,0 +1,126 @@
+@layer components {
+  .set {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+
+  .group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--field-gap);
+    min-width: 0;
+  }
+
+  .legend {
+    margin-block-end: var(--space-2);
+    padding: 0;
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    color: var(--text);
+  }
+
+  .legend[data-variant="label"] {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  /* The label sits above the control at every width (FRM-01). Horizontal is kept only
+     for the checkbox and radio rows, where the control belongs beside its label. */
+  .field[data-orientation="horizontal"] {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .field[data-orientation="horizontal"] > .content {
+    flex: 1 1 auto;
+  }
+
+  .field[data-invalid="true"] > .label {
+    color: var(--danger);
+  }
+
+  .label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: fit-content;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-snug);
+    color: var(--text);
+  }
+
+  .title {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text);
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+    line-height: var(--leading-snug);
+  }
+
+  .description {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-regular);
+    line-height: var(--leading-normal);
+    color: var(--text-muted);
+    text-align: start;
+    max-width: var(--measure);
+  }
+
+  .error {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--danger);
+  }
+
+  .errorList {
+    margin: 0;
+    padding-inline-start: var(--space-4);
+    list-style: disc;
+  }
+
+  .separator {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 2.5rem;
+    margin-block: calc(var(--space-2) * -1);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .separator::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 50%;
+    height: 1px;
+    background: var(--divider);
+  }
+
+  .separatorLabel {
+    position: relative;
+    padding-inline: var(--space-2);
+    background: var(--surface);
+  }
+}

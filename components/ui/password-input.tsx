@@ -4,7 +4,9 @@ import * as React from "react";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cx } from "@/lib/cx";
+
+import styles from "./password-input.module.css";
 
 /**
  * A password field with a visibility toggle (FRM-19): people verify what they typed
@@ -18,11 +20,11 @@ export const PasswordInput = React.forwardRef<
   const [visible, setVisible] = React.useState(false);
 
   return (
-    <div className="relative">
+    <div className={styles.root}>
       <Input
         ref={ref}
         type={visible ? "text" : "password"}
-        className={cn("pr-11", className)}
+        className={cx(styles.input, className)}
         {...props}
       />
       <button
@@ -30,9 +32,9 @@ export const PasswordInput = React.forwardRef<
         aria-label={visible ? "Hide password" : "Show password"}
         aria-pressed={visible}
         onClick={() => setVisible((value) => !value)}
-        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-eavi-muted-text hover:text-eavi-primary-text focus-visible:outline-2 focus-visible:outline-ring"
+        className={styles.toggle}
       >
-        {visible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+        {visible ? <EyeOffIcon aria-hidden="true" /> : <EyeIcon aria-hidden="true" />}
       </button>
     </div>
   );

@@ -1,0 +1,57 @@
+@layer components {
+  .root {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-12) var(--space-6);
+    text-align: center;
+  }
+
+  .icon {
+    display: grid;
+    width: 3rem;
+    height: 3rem;
+    place-items: center;
+    margin-block-end: var(--space-2);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--text-muted);
+  }
+
+  .icon > svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .title {
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
+    color: var(--text);
+  }
+
+  .description {
+    margin: 0;
+    max-width: 32rem;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+  }
+
+  .action {
+    margin-block-start: var(--space-2);
+  }
+
+  /* First use is quieter and more inviting; no-results reads as a dead end. */
+  .root[data-variant="first-use"] .icon {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+
+  .root[data-variant="error"] .icon {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+}

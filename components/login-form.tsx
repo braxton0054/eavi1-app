@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
-import { ShimmerButton } from "@/components/magicui/shimmer-button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -13,12 +14,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
-import { Spinner } from "@/components/ui/spinner";
 import { isEmail } from "@/lib/validation";
+
+import styles from "./login-form.module.css";
 
 type Errors = { email?: string; password?: string };
 
@@ -43,6 +44,9 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
 
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors: Errors = {};
@@ -51,7 +55,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
     if (!email.trim()) {
       nextErrors.email = "Enter the email address you registered with.";
     } else if (!isEmail(email)) {
-      nextErrors.email = "That does not look like an email address.";
+      nextErrors.email = "That does not look like an email address. It should look like name@example.com.";
     }
 
     if (!password) {
@@ -59,7 +63,17 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
     }
 
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+
+    // Focus the first field that needs attention instead of making the user hunt
+    // for the message (FRM-11).
+    if (nextErrors.email) {
+      emailRef.current?.focus();
+      return;
+    }
+    if (nextErrors.password) {
+      passwordRef.current?.focus();
+      return;
+    }
 
     setBusy(true);
     try {
@@ -87,75 +101,88 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   }
 
   return (
-    <Card className="relative w-full max-w-[350px] overflow-hidden">
-      <CardHeader>
-        <CardTitle>Login</CardTitle>
-        <CardDescription>Enter your credentials to access your account.</CardDescription>
-      </CardHeader>
+    <>
+      <Card className={styles.card}>
+        <CardHeader>
+          <CardTitle>Sign in</CardTitle>
+          <CardDescription>
+            Use the email address and password for your EAVI account.
+          </CardDescription>
+        </CardHeader>
 
-      <CardContent>
-        <form id="login-form" onSubmit={handleSubmit} noValidate>
-          <div className="grid w-full items-center gap-4">
-            <div className="flex flex-col space-y-1.5">
-              <Label htmlFor="email">Email</Label>
+        <CardContent>
+          <form id="login-form" onSubmit={handleSubmit} noValidate className={styles.form}>
+            <Field data-invalid={errors.email ? "true" : undefined}>
+              <FieldLabel htmlFor="email">Email address</FieldLabel>
               <Input
+                ref={emailRef}
                 id="email"
                 name="email"
                 type="email"
                 inputMode="email"
                 autoComplete="username"
-                placeholder="Enter your email"
+                spellCheck={false}
+                autoCapitalize="off"
+                placeholder="name@example.com"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 aria-invalid={errors.email ? true : undefined}
                 aria-describedby={errors.email ? "email-error" : undefined}
               />
-              {errors.email && (
-                <p id="email-error" className="text-sm font-medium text-destructive">
-                  {errors.email}
-                </p>
-              )}
-            </div>
+              <FieldError id="email-error">{errors.email}</FieldError>
+            </Field>
 
-            <div className="flex flex-col space-y-1.5">
-              <Label htmlFor="password">Password</Label>
+            <Field data-invalid={errors.password ? "true" : undefined}>
+              <FieldLabel htmlFor="password">Password</FieldLabel>
               <PasswordInput
+                ref={passwordRef}
                 id="password"
                 name="password"
                 autoComplete="current-password"
-                placeholder="Enter your password"
+                placeholder="Your password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 aria-invalid={errors.password ? true : undefined}
                 aria-describedby={errors.password ? "password-error" : undefined}
               />
-              {errors.password && (
-                <p id="password-error" className="text-sm font-medium text-destructive">
-                  {errors.password}
-                </p>
-              )}
+              <FieldError id="password-error">{errors.password}</FieldError>
+            </Field>
+
+            {failure && (
+              <Alert variant="destructive" className={styles.alert}>
+                <AlertTitle>That sign-in was not accepted</AlertTitle>
+                <AlertDescription>{failure}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className={styles.actions}>
+              <Button
+                type="submit"
+                size="lg"
+                loading={busy}
+                className={styles.submit}
+                form="login-form"
+              >
+                {busy ? "Signing in" : "Sign in"}
+              </Button>
             </div>
+          </form>
+        </CardContent>
+
+        <CardFooter>
+          <div className={styles.footer}>
+            <span className={styles.footerText}>No account yet?</span>
+            <Button asChild variant="secondary" size="sm">
+              <Link href="/register">Create an account</Link>
+            </Button>
           </div>
+        </CardFooter>
+      </Card>
 
-          {failure && (
-            <p role="alert" className="mt-4 text-sm font-medium text-destructive">
-              {failure}
-            </p>
-          )}
-        </form>
-      </CardContent>
-
-      <CardFooter className="flex justify-between">
-        {/* CMP-11 hierarchy: signing in is the one primary action; reaching the register
-            page is a quiet outline link beside it. */}
-        <Button asChild variant="outline">
-          <Link href="/register">Register</Link>
-        </Button>
-        <ShimmerButton type="submit" form="login-form" disabled={busy}>
-          {busy && <Spinner data-icon="inline-start" />}
-          {busy ? "Signing in" : "Sign in"}
-        </ShimmerButton>
-      </CardFooter>
-    </Card>
+      <p className={styles.legal}>
+        Sign-in is for enrolled students, tutors and college staff. Applications do not
+        need an account.
+      </p>
+    </>
   );
 }

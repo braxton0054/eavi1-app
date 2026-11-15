@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 
-import { DashboardFrame } from "@/components/dashboard/dashboard-frame";
+import { AppShell } from "@/components/shell/app-shell";
+import { signOut } from "@/lib/actions/auth";
 import { mobileNav, navGroups, shell, tutorNavGroups } from "@/lib/content/dashboard";
 import { requirePortalUser } from "@/lib/session";
 
@@ -27,16 +28,17 @@ export default async function PortalLayout({ children }: { children: React.React
   const isAdmin = scope.role === "SUPERADMIN" || scope.role === "CAMPUS_ADMIN";
 
   return (
-    <DashboardFrame
+    <AppShell
       scope={scope}
       home={isAdmin ? "/dashboard" : isTutor ? "/tutor" : "/portal/chat"}
       note={isTutor ? shell.tutorNote : shell.brandNote}
       profileHref={isAdmin ? "/dashboard/profile" : isTutor ? "/tutor/profile" : "/portal/chat"}
       nav={isAdmin ? navGroups : isTutor ? tutorNavGroups : navGroups}
       mobile={isTutor ? mobileNav.tutor : isAdmin ? mobileNav.admin : mobileNav.portal}
+      signOut={signOut}
       fill
     >
       {children}
-    </DashboardFrame>
+    </AppShell>
   );
 }

@@ -1,0 +1,243 @@
+/*
+ * The token layer. Three tiers, in this order:
+ *
+ *   1. palette   — raw ramps. Nothing outside this file may reference them.
+ *   2. semantic  — what a component actually means (--bg, --text, --primary…).
+ *   3. component — a handful of measurements that are a real decision (control
+ *                  heights, shell widths, radii, shadows).
+ *
+ * Every semantic colour carries the measured WCAG ratio it was chosen for. The numbers
+ * come from `node scripts/check-contrast.mjs`; if a value changes, re-run that script and
+ * update the comment in the same commit. Do not introduce a colour outside this file.
+ *
+ * Light only. Roles are named by meaning, not by shade, so a `[data-theme="dark"]` block
+ * can be added later without touching a single component.
+ */
+@layer tokens {
+  :root {
+    color-scheme: light;
+
+    /* ------------------------------------------------------------------ 1. palette */
+
+    --gray-0: #ffffff;
+    --gray-50: #f9fafb;
+    --gray-100: #f0f2f5;
+    --gray-150: #eef0f4;
+    --gray-200: #e4e8ee;
+    --gray-250: #dde2ea;
+    --gray-300: #c8cfda;
+    --gray-400: #aab2bf;
+    --gray-500: #858e9d;
+    --gray-600: #6b7583;
+    --gray-700: #4e5765;
+    --gray-800: #2b333f;
+    --gray-850: #202734;
+    --gray-900: #161c26;
+    --gray-950: #0d1219;
+
+    --violet-50: #f1effb;
+    --violet-100: #e3dff7;
+    --violet-200: #c7bfef;
+    --violet-300: #a79be4;
+    --violet-400: #7d6cc8;
+    --violet-500: #5c4bb8;
+    --violet-600: #4b3fa8;
+    --violet-700: #3d338c;
+    --violet-800: #322a75;
+    --violet-900: #27215c;
+
+    --teal-50: #e9f6f1;
+    --teal-100: #cfece2;
+    --teal-500: #14866a;
+    --teal-600: #0f7b5f;
+    --teal-700: #0b6650;
+
+    --amber-50: #fdf3e3;
+    --amber-100: #f9e4c2;
+    --amber-500: #b06a00;
+    --amber-600: #9a5b00;
+    --amber-700: #7d4900;
+
+    --red-50: #fdeceb;
+    --red-100: #f9d7d4;
+    --red-500: #cc2a1e;
+    --red-600: #b42318;
+    --red-700: #941b12;
+
+    --blue-50: #e9f2f8;
+    --blue-100: #cfe3f0;
+    --blue-500: #1f6d9e;
+    --blue-600: #1a5c88;
+    --blue-700: #144a6d;
+
+    /* ---------------------------------------------------------------- 2. semantic */
+
+    /* Surfaces — page, card, then two steps of raise. Elevation on light comes from
+       surface contrast plus a hairline, never from a heavier shadow (card rules 93–95). */
+    --bg: var(--gray-50);
+    --surface: var(--gray-0);
+    --surface-2: var(--gray-150);
+    --surface-3: var(--gray-200);
+    --surface-inverse: var(--gray-900);
+
+    /* Text — 15.81 on bg, 17.10 on surface. */
+    --text: var(--gray-900);
+    /* 5.53 on bg, 5.98 on surface, 5.24 on surface-2, 4.87 on surface-3. */
+    --text-muted: #5a6474;
+    --text-inverse: var(--gray-50);
+
+    /* Borders. --border is decorative: it separates two surfaces that also differ in
+       elevation, so it is exempt from the 3:1 UI rule. Anything whose boundary carries
+       meaning on its own (inputs, unfilled checkboxes, segmented tracks) uses
+       --border-strong, which clears 3:1 against both surfaces. */
+    --border: var(--gray-250);
+    --border-strong: var(--gray-500); /* 3.28 on surface, 3.03 on bg */
+    --divider: #e7eaf0;
+
+    /* Action. 8.15 on surface, 7.54 on bg; white on it is 8.15. */
+    --primary: var(--violet-600);
+    --primary-hover: var(--violet-700);
+    --primary-active: var(--violet-800);
+    --on-primary: var(--gray-0);
+    --primary-soft: color-mix(in oklab, var(--violet-600) 10%, var(--surface));
+
+    --link: var(--violet-700);
+    --link-hover: var(--violet-800);
+
+    /* State. Always paired with an icon and a word (COL-05). */
+    --positive: var(--teal-600); /* 5.23 on surface */
+    --on-positive: var(--gray-0);
+    --positive-soft: color-mix(in oklab, var(--teal-600) 12%, var(--surface));
+
+    --attention: var(--amber-600); /* 5.43 on surface */
+    --attention-soft: color-mix(in oklab, var(--amber-600) 14%, var(--surface));
+
+    --danger: var(--red-600); /* 6.57 on surface */
+    --on-danger: var(--gray-0);
+    --danger-soft: color-mix(in oklab, var(--red-600) 12%, var(--surface));
+
+    --info: var(--blue-600); /* 7.17 on surface */
+    --info-soft: color-mix(in oklab, var(--blue-600) 12%, var(--surface));
+
+    --focus: var(--violet-600); /* 8.15 on surface, 7.54 on bg */
+    --overlay: rgb(22 28 38 / 0.5);
+    --scrim: rgb(22 28 38 / 0.72);
+
+    /* --------------------------------------------------------------- 3. component */
+
+    /* Type. The next/font variables are injected on <html>; the fallbacks keep a font
+       stack valid even where that injection has not happened. */
+    --font-ui: var(--font-geist-sans, ui-sans-serif), system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-display: var(--font-eavi-display, ui-serif), Georgia, serif;
+    --font-mono: var(--font-geist-mono, ui-monospace), "SFMono-Regular", Consolas, monospace;
+
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.125rem;
+    --text-xl: 1.25rem;
+    --text-2xl: 1.5rem;
+    --text-3xl: 1.875rem;
+    --text-4xl: 2.25rem;
+    --text-display: clamp(2.5rem, 1.6rem + 3.2vw, 3.75rem);
+
+    --leading-tight: 1.2;
+    --leading-snug: 1.4;
+    --leading-normal: 1.6;
+
+    --weight-regular: 400;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+
+    --measure: 68ch;
+
+    /* Space — 4px base, 8px rhythm for layout. */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-7: 1.75rem;
+    --space-8: 2rem;
+    --space-9: 2.25rem;
+    --space-10: 2.5rem;
+    --space-11: 2.75rem;
+    --space-12: 3rem;
+    --space-16: 4rem;
+    --space-24: 6rem;
+
+    --gutter: clamp(1rem, 0.5rem + 2.5vw, 2rem);
+
+    /* Shape */
+    --radius-xs: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1.25rem;
+    --radius-pill: 999px;
+
+    /* Depth. Tinted toward the ink hue, never pure black. */
+    --shadow-sm: 0 1px 2px rgb(22 28 38 / 0.06);
+    --shadow-md: 0 4px 12px rgb(22 28 38 / 0.08);
+    --shadow-lg: 0 12px 32px rgb(22 28 38 / 0.12);
+
+    /* Controls */
+    --control-height-sm: 2rem; /* 32 */
+    --control-height-md: 2.5rem; /* 40 */
+    --control-height-lg: 3rem; /* 48 */
+    --input-height: 3rem;
+    --touch-target: 2.75rem; /* 44 — never smaller for a tappable control */
+
+    /* Shell */
+    --sidebar-width: 16.5rem; /* 264 */
+    --sidebar-width-rail: 4.5rem; /* 72 */
+    --topbar-height: 3.5rem; /* 56 on small screens */
+    --bottombar-height: 3.5rem;
+    --card-pad: var(--space-6);
+    --field-gap: var(--space-5);
+
+    /* Motion */
+    --dur-fast: 120ms;
+    --dur-base: 200ms;
+    --dur-slow: 300ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+    /* Stacking */
+    --z-nav: 30;
+    --z-overlay: 40;
+    --z-toast: 60;
+  }
+
+  @media (min-width: 48rem) {
+    :root {
+      --topbar-height: 4rem; /* 64 */
+    }
+  }
+}
+
+/*
+ * Names the legacy Tailwind sheet also declares.
+ *
+ * app/globals.css sets `--border`, `--primary` and the radius scale in an unlayered
+ * `:root` block, and unlayered declarations beat every cascade layer. Until that sheet is
+ * deleted, these few names are restated here at a higher specificity so the rebuilt
+ * tokens are the ones the interface actually reads. This block disappears in Phase 6.
+ */
+:root:root {
+  --border: var(--gray-250);
+  --primary: var(--violet-600);
+  --primary-hover: var(--violet-700);
+  --radius-xs: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.25rem;
+  /* Tailwind's default theme also names these, with its own values. */
+  --shadow-sm: 0 1px 2px rgb(22 28 38 / 0.06);
+  --shadow-md: 0 4px 12px rgb(22 28 38 / 0.08);
+  --shadow-lg: 0 12px 32px rgb(22 28 38 / 0.12);
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-normal: 1.6;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+

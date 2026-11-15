@@ -1,17 +1,24 @@
 "use client";
 
+import { ChevronDownIcon, Loader2Icon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-import { Spinner } from "@/components/ui/spinner";
 import { shell } from "@/lib/content/dashboard";
-import { cn } from "@/lib/utils";
+
+import styles from "./scope-picker.module.css";
 
 /**
  * The campus a super admin is working in. Read-only for everyone else: a campus admin's
  * scope is their own campus and the server decides it, never this control.
  */
-export function ScopePicker({ campusId, campuses }: { campusId: number | null; campuses: { id: number; name: string }[] }) {
+export function ScopePicker({
+  campusId,
+  campuses,
+}: {
+  campusId: number | null;
+  campuses: { id: number; name: string }[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
@@ -19,12 +26,13 @@ export function ScopePicker({ campusId, campuses }: { campusId: number | null; c
   const value = campusId === null ? "all" : String(campusId);
 
   return (
-    <div className="relative flex min-w-0 items-center">
-      <label htmlFor="scope-campus" className="sr-only">
+    <div className={styles.root}>
+      <label htmlFor="scope-campus" className="srOnly">
         {shell.scopeLabel}
       </label>
       <select
         id="scope-campus"
+        className={styles.select}
         value={value}
         disabled={pending}
         onChange={(event) => {
@@ -35,10 +43,6 @@ export function ScopePicker({ campusId, campuses }: { campusId: number | null; c
             router.refresh();
           });
         }}
-        className={cn(
-          "h-11 max-w-[8.5rem] min-w-0 appearance-none truncate rounded-lg border border-eavi-border bg-eavi-card pr-7 pl-2 text-sm font-medium sm:max-w-[12rem]",
-          pending && "opacity-60",
-        )}
       >
         <option value="all">{shell.allCampuses}</option>
         {campuses.map((campus) => (
@@ -47,11 +51,13 @@ export function ScopePicker({ campusId, campuses }: { campusId: number | null; c
           </option>
         ))}
       </select>
-      <span aria-hidden className="pointer-events-none absolute right-2 text-xs text-eavi-muted-text">
-        {pending ? <Spinner className="size-3" /> : "▾"}
+
+      <span className={styles.chevron} aria-hidden="true">
+        {pending ? <Loader2Icon className={styles.spinner} /> : <ChevronDownIcon />}
       </span>
+
       {/* The current pathname is only read so the control re-renders after a scope change. */}
-      <span className="sr-only">{pathname}</span>
+      <span className="srOnly">{pathname}</span>
     </div>
   );
 }

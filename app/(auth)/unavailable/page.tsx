@@ -1,5 +1,16 @@
+import Link from "next/link";
 import { AlertTriangleIcon } from "lucide-react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { signOut } from "@/lib/actions/auth";
 import { shell } from "@/lib/content/dashboard";
 
@@ -22,23 +33,37 @@ export default async function UnavailablePage({
   const { reason } = await searchParams;
 
   return (
-    <div className="w-full max-w-md rounded-3xl border border-eavi-border bg-eavi-card p-6 shadow-eavi-card sm:p-8">
-      <span className="flex size-11 items-center justify-center rounded-full bg-eavi-warn-soft text-eavi-warn-text">
-        <AlertTriangleIcon aria-hidden className="size-5" />
-      </span>
-      <h1 className="mt-4 text-xl font-semibold tracking-tight">{shell.unavailable.title}</h1>
-      <p className="mt-2 text-sm text-eavi-muted-text">
-        {reason === "unassigned" ? shell.unavailable.unassigned : shell.unavailable.body}
-      </p>
+    <Card>
+      <CardHeader>
+        <CardTitle>{shell.unavailable.title}</CardTitle>
+        <CardDescription>
+          {reason === "unassigned"
+            ? shell.unavailable.unassigned
+            : shell.unavailable.body}
+        </CardDescription>
+      </CardHeader>
 
-      <form action={signOut} className="mt-6">
-        <button
-          type="submit"
-          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-eavi-fill px-4 text-sm font-semibold text-eavi-on-fill transition-colors hover:bg-eavi-fill-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-eavi-primary"
-        >
-          {shell.account.signOut}
-        </button>
-      </form>
-    </div>
+      <CardContent>
+        <Alert variant="attention">
+          <AlertTriangleIcon aria-hidden="true" />
+          <AlertTitle>What you can do</AlertTitle>
+          <AlertDescription>
+            The college office can confirm which portal your account belongs to. If you
+            signed in with the wrong address, sign out and use the one on your account.
+          </AlertDescription>
+        </Alert>
+      </CardContent>
+
+      <CardFooter>
+        <form action={signOut}>
+          <Button type="submit" variant="secondary">
+            {shell.account.signOut}
+          </Button>
+        </form>
+        <Button asChild variant="ghost">
+          <Link href="/">Back to home</Link>
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }

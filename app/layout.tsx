@@ -1,6 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+// The rebuilt stylesheet comes first so its cascade layers are declared before the
+// legacy Tailwind sheet, which every unconverted screen still uses until it is ported.
+import "./styles/index.css";
 import "./globals.css";
+
+import { ToastProvider } from "@/components/ui/toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -78,7 +83,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+      <ToastProvider>{children}</ToastProvider>
+    </body>
     </html>
   );
 }

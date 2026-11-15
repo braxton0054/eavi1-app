@@ -1,0 +1,61 @@
+@layer components {
+  .root {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: var(--input-height);
+    padding-inline: var(--space-3);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-xs);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-ui);
+    /* 16px stops iOS zooming the page when the field is focused (FRM-18). */
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    transition:
+      border-color var(--dur-fast) var(--ease-out),
+      box-shadow var(--dur-fast) var(--ease-out);
+  }
+
+  .root:hover:not(:disabled) {
+    border-color: var(--gray-600);
+  }
+
+  .root:focus,
+  .root:focus-visible {
+    border-color: var(--primary);
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+  }
+
+  .root[aria-invalid="true"] {
+    border-color: var(--danger);
+  }
+
+  .root[aria-invalid="true"]:focus-visible {
+    outline-color: var(--danger);
+  }
+
+  .root:disabled {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 1;
+  }
+
+  .root::file-selector-button {
+    margin-inline-end: var(--space-3);
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+  }
+
+  .withToggle {
+    padding-inline-end: var(--space-12);
+  }
+}

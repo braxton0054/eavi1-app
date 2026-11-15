@@ -1,0 +1,19 @@
+@layer components {
+  .consequence {
+    margin: 0;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--danger-soft);
+    color: var(--danger);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    margin-block-start: var(--space-2);
+  }
+}

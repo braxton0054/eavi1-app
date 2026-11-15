@@ -1,0 +1,104 @@
+/*
+ * Motion. Animation explains a change, never decorates a page load (MOT-01).
+ * The reduced-motion guard is global, so no component has to restate it.
+ */
+@layer base {
+  @keyframes eavi-shimmer {
+    from {
+      background-position: 100% 50%;
+    }
+    to {
+      background-position: 0 50%;
+    }
+  }
+
+  @keyframes eavi-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes eavi-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes eavi-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Overlay entrances: a short fade with a slight settle, so a panel reads as arriving
+     from the surface rather than appearing on it. */
+  @keyframes eavi-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes eavi-pop-in {
+    from {
+      opacity: 0;
+      transform: translate(var(--pop-from-x, 0), var(--pop-from-y, 0)) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translate(0, 0) scale(1);
+    }
+  }
+
+  @keyframes eavi-pop-out {
+    from {
+      opacity: 1;
+      transform: translate(0, 0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translate(var(--pop-from-x, 0), var(--pop-from-y, 0)) scale(0.97);
+    }
+  }
+
+  /* A sheet slides in from the edge it is attached to. The direction is a token, so one
+     pair of keyframes serves all four sides. */
+  @keyframes eavi-sheet-in {
+    from {
+      transform: translate(var(--sheet-from-x, 0%), var(--sheet-from-y, 0%));
+    }
+    to {
+      transform: translate(0, 0);
+    }
+  }
+
+  @keyframes eavi-sheet-out {
+    from {
+      transform: translate(0, 0);
+    }
+    to {
+      transform: translate(var(--sheet-from-x, 0%), var(--sheet-from-y, 0%));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

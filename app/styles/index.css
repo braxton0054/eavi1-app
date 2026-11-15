@@ -1,0 +1,16 @@
+/*
+ * The one stylesheet the app imports (app/layout.tsx once Phase 1 lands).
+ *
+ * Everything is ordered by cascade layer, so a component rule can never outrank a
+ * base rule by accident and nothing needs !important. print.css is imported last and
+ * sits outside the layers on purpose: paper rules must beat every screen rule.
+ */
+@layer reset, tokens, base, layout, components, utilities;
+
+@import "./reset.css";
+@import "./tokens.css";
+@import "./base.css";
+@import "./layout.css";
+@import "./motion.css";
+@import "./utilities.css";
+@import "./print.css";

@@ -1,0 +1,39 @@
+@layer components {
+  .root {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-block-start: var(--space-4);
+  }
+
+  .status {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pageSize {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-inline-start: auto;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .pageSizeLabel {
+    font-weight: var(--weight-medium);
+  }
+
+  .pageSizeSelect {
+    min-height: var(--control-height-sm);
+    padding-inline: var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-xs);
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--text-sm);
+  }
+}

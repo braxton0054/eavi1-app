@@ -1,0 +1,135 @@
+@layer components {
+  .root {
+    position: relative;
+    display: flex;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    border-radius: var(--radius-pill);
+    user-select: none;
+  }
+
+  .root[data-size="sm"] {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .root[data-size="lg"] {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  /* A hairline inner ring, so a light photograph still has a defined edge. */
+  .root::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--border);
+    border-radius: inherit;
+    mix-blend-mode: darken;
+    pointer-events: none;
+  }
+
+  .image {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 1;
+    border-radius: var(--radius-pill);
+    object-fit: cover;
+  }
+
+  .fallback {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .root[data-size="sm"] .fallback {
+    font-size: var(--text-xs);
+  }
+
+  .badge {
+    position: absolute;
+    inset-block-end: 0;
+    inset-inline-end: 0;
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: var(--radius-pill);
+    background: var(--primary);
+    color: var(--on-primary);
+    box-shadow: 0 0 0 2px var(--bg);
+    background-blend-mode: color;
+    user-select: none;
+  }
+
+  .root[data-size="sm"] .badge {
+    width: 0.5rem;
+    height: 0.5rem;
+  }
+
+  .root[data-size="lg"] .badge {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  .badge > svg {
+    width: 0.5rem;
+    height: 0.5rem;
+  }
+
+  .group {
+    display: flex;
+    align-items: center;
+  }
+
+  /* Overlapping avatars, each with a ring in the page colour so the stack stays legible. */
+  .group > * + * {
+    margin-inline-start: -0.5rem;
+  }
+
+  .group > * {
+    border-radius: var(--radius-pill);
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+
+  .groupCount {
+    position: relative;
+    display: flex;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+
+  /* The count matches the largest avatar in the stack it closes. */
+  .group:has([data-size="lg"]) .groupCount {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .group:has([data-size="sm"]) .groupCount {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .groupCount > svg {
+    width: 1rem;
+    height: 1rem;
+  }
+}

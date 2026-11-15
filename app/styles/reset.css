@@ -1,0 +1,129 @@
+/*
+ * Reset. Only what the browser does not already do well; every visual decision that
+ * matters is made in base.css or a component module.
+ *
+ * This file replaces Tailwind's preflight, which is no longer loaded: preflight sat in
+ * the same `base` cascade layer as base.css but later in source order, so it overrode
+ * the type scale, the link colour and the placeholder colour. The rules below keep the
+ * parts of preflight the product actually depends on — form controls, media, lists — so
+ * the screens that have not been ported yet look exactly as they did.
+ */
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    tab-size: 4;
+  }
+
+  body {
+    min-height: 100dvh;
+    line-height: var(--leading-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  img,
+  picture,
+  video,
+  canvas,
+  svg,
+  audio,
+  iframe,
+  embed,
+  object {
+    display: block;
+    vertical-align: middle;
+  }
+
+  img,
+  picture,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+  }
+
+  img,
+  video {
+    height: auto;
+  }
+
+  input,
+  button,
+  textarea,
+  select,
+  optgroup {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+
+  button {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  table {
+    border-collapse: collapse;
+    border-spacing: 0;
+    text-indent: 0;
+  }
+
+  dialog {
+    border: 0;
+    padding: 0;
+  }
+
+  fieldset {
+    border: 0;
+    padding: 0;
+  }
+
+  legend {
+    padding: 0;
+  }
+
+  /* Lists carry no markers in this product: the layout supplies its own. */
+  ol,
+  ul,
+  menu {
+    list-style: none;
+  }
+
+  ul[role="list"],
+  ol[role="list"] {
+    list-style: none;
+    padding: 0;
+  }
+
+  summary {
+    display: list-item;
+  }
+
+  /* Anchored targets clear the sticky header (A11-33). */
+  :target {
+    scroll-margin-block: var(--space-12);
+  }
+}

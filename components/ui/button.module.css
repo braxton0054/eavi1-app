@@ -1,0 +1,196 @@
+@layer components {
+  .root {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2, 0.5rem);
+    flex-shrink: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md, 0.75rem);
+    font-family: var(--font-ui, inherit);
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: var(--weight-medium, 500);
+    line-height: 1;
+    white-space: nowrap;
+    user-select: none;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-fast, 120ms) var(--ease-out, ease),
+      border-color var(--dur-fast, 120ms) var(--ease-out, ease),
+      color var(--dur-fast, 120ms) var(--ease-out, ease);
+  }
+
+  .root:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .root:disabled,
+  .root[aria-disabled="true"] {
+    /* Still legible: disabled is not invisible (COL-20). */
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  /* Sizes: 32 / 40 / 48, plus the two square controls. */
+  .root[data-size="xs"] {
+    height: 1.75rem;
+    padding-inline: var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  .root[data-size="sm"] {
+    height: var(--control-height-sm);
+    padding-inline: var(--space-3);
+    font-size: var(--text-xs);
+  }
+
+  .root[data-size="md"] {
+    height: var(--control-height-md);
+    padding-inline: var(--space-4);
+  }
+
+  .root[data-size="lg"] {
+    height: var(--control-height-lg);
+    padding-inline: var(--space-6);
+    font-size: var(--text-base);
+  }
+
+  .root[data-size="icon"],
+  .root[data-size="icon-xs"],
+  .root[data-size="icon-sm"],
+  .root[data-size="icon-lg"] {
+    padding: 0;
+    aspect-ratio: 1;
+  }
+
+  .root[data-size="icon"] {
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
+
+  .root[data-size="icon-xs"] {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .root[data-size="icon-sm"] {
+    width: var(--control-height-md);
+    height: var(--control-height-md);
+  }
+
+  .root[data-size="icon-lg"] {
+    width: var(--control-height-lg);
+    height: var(--control-height-lg);
+  }
+
+  /* Variants */
+  .root[data-variant="primary"] {
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+
+  .root[data-variant="primary"]:hover {
+    background: var(--primary-hover);
+  }
+
+  .root[data-variant="primary"]:active {
+    background: var(--primary-active);
+  }
+
+  .root[data-variant="secondary"],
+  .root[data-variant="outline"] {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+
+  .root[data-variant="secondary"]:hover,
+  .root[data-variant="outline"]:hover {
+    background: var(--surface-2);
+  }
+
+  .root[data-variant="secondary"]:active,
+  .root[data-variant="outline"]:active {
+    background: var(--surface-3);
+  }
+
+  .root[data-variant="ghost"] {
+    background: transparent;
+    color: var(--text);
+  }
+
+  .root[data-variant="ghost"]:hover {
+    background: var(--surface-2);
+  }
+
+  .root[data-variant="ghost"]:active {
+    background: var(--surface-3);
+  }
+
+  .root[data-variant="danger"],
+  .root[data-variant="destructive"] {
+    background: var(--danger);
+    color: var(--on-danger);
+  }
+
+  .root[data-variant="danger"]:hover,
+  .root[data-variant="destructive"]:hover {
+    background: var(--red-700);
+  }
+
+  .root[data-variant="link"] {
+    height: auto;
+    padding: 0;
+    background: transparent;
+    color: var(--link);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .root[data-variant="link"]:hover {
+    color: var(--link-hover);
+  }
+
+  /* Icons scale with the button, not with the page. */
+  .icon {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+
+  .root[data-size="sm"] .icon > svg,
+  .root[data-size="icon-sm"] .icon > svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .root[data-size="icon"] .icon > svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  /* Loading: the label keeps its width so the button does not jump, and the
+     spinner sits centred over it. */
+  .root[data-loading="true"] {
+    position: relative;
+    cursor: progress;
+  }
+
+  .root[data-loading="true"] .label,
+  .root[data-loading="true"] .icon {
+    visibility: hidden;
+  }
+
+  .spinner {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .spinner > svg {
+    width: 1rem;
+    height: 1rem;
+    animation: eavi-spin 0.9s linear infinite;
+  }
+}

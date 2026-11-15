@@ -1,4 +1,10 @@
-@import "tailwindcss";
+/* Tailwind is still installed for the screens that have not been ported yet, so its theme
+   and utilities are imported directly. Preflight is deliberately NOT loaded: it lands in
+   the same `base` cascade layer as app/styles/base.css but later in source order, so it
+   silently overrode the new type scale, the link colour and the placeholder colour.
+   app/styles/reset.css and base.css own the element defaults instead. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 

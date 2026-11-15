@@ -1,0 +1,82 @@
+@layer components {
+  .root {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+    font-size: var(--text-sm);
+  }
+
+  .header,
+  .content,
+  .footer {
+    padding-inline: var(--card-pad);
+  }
+
+  .header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+    align-items: start;
+    padding-block: var(--card-pad) var(--space-4);
+  }
+
+  .header[data-has-action="true"] {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .title {
+    font-family: var(--font-ui);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  .description {
+    font-size: var(--text-sm);
+    line-height: var(--leading-snug);
+    color: var(--text-muted);
+  }
+
+  .action {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: start;
+    justify-self: end;
+  }
+
+  .content {
+    padding-block-end: var(--card-pad);
+  }
+
+  .footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-block-start: auto;
+    padding-block: var(--space-4);
+    border-block-start: 1px solid var(--divider);
+    background: var(--surface-2);
+  }
+
+  /* A compact card is used inside dense lists. */
+  .root[data-size="sm"] .header {
+    padding-block: var(--space-4) var(--space-3);
+  }
+
+  .root[data-size="sm"] .title {
+    font-size: var(--text-base);
+  }
+
+  .root[data-size="sm"] .content {
+    padding-block-end: var(--space-4);
+  }
+}

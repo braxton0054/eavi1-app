@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 
-import { DashboardFrame } from "@/components/dashboard/dashboard-frame";
+import { AppShell } from "@/components/shell/app-shell";
+import { signOut } from "@/lib/actions/auth";
 import { requireStudent } from "@/lib/session";
 import { mobileNav, shell, studentNavGroups } from "@/lib/content/dashboard";
 
@@ -22,15 +23,16 @@ export default async function StudentLayout({ children }: { children: React.Reac
   const scope = await requireStudent();
 
   return (
-    <DashboardFrame
+    <AppShell
       scope={scope}
       home="/student"
       note={shell.studentNote}
       profileHref="/student/profile"
       nav={studentNavGroups}
       mobile={mobileNav.student}
+      signOut={signOut}
     >
       {children}
-    </DashboardFrame>
+    </AppShell>
   );
 }

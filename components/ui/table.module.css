@@ -1,0 +1,76 @@
+@layer components {
+  .container {
+    position: relative;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .root {
+    width: 100%;
+    caption-side: bottom;
+    font-size: var(--text-sm);
+  }
+
+  .header tr {
+    border-block-end: 1px solid var(--border);
+  }
+
+  .body tr:last-child {
+    border-block-end: 0;
+  }
+
+  .footer {
+    border-block-start: 1px solid var(--border);
+    background: var(--surface-2);
+    font-weight: var(--weight-medium);
+  }
+
+  .footer > tr:last-child {
+    border-block-end: 0;
+  }
+
+  .row {
+    border-block-end: 1px solid var(--divider);
+    transition: background-color var(--dur-fast) var(--ease-out);
+  }
+
+  .row:hover {
+    background: var(--surface-2);
+  }
+
+  .row:has([aria-expanded]) {
+    background: var(--surface-2);
+  }
+
+  .row[data-state="selected"] {
+    background: var(--surface-2);
+  }
+
+  .head {
+    height: 2.5rem;
+    padding: var(--space-2);
+    text-align: left;
+    vertical-align: middle;
+    font-weight: var(--weight-medium);
+    white-space: nowrap;
+    color: var(--text);
+  }
+
+  .cell {
+    padding: var(--space-2);
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  /* A cell holding a checkbox has no room for trailing padding. */
+  .head:has([role="checkbox"]),
+  .cell:has([role="checkbox"]) {
+    padding-inline-end: 0;
+  }
+
+  .caption {
+    margin-block-start: var(--space-4);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+}

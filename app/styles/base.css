@@ -1,0 +1,152 @@
+/*
+ * Element defaults. Components never restate any of this; they inherit it and
+ * override through their own module classes.
+ */
+@layer base {
+  html {
+    font-family: var(--font-ui);
+    font-size: 100%;
+    line-height: var(--leading-normal);
+    color-scheme: light;
+    scroll-padding-block-start: var(--topbar-height);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-size: var(--text-base);
+  }
+
+  /* A visible focus ring on everything interactive, at 3:1 against its surroundings. */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  a {
+    color: var(--link);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  a:hover {
+    color: var(--link-hover);
+    text-decoration-line: underline;
+  }
+
+  ::selection {
+    background: var(--primary-soft);
+    color: var(--text);
+  }
+
+  /* Type scale. Sizes are rem so user font scaling works (TYP-30). */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--text);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-tight);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  h1 {
+    font-size: var(--text-3xl);
+  }
+  h2 {
+    font-size: var(--text-2xl);
+  }
+  h3 {
+    font-size: var(--text-xl);
+  }
+  h4,
+  h5,
+  h6 {
+    font-size: var(--text-lg);
+  }
+
+  p {
+    text-wrap: pretty;
+    max-width: var(--measure);
+  }
+
+  small {
+    font-size: var(--text-sm);
+  }
+
+  strong,
+  b {
+    font-weight: var(--weight-semibold);
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  hr {
+    height: 0;
+    border: 0;
+    border-block-start: 1px solid var(--divider);
+  }
+
+  abbr:where([title]) {
+    text-decoration: underline dotted;
+  }
+
+  /* Superscripts must not stretch the line they sit in. */
+  sub,
+  sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  button,
+  input:where([type="button"], [type="reset"], [type="submit"]) {
+    appearance: button;
+  }
+
+  ::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
+
+  fieldset {
+    border: 0;
+    padding: 0;
+  }
+
+  legend {
+    padding: 0;
+  }
+
+  /* Placeholders are a hint, never a label, and must stay legible (A11-31). */
+  ::placeholder {
+    color: var(--text-muted);
+    opacity: 1;
+  }
+
+  /* Figures compare by digit, so they share a width everywhere. */
+  [data-numeric],
+  .num,
+  table td.num,
+  table th.num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+}

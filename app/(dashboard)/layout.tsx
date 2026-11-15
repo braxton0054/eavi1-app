@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 
-import { DashboardFrame } from "@/components/dashboard/dashboard-frame";
+import { AppShell } from "@/components/shell/app-shell";
+import { signOut } from "@/lib/actions/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { mobileNav, navGroups, shell, superNavGroups } from "@/lib/content/dashboard";
@@ -31,15 +32,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
       : [];
 
   return (
-    <DashboardFrame
+    <AppShell
       scope={{ ...scope, campusPicker: scope.role === "SUPERADMIN" ? { campusId: scope.campusId, campuses } : undefined }}
       home="/dashboard"
       note={shell.brandNote}
       profileHref="/dashboard/profile"
       nav={scope.role === "SUPERADMIN" ? superNavGroups : navGroups}
       mobile={mobileNav.admin}
+      signOut={signOut}
     >
       {children}
-    </DashboardFrame>
+    </AppShell>
   );
 }

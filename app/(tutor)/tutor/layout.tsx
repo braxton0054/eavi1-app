@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 
-import { DashboardFrame } from "@/components/dashboard/dashboard-frame";
+import { AppShell } from "@/components/shell/app-shell";
+import { signOut } from "@/lib/actions/auth";
 import { requireTutor } from "@/lib/session";
 import { mobileNav, shell, tutorNavGroups } from "@/lib/content/dashboard";
 
@@ -21,15 +22,16 @@ export default async function TutorLayout({ children }: { children: React.ReactN
   const scope = await requireTutor();
 
   return (
-    <DashboardFrame
+    <AppShell
       scope={scope}
       home="/tutor"
       note={shell.tutorNote}
       profileHref="/tutor/profile"
       nav={tutorNavGroups}
       mobile={mobileNav.tutor}
+      signOut={signOut}
     >
       {children}
-    </DashboardFrame>
+    </AppShell>
   );
 }

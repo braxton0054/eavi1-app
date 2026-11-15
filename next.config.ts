@@ -97,9 +97,18 @@ const nextConfig: NextConfig = {
       "node_modules/@prisma/client-runtime-utils/**/*",
     ],
   },
+  /*
+   * Tailwind compiles only the legacy sheet.
+   *
+   * The rule used to match `*.css`, which also swallowed every CSS Module: Tailwind
+   * handled the file as a plain stylesheet, the module's class map came back empty, and
+   * every component rendered with no class at all. Component modules are ordinary CSS
+   * and must reach the bundler untouched. The entry is enough — Tailwind v4 scans the
+   * source tree for the classes it needs.
+   */
   turbopack: {
     rules: {
-      "*.css": {
+      "**/globals.css": {
         loaders: ["@tailwindcss/turbopack"],
         as: "*.css",
       },
