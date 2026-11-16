@@ -4,13 +4,9 @@ import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
-import { storageConfigured, uploadFile } from "@/lib/storage";
 import { pages } from "@/lib/content/dashboard";
-import { buildPrintableCards, getCardCandidates, type CardTarget } from "@/lib/dal/cards";
-import { paginateSheets } from "@/lib/cards/sheet";
-import { renderSheetPng } from "@/lib/cards/render";
-import { buildCardsPdf } from "@/lib/cards/pdf";
-import { recordAudit } from "@/lib/academics/audit";
+import { getCardCandidates, type CardTarget } from "@/lib/dal/cards";
+import { enqueueCardBatch } from "@/lib/queue/queues";
 
 const copy = pages.cards.generate;
 
@@ -60,11 +56,16 @@ async function targetLabel(target: CardTarget) {
 }
 
 /**
- * Renders the chosen students onto print sheets and stores the PDF.
+ * Records the chosen students as a print run and hands the rendering to the queue.
  *
- * The run is saved as a batch and the browser is sent to that batch inside the portal, so
- * the file is viewed and downloaded on the system rather than thrown at a separate tab or a
- * raw storage URL that leaves the portal behind.
+ * The request answers in the time it takes to count the candidates: the batch row is
+ * created in state PENDING, the job carries everything the worker needs, and the browser
+ * lands on the batch page where the run's own progress is shown. Rendering used to happen
+ * right here — a batch of four hundred cards held the request for the better part of a
+ * minute and died with it.
+ *
+ * The validation that guards what a run may cover (an empty or oversized target) stays
+ * synchronous: those answers are the office's to fix now, not the worker's to discover.
  */
 export async function generateCards(formData: FormData) {
   const scope = await requireCollegeAdmin();
@@ -76,53 +77,34 @@ export async function generateCards(formData: FormData) {
   if (candidates.length === 0) redirect("/dashboard/cards?empty=1");
   if (candidates.length > MAX_CARDS) redirect("/dashboard/cards?tooMany=1");
 
-  const { cards } = await buildPrintableCards(target, scope.campusId);
-  if (cards.length === 0) redirect("/dashboard/cards?empty=1");
-
-  const { sheets } = paginateSheets(cards);
-
-  // Fronts and backs are separate pages, in sheet order, so a duplex print flips cleanly.
-  const images = [];
-  for (const sheet of sheets) {
-    const bind = copy.sheetCaption(sheet.page, sheets.length);
-    images.push({ png: await renderSheetPng(sheet, "fronts", `${bind} · ${copy.frontLabel}`), label: "front" });
-    images.push({ png: await renderSheetPng(sheet, "backs", `${bind} · ${copy.backLabel}`), label: "back" });
-  }
-
-  const pdf = await buildCardsPdf(images);
-
-  // Without storage the batch is still recorded so the run can be seen, just not reopened.
-  let fileUrl: string | null = null;
-  if (storageConfigured()) {
-    try {
-      fileUrl = await uploadFile(`id-cards/${Date.now()}-${cards.length}-cards.pdf`, pdf, "application/pdf");
-    } catch (error) {
-      console.error("[cards] the PDF could not be stored:", error instanceof Error ? error.message : error);
-    }
-  }
-
   const batch = await prisma.cardBatch.create({
     data: {
       campusId: scope.campusId,
       targetLabel: await targetLabel(target),
-      cardCount: cards.length,
-      sheetCount: sheets.length,
-      fileUrl,
+      cardCount: 0,
+      sheetCount: 0,
+      fileUrl: null,
+      status: "PENDING",
       actorId: scope.userId,
       actorEmail: scope.email,
     },
     select: { id: true },
   });
 
-  await recordAudit({
-    campusId: scope.campusId,
-    actorId: scope.userId,
-    actorEmail: scope.email,
-    action: "card.generate",
-    entityType: "card",
-    entityId: batch.id,
-    detail: { cards: cards.length, sheets: sheets.length },
-  });
+  try {
+    // The batch row's id is the job's id, so a double submit cannot queue a run twice.
+    await enqueueCardBatch({
+      batchId: batch.id,
+      target,
+      campusId: scope.campusId,
+      actorId: scope.userId,
+      actorEmail: scope.email,
+    });
+  } catch (error) {
+    // Redis unreachable: the run must not sit pending forever pretending to be coming.
+    console.error("card batch could not be queued:", error);
+    await prisma.cardBatch.update({ where: { id: batch.id }, data: { status: "FAILED" } });
+  }
 
   redirect(`/dashboard/cards/batches/${batch.id}`);
 }
