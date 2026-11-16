@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRightIcon, ImagesIcon, LogInIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,21 @@ import { CountUp } from "@/components/home/count-up";
 import { Reveal } from "@/components/home/reveal";
 import { hero, pending } from "@/lib/content/home";
 
-export function Hero() {
+export function Hero({
+  programmeCount,
+  studentCount,
+}: {
+  /** Live counts from the database; null keeps the honest TODO chip. */
+  programmeCount?: number | null;
+  studentCount?: number | null;
+}) {
+  const liveValue = (item: { label: string; value: number | null }) => {
+    if (item.value !== null) return item.value;
+    if (item.label.startsWith("Programmes") && programmeCount != null) return programmeCount;
+    if (item.label.startsWith("Students") && studentCount != null) return studentCount;
+    return null;
+  };
+
   return (
     <section className="eavi-mesh relative overflow-hidden border-b border-border">
       <div className="mx-auto grid w-full max-w-6xl items-center gap-8 px-5 pt-12 pb-8 sm:px-6 sm:pt-16 sm:pb-10 lg:grid-cols-12 lg:gap-12 lg:pt-20 lg:pb-12">
@@ -52,15 +67,26 @@ export function Hero() {
         </Reveal>
 
         <Reveal className="lg:col-span-5" delay={0.1}>
-          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border bg-eavi-primary-soft p-6 text-center sm:aspect-[5/4]">
-            <span className="rounded-2xl border border-border bg-eavi-plate p-3">
-              <ImagesIcon className="size-7 text-eavi-primary-text" aria-hidden />
-            </span>
-            <p className="cn-font-heading text-sm font-semibold">{hero.photoLabel}</p>
-            <p className="text-xs leading-5 text-eavi-muted-text">
-              {pending.label} — {hero.photoPending}
-            </p>
-          </div>
+          {hero.photo ? (
+            <Image
+              src={hero.photo}
+              alt={hero.photoAlt}
+              width={1200}
+              height={960}
+              priority
+              className="aspect-[4/3] w-full rounded-3xl object-cover ring-1 ring-foreground/10 sm:aspect-[5/4]"
+            />
+          ) : (
+            <div className="flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border bg-eavi-primary-soft p-6 text-center sm:aspect-[5/4]">
+              <span className="rounded-2xl border border-border bg-eavi-plate p-3">
+                <ImagesIcon className="size-7 text-eavi-primary-text" aria-hidden />
+              </span>
+              <p className="cn-font-heading text-sm font-semibold">{hero.photoLabel}</p>
+              <p className="text-xs leading-5 text-eavi-muted-text">
+                {pending.label} — {hero.photoPending}
+              </p>
+            </div>
+          )}
         </Reveal>
       </div>
 
@@ -78,12 +104,12 @@ export function Hero() {
                 {item.label}
               </dt>
               <dd className="cn-font-heading text-2xl font-semibold text-eavi-primary-text sm:text-3xl">
-                {item.value === null ? (
+                {liveValue(item) === null ? (
                   <span className="rounded-md border border-dashed border-border px-2 py-0.5 text-sm font-medium text-eavi-muted-text">
                     {hero.pendingValue}
                   </span>
                 ) : (
-                  <CountUp value={item.value} />
+                  <CountUp value={liveValue(item) as number} />
                 )}
               </dd>
             </div>

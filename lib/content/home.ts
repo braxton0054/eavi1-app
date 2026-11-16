@@ -73,6 +73,8 @@ export const hero = {
   subheading: `Quality and affordable education across ${campuses.length} campuses in Eldoret, Kenya.`,
   apply: "Apply Now",
   portal: "Portal Login",
+  photo: "/eavi-assets/web/hero.jpg",
+  photoAlt: "The EAVI College campus in Eldoret.",
   photoLabel: "Campus photo",
   photoPending: "Add a campus photo in public/campus-life/",
   trustHeading: "EAVI at a glance",

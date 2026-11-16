@@ -46,12 +46,16 @@ async function programCards(): Promise<Program[]> {
 }
 
 export default async function HomePage() {
-  const programs = await programCards();
+  const [programs, students] = await Promise.all([
+    programCards(),
+    // The hero's "Students" figure: everyone currently enrolled, straight from the ledger.
+    prisma.studentProfile.count({ where: { enrollments: { some: { status: "ACTIVE" } } } }),
+  ]);
 
   return (
     <>
       <OrganizationJsonLd />
-      <Hero />
+      <Hero programmeCount={programs.length} studentCount={students} />
       <PortalSection />
       <WhySection />
       <ProgramsSection programs={programs} />
