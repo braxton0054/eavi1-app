@@ -51,3 +51,6 @@ test-data/
 
 # Compiled chat server (npm run server:build)
 server.mjs
+
+# Full-resolution photo originals; the site serves the optimized copies in web/.
+public/eavi-assets/originals/
