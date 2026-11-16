@@ -186,12 +186,21 @@
       z-index: var(--z-overlay);
       width: min(var(--sidebar-width), 86vw);
       transform: translateX(-100%);
-      transition: transform var(--dur-base) var(--ease-out);
+      /* Hidden, not merely translated: a drawer that is only off-screen still holds
+         keyboard focus, so a Tab press lands on links nobody can see. */
+      visibility: hidden;
+      transition:
+        transform var(--dur-base) var(--ease-out),
+        visibility 0s linear var(--dur-base);
       box-shadow: var(--shadow-lg);
     }
 
     .sidebar[data-open="true"] {
       transform: none;
+      visibility: visible;
+      transition:
+        transform var(--dur-base) var(--ease-out),
+        visibility 0s;
     }
 
     .close {

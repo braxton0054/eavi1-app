@@ -115,15 +115,15 @@ export async function CollegeOverview() {
               label={`${money(totals.collected)} of ${money(totals.billed)}`}
               caption={`${copy.figures.collected}: ${money(totals.collected)} of ${money(totals.billed)}`}
             />
-            <dl className="grid grid-cols-3 gap-3 text-sm">
+            <dl className="flex flex-col gap-2 text-sm">
               {[
                 { label: copy.figures.billed, value: totals.billed },
                 { label: copy.figures.collected, value: totals.collected },
                 { label: copy.figures.outstanding, value: totals.billed - totals.collected },
               ].map((figure) => (
-                <div key={figure.label} className="space-y-1">
+                <div key={figure.label} className="flex items-baseline justify-between gap-3">
                   <dt className="text-xs text-eavi-muted-text">{figure.label}</dt>
-                  <dd className="font-semibold tabular-nums">{money(figure.value)}</dd>
+                  <dd className="whitespace-nowrap font-semibold tabular-nums">{money(figure.value)}</dd>
                 </div>
               ))}
             </dl>

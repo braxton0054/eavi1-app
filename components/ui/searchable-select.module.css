@@ -6,7 +6,7 @@
     height: var(--input-height);
     align-items: center;
     gap: var(--space-1);
-    padding: var(--space-2) var(--space-3);
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-md);
     background: var(--surface);
@@ -25,7 +25,7 @@
     width: 100%;
     height: 100%;
     min-width: 0;
-    padding: 0;
+    padding: 0 var(--space-2);
     border: 0;
     background: transparent;
     font-size: var(--text-base);
@@ -38,8 +38,8 @@
 
   .trigger {
     display: flex;
-    width: 1.5rem;
-    height: 1.5rem;
+    width: var(--touch-target);
+    height: var(--touch-target);
     flex-shrink: 0;
     align-items: center;
     justify-content: center;

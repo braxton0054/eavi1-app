@@ -26,6 +26,9 @@
 
   a {
     color: var(--link);
+    /* The browser underlines links by default; this system marks links with colour and
+       weight instead, and underlines only on hover and in body copy (TYP-24). */
+    text-decoration: none;
     text-decoration-thickness: 1px;
     text-underline-offset: 0.2em;
   }
