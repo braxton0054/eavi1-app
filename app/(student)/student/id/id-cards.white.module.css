@@ -1,0 +1,123 @@
+/* Self-contained: all tokens live on .page, no globals.css or brand colors needed */
+.page{
+  --bg:#ffffff; --card:#ffffff; --fg:#111827; --muted:#f3f4f6; --mfg:#6b7280;
+  --border:#e5e7eb; --primary:#111827; --primary-fg:#ffffff; --primary-h:#374151;
+  --ok:#16a34a; --ok-bg:#dcfce7; --ok-fg:#166534;
+  --danger:#dc2626; --danger-bg:#fee2e2; --danger-fg:#991b1b;
+  --ring:#2563eb;
+  color-scheme:light;
+  background:var(--bg); color:var(--fg); min-height:100vh;
+  max-width:1000px; margin:0 auto; padding:24px 20px;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; line-height:1.45;
+}
+
+/* Sticky top tab bar. Negative margins make the bar full-bleed so cards scroll
+   underneath it; the row scrolls sideways instead of wrapping at 360px. */
+.tabs{
+  position:sticky; top:0; z-index:20;
+  display:flex; gap:6px; align-items:center;
+  margin:-24px -20px 20px; padding:12px 20px;
+  background:var(--bg); border-bottom:1px solid var(--border);
+  overflow-x:auto; white-space:nowrap;
+}
+.tabs::-webkit-scrollbar{height:0}
+
+.btn{
+  font:inherit; font-size:14px; cursor:pointer; border-radius:8px;
+  min-height:44px; /* 44px tap target on mobile, comfortable on desktop */
+  padding:8px 14px; border:1px solid var(--border);
+  background:var(--bg); color:var(--fg);
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  transition:background .15s;
+}
+.btn:hover{background:var(--muted)}
+.btn:disabled{opacity:.6; cursor:progress}
+.btn:focus-visible{outline:2px solid var(--ring); outline-offset:2px}
+.btnPrimary{background:var(--primary); border-color:var(--primary); color:var(--primary-fg)}
+.btnPrimary:hover{background:var(--primary-h)}
+
+.spinner{
+  width:14px; height:14px; border-radius:50%; flex:none;
+  border:2px solid currentColor; border-top-color:transparent;
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(1turn)}}
+
+.grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); gap:24px}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+
+.panel{
+  background:var(--card); border:1px solid var(--border); border-radius:12px;
+  padding:20px; box-shadow:0 1px 2px rgba(0,0,0,.04);
+}
+.panel h2{font-size:15px; font-weight:600; margin:0 0 14px}
+
+.label{display:block; font-size:12px; font-weight:500; color:var(--mfg); margin:12px 0 4px}
+.input{
+  width:100%; font:inherit; font-size:16px; /* 16px avoids iOS zoom-on-focus */
+  padding:9px 10px; border-radius:8px;
+  border:1px solid var(--border); background:var(--bg); color:var(--fg);
+}
+.input:focus{outline:2px solid var(--ring); outline-offset:1px; border-color:transparent}
+.row{display:flex; gap:10px}
+.row>*{flex:1}
+
+/* Search + campus filter above the list */
+.filters{display:flex; gap:10px; flex-wrap:wrap; margin:0 0 4px}
+.filters>*{flex:1 1 150px; min-width:150px}
+.count{font-size:12px; color:var(--mfg); margin:10px 0 0}
+.empty td{text-align:center; color:var(--mfg); padding:32px 8px}
+
+/* The artwork is CR80 landscape (856 x 540). Widths are fixed, height follows the
+   viewBox, so a card is never stretched or cropped at any screen size. */
+.cards{
+  display:flex; gap:18px; justify-content:center; flex-wrap:wrap;
+  background:var(--muted); border-radius:10px; padding:20px;
+}
+.cards svg{display:block; width:220px; max-width:100%; height:auto; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.15)}
+.actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:18px}
+.center{justify-content:center}
+.notice{font-size:13px; margin:12px 0 0; color:var(--ok-fg)}
+.noticeError{color:var(--danger-fg)}
+
+/* Student view: one card, tap or press Enter/Space to flip (CSS 3D) */
+.flip{perspective:900px; width:340px; max-width:100%; margin:0 auto; cursor:pointer; border-radius:10px}
+.flip:focus-visible{outline:2px solid var(--ring); outline-offset:4px}
+.flipInner{position:relative; aspect-ratio:856/540; transition:transform .6s; transform-style:preserve-3d}
+.flipped .flipInner{transform:rotateY(180deg)}
+.face{position:absolute; inset:0; backface-visibility:hidden}
+.face svg{display:block; width:100%; height:auto; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.back{transform:rotateY(180deg)}
+@media (prefers-reduced-motion:reduce){
+  .flipInner{transition:none}
+  .spinner{animation-duration:1.6s}
+}
+
+.meta{font-size:13px; color:var(--mfg); text-align:center; margin-top:16px}
+.meta b{color:var(--fg); font-size:15px}
+.meta a{color:var(--fg); overflow-wrap:anywhere}
+.badge{
+  display:inline-block; font-size:12px; font-weight:500; padding:3px 10px;
+  border-radius:99px; background:var(--ok-bg); color:var(--ok-fg);
+}
+.badgePending{background:var(--muted); color:var(--mfg)}
+.badgeExpired{background:var(--danger-bg); color:var(--danger-fg)}
+
+.tableWrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
+.table{width:100%; min-width:540px; border-collapse:collapse; font-size:13px}
+.table th,.table td{padding:10px 8px; border-bottom:1px solid var(--border); text-align:left}
+.table th{color:var(--mfg); font-weight:500; font-size:12px}
+.table tr:hover td{background:var(--muted)}
+
+.srOnly{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+}
+
+@media print{
+  body *{visibility:hidden}
+  .printArea,.printArea *{visibility:visible}
+  .printArea{position:absolute; inset:0; background:#fff; padding:0; border:0; border-radius:0; box-shadow:none}
+  .printArea svg{box-shadow:none; border-radius:0}
+  @page{size:85.6mm 54mm; margin:0}
+}

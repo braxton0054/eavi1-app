@@ -4,12 +4,11 @@
  *
  * Run: npx tsx scripts/verify-cards.ts
  */
-import { readFileSync } from "node:fs";
-
 import { addMonths, expiryForProgram } from "../lib/cards/validity";
 import { escapeXml, mergeCardTemplate, slotsIn } from "../lib/cards/template";
 import { A4, CR80, SHEET, paginateSheets, sheetGrid } from "../lib/cards/sheet";
 import { qrSvgGroup, verifyUrl } from "../lib/cards/qr";
+import { CARD_TEMPLATES } from "../components/id-card-svg";
 
 let passed = 0;
 let failed = 0;
@@ -211,8 +210,8 @@ console.log("\nverification code");
 
 console.log("\nartwork ships with the build");
 {
-  const front = readFileSync("card-templates/front.svg", "utf8");
-  const back = readFileSync("card-templates/back.svg", "utf8");
+  const front = CARD_TEMPLATES.front;
+  const back = CARD_TEMPLATES.back;
 
   check("front template exists and is an svg", front.startsWith("<svg"));
 

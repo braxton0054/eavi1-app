@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/format";
@@ -10,29 +8,17 @@ import { mergeCardTemplate, type CardSlots } from "@/lib/cards/template";
 import { fillQrSlot, verifyUrl } from "@/lib/cards/qr";
 import { expiryForProgram } from "@/lib/cards/validity";
 import type { PrintableCard } from "@/lib/cards/sheet";
+import { CARD_TEMPLATES } from "@/components/id-card-svg";
 
 /**
  * The artwork ships with the app rather than living in the database: it is part of the
  * build, and a missing template should fail loudly at request time rather than leave the
- * office staring at a blank card. Edit `card-templates/*.svg` to change the design.
+ * office staring at a blank card. The single copy lives beside the React components that
+ * preview it (`components/id-card-svg.tsx`), so the print run and the screen always show
+ * the same card — edit the design there, once, in one place.
  */
-const TEMPLATE_DIR = path.join(process.cwd(), "card-templates");
-
-/**
- * The artwork is read once per process. A batch of three hundred cards would otherwise
- * re-read the same two files three hundred times, which is the difference between a print
- * run that finishes and one that times out.
- */
-let cache: { front: string; back: string } | null = null;
-
 export async function templates() {
-  if (!cache) {
-    cache = {
-      front: await readFile(path.join(TEMPLATE_DIR, "front.svg"), "utf8"),
-      back: await readFile(path.join(TEMPLATE_DIR, "back.svg"), "utf8"),
-    };
-  }
-  return cache;
+  return CARD_TEMPLATES;
 }
 
 export type CardFace = {
