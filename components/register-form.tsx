@@ -455,6 +455,21 @@ export function RegisterForm() {
           )}
         </CardFooter>
       )}
+      {!result && step === 3 && (
+        <p
+          style={{
+            marginBlockStart: "var(--space-2)",
+            fontSize: "var(--text-xs)",
+            lineHeight: 1.5,
+            color: "var(--text-muted)",
+            textAlign: "center",
+          }}
+        >
+          By creating an account you agree to the{" "}
+          <Link href="/terms">terms of use</Link> and the{" "}
+          <Link href="/privacy">privacy notice</Link>.
+        </p>
+      )}
     </Card>
   );
 }

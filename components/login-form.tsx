@@ -17,6 +17,7 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { landingFor } from "@/lib/landing";
 import { isEmail } from "@/lib/validation";
 
 import styles from "./login-form.module.css";
@@ -27,25 +28,78 @@ type Errors = { email?: string; password?: string };
 type Failure = { title: string; body: string };
 
 /**
- * Where a signed-in account belongs. The ?next= value only wins when it is a plain
- * in-app path, so the form cannot be turned into an open redirect.
+ * What the Google callback's `?error=` code means, in words a person can act on.
+ *
+ * The codes come from `app/api/auth/google/callback/route.ts`; the sentences live here so
+ * the callback can stay free of copy and only ever redirects with a short reason.
  */
-function landingFor(role: string, nextPath: string | undefined) {
-  const safe =
-    nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : null;
-  if (safe) return safe;
-  if (role === "TUTOR") return "/tutor";
-  if (role === "STUDENT") return "/student";
-  return role === "SUPERADMIN" || role === "CAMPUS_ADMIN" ? "/dashboard" : "/unavailable";
+const GOOGLE_FAILURES: Record<string, Failure> = {
+  noaccount: {
+    title: "No EAVI account uses that Google email",
+    body: "Sign-in only works for an address the college has already registered. Check the address on the Google account, or sign in with your EAVI password.",
+  },
+  unverified: {
+    title: "That Google address is not verified",
+    body: "Google could not confirm the address belongs to you, so it cannot be used to sign in. Verify it with Google and try again.",
+  },
+  unconfigured: {
+    title: "Google sign-in is not available",
+    body: "This site has no Google client configured. Sign in with your EAVI password.",
+  },
+  denied: {
+    title: "Google sign-in was cancelled",
+    body: "Nothing was changed. Choose an account and try again, or sign in with your password.",
+  },
+  state: {
+    title: "That sign-in expired",
+    body: "For safety, a sign-in attempt only lasts ten minutes and cannot be reused. Start again.",
+  },
+  pending: {
+    title: "Account needs approval",
+    body: "A superadmin still needs to approve this account.",
+  },
+  disabled: {
+    title: "Account needs attention",
+    body: "This account has been disabled.",
+  },
+  exchange: {
+    title: "Google sign-in failed",
+    body: "Google did not confirm the sign-in. Try again in a moment, or use your password.",
+  },
+  failed: {
+    title: "Google sign-in failed",
+    body: "Something went wrong on the way back from Google. Try again, or use your password.",
+  },
+};
+
+/** Google's mark, drawn here so the page needs no third-party asset or request. */
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true" focusable="false">
+      <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.4 5.4 2.5 13.2l7.8 6.1C12.1 13.6 17.6 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.2 5.4-4.7 7l7.6 5.9c4.4-4.1 6.8-10.1 6.8-17.4z" />
+      <path fill="#FBBC05" d="M10.3 28.7a14.5 14.5 0 0 1 0-9.4l-7.8-6.1a24 24 0 0 0 0 21.6l7.8-6.1z" />
+      <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.8-5.8l-7.6-5.9c-2.1 1.4-4.8 2.3-8.2 2.3-6.4 0-11.9-4.1-13.7-9.8l-7.8 6.1C6.4 42.6 14.6 48 24 48z" />
+    </svg>
+  );
 }
 
-export function LoginForm({ nextPath }: { nextPath?: string }) {
+export function LoginForm({
+  nextPath,
+  initialError,
+}: {
+  nextPath?: string;
+  /** A `?error=` code from the Google callback, shown before anything is typed. */
+  initialError?: string;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<Failure | null>(null);
+  const [failure, setFailure] = useState<Failure | null>(() =>
+    initialError ? (GOOGLE_FAILURES[initialError] ?? GOOGLE_FAILURES.failed) : null,
+  );
   const [capsLock, setCapsLock] = useState(false);
 
   const emailRef = useRef<HTMLInputElement>(null);
@@ -203,6 +257,33 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
               </Button>
             </div>
           </form>
+
+          {/*
+           * A plain link, not a popup: the browser leaves the page, sets the CSRF cookie on
+           * the way out, and comes back to the same session cookie the password form sets.
+           * `next` is carried so a deep link survives the round trip through Google.
+           */}
+          <div className={styles.actions}>
+            <div
+              className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide opacity-60"
+              aria-hidden="true"
+            >
+              <span className="h-px flex-1 bg-current" />
+              <span>or</span>
+              <span className="h-px flex-1 bg-current" />
+            </div>
+
+            <Button asChild variant="outline" size="lg" className={styles.submit}>
+              <a
+                href={`/api/auth/google${
+                  nextPath ? `?next=${encodeURIComponent(nextPath)}` : ""
+                }`}
+              >
+                <GoogleMark />
+                Sign in with Google
+              </a>
+            </Button>
+          </div>
         </CardContent>
 
         <CardFooter>
@@ -216,8 +297,10 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       </Card>
 
       <p className={styles.legal}>
-        Sign-in is for enrolled students, tutors and college staff. Applications do not
-        need an account.
+        Sign in is for enrolled students, tutors and college staff. Applications do not
+        need an account. Read the{" "}
+        <Link href="/terms">terms of use</Link> and the{" "}
+        <Link href="/privacy">privacy notice</Link>.
       </p>
     </>
   );

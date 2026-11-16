@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOutIcon, MenuIcon, PanelLeftIcon, UserRoundIcon } from "lucide-react";
+import { FileTextIcon, LogOutIcon, MenuIcon, PanelLeftIcon, ShieldCheckIcon, UserRoundIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTransition } from "react";
 
@@ -115,6 +115,19 @@ export function Topbar({
                 <UserRoundIcon aria-hidden="true" />
                 Profile and settings
               </Link>
+            </MenuItem>
+            <MenuItem asChild>
+              {/* The legal pages are public; a new tab keeps the person's place in the portal. */}
+              <a href="/terms" target="_blank" rel="noopener noreferrer">
+                <FileTextIcon aria-hidden="true" />
+                Terms of use
+              </a>
+            </MenuItem>
+            <MenuItem asChild>
+              <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                <ShieldCheckIcon aria-hidden="true" />
+                Privacy notice
+              </a>
             </MenuItem>
             <MenuSeparator />
             <MenuItem variant="danger" disabled={pending} onSelect={handleSignOut}>
