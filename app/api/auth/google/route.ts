@@ -9,6 +9,7 @@ import {
   authorizeUrl,
   callbackUrl,
   googleConfigured,
+  publicOrigin,
 } from "@/lib/oauth/google";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export const dynamic = "force-dynamic";
  * Google and cannot be tampered with on the way back.
  */
 export async function GET(request: NextRequest) {
-  const origin = request.nextUrl.origin;
+  const origin = publicOrigin(request);
 
   // A deployment with no Google client should say so rather than bounce through a broken page.
   if (!googleConfigured()) {

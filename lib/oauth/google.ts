@@ -50,6 +50,26 @@ export function callbackUrl(origin: string): string {
   return new URL("/api/auth/google/callback", origin).toString();
 }
 
+/**
+ * The public origin a browser should be sent back to.
+ *
+ * Behind the reverse proxy the bare request origin is the container's own
+ * `localhost:3000` — a login that ends there is a login that ends nowhere. The
+ * deployment's own origin wins when set; otherwise the proxy's forwarded host is
+ * exactly what the user's browser used to reach us.
+ */
+export function publicOrigin(request: {
+  headers: { get(name: string): string | null };
+  nextUrl: { origin: string };
+}): string {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, "");
+
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const proto = request.headers.get("x-forwarded-proto") ?? "https";
+  return host ? `${proto}://${host}` : request.nextUrl.origin;
+}
+
 /** Where to send the browser to choose a Google account. */
 export function authorizeUrl(input: { state: string; redirectUri: string }): string {
   const url = new URL(AUTH_ENDPOINT);

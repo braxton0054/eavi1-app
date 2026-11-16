@@ -52,6 +52,9 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      # The public origin at runtime: sign-in redirects must end at the site the browser
+      # actually used, never the container's own localhost behind the proxy.
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
       # Object storage (Contabo S3-compatible). Declared with :- so a server
       # without these in .env still starts instead of failing interpolation.
       S3_ENDPOINT: ${S3_ENDPOINT:-}

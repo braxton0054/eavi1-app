@@ -11,6 +11,7 @@ import {
   exchangeCode,
   googleConfigured,
   googleProfile,
+  publicOrigin,
 } from "@/lib/oauth/google";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ function stateMatches(a: string, b: string): boolean {
  * a record of only half the ways into the system, which is worse than neither.
  */
 export async function GET(request: NextRequest) {
-  const origin = request.nextUrl.origin;
+  const origin = publicOrigin(request);
   const { searchParams } = request.nextUrl;
 
   /** Back to the login page with a reason the page can turn into a sentence. */
