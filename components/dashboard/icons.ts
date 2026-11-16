@@ -1,6 +1,7 @@
 import {
   BookOpenIcon,
   CalendarDaysIcon,
+  ListChecksIcon,
   MessagesSquareIcon,
   ClipboardListIcon,
   GraduationCapIcon,
@@ -31,6 +32,7 @@ export const icons: Record<DashboardIcon, typeof LayoutDashboardIcon> = {
   accounts: WalletIcon,
   cards: ReceiptIcon,
   reports: ScrollTextIcon,
+  jobs: ListChecksIcon,
   communication: MegaphoneIcon,
   chat: MessagesSquareIcon,
   profile: UserRoundIcon,
