@@ -40,11 +40,18 @@ services:
       args:
         # The public origin, baked into metadata, JSON-LD, sitemap and robots.
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+        # The push public key, inlined into the client bundle at build time.
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
     image: ${APP_IMAGE:-eavi-portal:latest}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
       NODE_ENV: production
+      # Web push (VAPID). Declared with :- so a server without keys still starts; the
+      # bell then works in-app only, and the first push attempt says what is missing.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       # Object storage (Contabo S3-compatible). Declared with :- so a server
       # without these in .env still starts instead of failing interpolation.
       S3_ENDPOINT: ${S3_ENDPOINT:-}
