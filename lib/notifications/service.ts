@@ -1,4 +1,3 @@
-import { after } from "next/server";
 import { sendNotification } from "web-push";
 import { Role, Status } from "@/generated/prisma/enums";
 
@@ -197,23 +196,14 @@ async function deliverTo(userIds: string[], payload: PushPayload) {
 }
 
 /**
- * Hands delivery to the background: `after()` runs it once the response is written, so a
- * slow push service never holds the request that caused it. Outside a request (a script
- * or a scheduled job), it simply delivers now. Transient failures are logged; the
- * notification row is already saved, so the bell never depended on the push arriving.
+ * Fire-and-forget: the promise keeps running after the response is written — this is a
+ * long-lived server (a container, plus the chat's socket process, which imports this
+ * module from outside any Next request), not a frozen lambda. The row is already saved,
+ * so the bell never waited on the push; a failed delivery is logged, never thrown into
+ * the request that caused it.
  */
 function scheduleDelivery(userIds: string[], payload: PushPayload) {
-  try {
-    after(async () => {
-      try {
-        await deliverTo(userIds, payload);
-      } catch (error) {
-        console.error("[notify] delivery failed:", error instanceof Error ? error.message : error);
-      }
-    });
-  } catch {
-    void deliverTo(userIds, payload).catch((e: Error) =>
-      console.error("[notify] delivery failed:", e.message),
-    );
-  }
+  void deliverTo(userIds, payload).catch((error: Error) =>
+    console.error("[notify] delivery failed:", error.message),
+  );
 }
