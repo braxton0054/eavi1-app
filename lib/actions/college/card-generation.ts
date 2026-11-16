@@ -92,9 +92,14 @@ export async function generateCards(formData: FormData) {
   const pdf = await buildCardsPdf(images);
 
   // Without storage the batch is still recorded so the run can be seen, just not reopened.
-  const fileUrl = storageConfigured()
-    ? await uploadFile(`id-cards/${Date.now()}-${cards.length}-cards.pdf`, pdf, "application/pdf")
-    : null;
+  let fileUrl: string | null = null;
+  if (storageConfigured()) {
+    try {
+      fileUrl = await uploadFile(`id-cards/${Date.now()}-${cards.length}-cards.pdf`, pdf, "application/pdf");
+    } catch (error) {
+      console.error("[cards] the PDF could not be stored:", error instanceof Error ? error.message : error);
+    }
+  }
 
   const batch = await prisma.cardBatch.create({
     data: {

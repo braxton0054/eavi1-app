@@ -12,10 +12,21 @@ const campusCode = (name: string) =>
     .replace(/^([a-z]+)\s+campus$|^([a-z]+)\s+office$/, "$1$2")
     .replace(/[^a-z0-9]+/g, "-");
 
-/** The two college-administration logins this build is written against. */
+/** The two college-administration logins this build is written against. The emails come
+ * from the deployment's .env (SUPER_ADMIN_EMAIL, MAIN_CAMPUS_ADMIN_EMAIL,
+ * WEST_CAMPUS_ADMIN_EMAIL) so the accounts are the college's real ones; the old
+ * addresses remain only as fallbacks for a checkout with no .env. */
 const adminAccounts = [
-  { code: "main", email: "admin-main@eavi.ac.ke", fullName: "EAVI Main Campus Office" },
-  { code: "west", email: "admin-west@eavi.ac.ke", fullName: "EAVI West Campus Office" },
+  {
+    code: "main",
+    email: (process.env.MAIN_CAMPUS_ADMIN_EMAIL ?? "admin-main@eavi.ac.ke").trim().toLowerCase(),
+    fullName: "EAVI Main Campus Office",
+  },
+  {
+    code: "west",
+    email: (process.env.WEST_CAMPUS_ADMIN_EMAIL ?? "admin-west@eavi.ac.ke").trim().toLowerCase(),
+    fullName: "EAVI West Campus Office",
+  },
 ];
 
 /**
@@ -67,16 +78,33 @@ async function seedCampuses() {
 }
 
 async function ensureSuperadmin() {
+  const email = (
+    process.env.SUPER_ADMIN_EMAIL ??
+    process.env.SEED_SUPERADMIN_EMAIL ??
+    "superadmin@eavi.ac.ke"
+  )
+    .trim()
+    .toLowerCase();
+
   const existing = await prisma.user.findFirst({ where: { role: "SUPERADMIN" } });
 
   if (existing) {
-    console.log(`superadmin already present: ${existing.email}`);
+    // The .env owns the identity: an account seeded under an old address is aligned to
+    // the deployment's own email, provided nothing else holds it.
+    if (existing.email !== email) {
+      const taken = await prisma.user.findUnique({ where: { email } });
+      if (taken) {
+        console.log(`superadmin stays ${existing.email}: ${email} is already a user`);
+        return;
+      }
+      await prisma.user.update({ where: { id: existing.id }, data: { email } });
+      console.log(`superadmin email aligned to ${email}`);
+    } else {
+      console.log(`superadmin already present: ${existing.email}`);
+    }
     return;
   }
 
-  const email = (process.env.SEED_SUPERADMIN_EMAIL ?? "superadmin@eavi.ac.ke")
-    .trim()
-    .toLowerCase();
   const password =
     process.env.SEED_SUPERADMIN_PASSWORD ?? randomBytes(12).toString("base64url");
 
@@ -107,9 +135,22 @@ async function ensureCampusAdmins() {
       continue;
     }
 
-    const existing = await prisma.user.findUnique({ where: { email: account.email } });
+    // The campus's own admin account is aligned to the .env email the same way.
+    const existing = await prisma.user.findFirst({
+      where: { role: "CAMPUS_ADMIN", campusId: campus.id },
+    });
     if (existing) {
-      console.log(`campus admin already present: ${existing.email} (${campus.name})`);
+      if (existing.email !== account.email) {
+        const taken = await prisma.user.findUnique({ where: { email: account.email } });
+        if (taken) {
+          console.log(`${campus.name} admin stays ${existing.email}: ${account.email} is already a user`);
+          continue;
+        }
+        await prisma.user.update({ where: { id: existing.id }, data: { email: account.email } });
+        console.log(`${campus.name} admin email aligned to ${account.email}`);
+      } else {
+        console.log(`campus admin already present: ${existing.email} (${campus.name})`);
+      }
       continue;
     }
 
