@@ -118,6 +118,9 @@ main()
   .then(async () => {
     await closeQueues();
     await prisma.$disconnect();
+    // Every connection is closed by now; exiting explicitly keeps a lingering event-loop
+    // handle from holding CI open on a slow runner.
+    process.exit(process.exitCode ?? 0);
   })
   .catch(async (error) => {
     console.error("queue verification failed:", error);
