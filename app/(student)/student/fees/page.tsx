@@ -3,6 +3,7 @@ import { labels, studentPortal } from "@/lib/content/dashboard";
 import { EmptyState, PageHeader, Panel } from "@/components/dashboard/panel";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
+import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
 
 const copy = studentPortal.fees;
@@ -44,6 +45,14 @@ export default async function StudentFeesPage() {
               icon="accounts"
               tone={totals.balance > 0 ? "attention" : "money"}
             />
+          </div>
+
+          {/* The printable statement carries the same numbers as these cards, so the
+              download lives beside them rather than buried in a menu. */}
+          <div className="flex justify-end">
+            <Button asChild variant="secondary" size="sm">
+              <a href="/student/fees/statement">Download statement (PDF)</a>
+            </Button>
           </div>
 
           <Panel title={copy.title}>
