@@ -23,6 +23,9 @@ import styles from "./login-form.module.css";
 
 type Errors = { email?: string; password?: string };
 
+/** A sign-in refusal, with a title that names the actual problem. */
+type Failure = { title: string; body: string };
+
 /**
  * Where a signed-in account belongs. The ?next= value only wins when it is a plain
  * in-app path, so the form cannot be turned into an open redirect.
@@ -42,7 +45,8 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState("");
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const [capsLock, setCapsLock] = useState(false);
 
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -50,7 +54,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors: Errors = {};
-    setFailure("");
+    setFailure(null);
 
     if (!email.trim()) {
       nextErrors.email = "Enter the email address you registered with.";
@@ -85,7 +89,27 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setFailure(data.error ?? "We could not sign you in. Try again.");
+        const detail =
+          typeof data.error === "string" && data.error.trim()
+            ? data.error
+            : "We could not sign you in. Try again.";
+
+        if (response.status === 401) {
+          // Name the problem plainly, then put the caret back where the typo most
+          // likely is — the password — so the retry is one keystroke away (FRM-11).
+          setFailure({
+            title: "Incorrect email or password",
+            body: "Check both fields and try again.",
+          });
+          passwordRef.current?.focus();
+          passwordRef.current?.select();
+        } else if (response.status === 429) {
+          setFailure({ title: "Too many attempts", body: "Wait a few minutes, then try again." });
+        } else if (response.status === 403) {
+          setFailure({ title: "Account needs attention", body: detail });
+        } else {
+          setFailure({ title: "Sign-in failed", body: detail });
+        }
         setBusy(false);
         return;
       }
@@ -95,7 +119,10 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       router.replace(landingFor(data.role, nextPath));
       router.refresh();
     } catch {
-      setFailure("We could not reach the server. Check your connection and try again.");
+      setFailure({
+        title: "Connection problem",
+        body: "We could not reach the server. Check your connection and try again.",
+      });
       setBusy(false);
     }
   }
@@ -142,16 +169,25 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
                 placeholder="Your password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))}
+                onBlur={() => setCapsLock(false)}
                 aria-invalid={errors.password ? true : undefined}
-                aria-describedby={errors.password ? "password-error" : undefined}
+                aria-describedby={
+                  errors.password ? "password-error" : capsLock ? "password-caps" : undefined
+                }
               />
               <FieldError id="password-error">{errors.password}</FieldError>
+              {capsLock && (
+                <p id="password-caps" className={styles.caps} aria-live="polite">
+                  Caps Lock is on.
+                </p>
+              )}
             </Field>
 
             {failure && (
               <Alert variant="destructive" className={styles.alert}>
-                <AlertTitle>That sign-in was not accepted</AlertTitle>
-                <AlertDescription>{failure}</AlertDescription>
+                <AlertTitle>{failure.title}</AlertTitle>
+                <AlertDescription>{failure.body}</AlertDescription>
               </Alert>
             )}
 

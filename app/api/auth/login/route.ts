@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
   }
 
   const invalid = NextResponse.json(
-    { error: "That email and password do not match an account." },
+    { error: "Incorrect email or password. Check them and try again." },
     { status: 401 },
   );
 
