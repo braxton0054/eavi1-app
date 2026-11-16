@@ -462,6 +462,8 @@ const CircularGallery = ({
 
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const textures = new Map<string, TextureEntry>();
+    // Where each image sits in the item list, so far-away textures can be released.
+    let urlIndex = new Map<string, number>();
     const view = { width: 1, height: 1, ratio: 1 };
     const state = {
       scroll: 0,
@@ -529,6 +531,27 @@ const CircularGallery = ({
         if (keep.has(url)) return;
         if (entry.texture) gl.deleteTexture(entry.texture);
         textures.delete(url);
+      });
+    };
+
+    // A long gallery cannot hold every photograph on the GPU at once — a few hundred
+    // cards would exhaust a phone's memory. Textures beyond a neighbourhood of the
+    // centered card are released (the decoded aspect is kept) and re-load when the
+    // loop brings those cards back around.
+    const evictFar = () => {
+      const total = urlIndex.size;
+      if (total <= 28) return;
+      const center = wrap(state.active, total);
+      textures.forEach((entry, url) => {
+        const index = urlIndex.get(url);
+        if (index === undefined || !entry.loaded) return;
+        const dist = Math.abs(wrap(index - center + total / 2, total) - total / 2);
+        if (dist > 12 && entry.texture) {
+          gl.deleteTexture(entry.texture);
+          entry.texture = null;
+          entry.loaded = false;
+          entry.ready = 0;
+        }
       });
     };
 
@@ -782,8 +805,8 @@ const CircularGallery = ({
       last = now;
       if (s.items !== lastItems) {
         lastItems = s.items as GalleryItem[];
+        urlIndex = new Map(lastItems.map((item, index) => [item.image, index]));
         prune(lastItems);
-        lastItems.forEach(item => textureFor(item.image));
       }
       const idle = now - state.lastInput > 1800;
       const auto =
@@ -848,6 +871,7 @@ const CircularGallery = ({
       const metrics = layout();
       draw(metrics);
       placeLabels(metrics);
+      evictFar();
       const moving =
         (s.autoScroll && !reduce) ||
         state.scroll !== state.target ||
@@ -1095,7 +1119,7 @@ const CircularGallery = ({
     document.addEventListener('keydown', onAnyKey, true);
     document.addEventListener('pointerdown', onAnyPointer, true);
     lastItems = (settingsRef.current?.items as GalleryItem[]) ?? null;
-    if (lastItems) lastItems.forEach(item => textureFor(item.image));
+    urlIndex = new Map((lastItems ?? []).map((item, index) => [item.image, index]));
     resize();
 
     const slotFor = (index: number) => {

@@ -16,10 +16,12 @@ import { gallerySection } from "@/lib/content/home";
 
 const TITLES = ["Campus life", "Around EAVI", "On campus", "Student life", "The college", "Campus scenes"];
 
-// Every photograph the college sent, in the order the folders give them.
-const PHOTO_COUNT = 25;
+// Every photograph the college sent, in the order the folders give them. The gallery
+// loads textures lazily as cards approach, so the full set is safe on a phone.
+const PHOTO_COUNT = 226;
+const pad = (n: number) => String(n).padStart(3, "0");
 const items = Array.from({ length: PHOTO_COUNT }, (_, index) => ({
-  image: `/eavi-assets/web/${String(index + 1).padStart(2, "0")}.jpg`,
+  image: `/eavi-assets/web/${pad(index + 1)}.jpg`,
   text: TITLES[index % TITLES.length],
   alt: `A photograph of EAVI College — ${TITLES[index % TITLES.length].toLowerCase()}.`,
   description: "A photo from around EAVI College's campuses in Eldoret.",
