@@ -184,6 +184,13 @@ enum Audience {
   TUTORS
 }
 
+/// The queue's lifecycle for a card print run: requested, rendered and stored, or given up on.
+enum CardBatchStatus {
+  PENDING
+  COMPLETE
+  FAILED
+}
+
 model Campus {
   id              Int              @id @default(autoincrement())
   code            String           @unique
@@ -1007,6 +1014,13 @@ model IdCard {
   createdAt   DateTime       @default(now())
 
   @@index([campusId, status])
+  /*
+   * The newest live card per student is read on the students list (one lateral per row),
+   * when a run looks up existing cards, and when a replacement retires the old ones. The
+   * table only ever grows — one row per card ever issued — so the per-student lookup stays
+   * an index scan instead of becoming a scan of every card the college has printed.
+   */
+  @@index([studentId, createdAt(sort: Desc)])
   @@map("id_cards")
 }
 
@@ -1141,6 +1155,9 @@ model CardBatch {
   sheetCount  Int
   /// Where the generated PDF lives. The file itself is in object storage, not the database.
   fileUrl     String?
+  /// Where the run stands. COMPLETE is the default so every run recorded before the
+  /// queue existed reads exactly as it always did: done.
+  status      CardBatchStatus @default(COMPLETE)
   actorId     String?
   actorEmail  String?
   createdAt   DateTime @default(now())

@@ -29,6 +29,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     env:
       DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public
     steps:
@@ -61,6 +70,10 @@ jobs:
         run: npm run build
 
       - run: npx tsc --noEmit
+
+      # The queue smoke check runs a real worker against the service container and the
+      # migrated database, so the queue layer cannot rot silently.
+      - run: npm run verify:queue
 
   image:
     name: Docker image builds

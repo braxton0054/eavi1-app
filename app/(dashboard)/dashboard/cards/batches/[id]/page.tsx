@@ -28,6 +28,7 @@ export default async function CardBatchPage({ params }: { params: Promise<{ id: 
       cardCount: true,
       sheetCount: true,
       fileUrl: true,
+      status: true,
       actorEmail: true,
       createdAt: true,
     },
@@ -64,7 +65,11 @@ export default async function CardBatchPage({ params }: { params: Promise<{ id: 
         </div>
       </Panel>
 
-      {batch.fileUrl === null ? (
+      {batch.status === "PENDING" ? (
+        <Notice tone="neutral" title={copy.pendingTitle} body={copy.pendingBody} />
+      ) : batch.status === "FAILED" ? (
+        <Notice tone="warning" title={copy.failedTitle} body={copy.failedBody} />
+      ) : batch.fileUrl === null ? (
         <Notice tone="warning" title={copy.noFileTitle} body={copy.noFileBody} />
       ) : (
         <Panel
@@ -100,7 +105,7 @@ export default async function CardBatchPage({ params }: { params: Promise<{ id: 
         </Panel>
       )}
 
-      {batch.cardCount === 0 ? (
+      {batch.status === "COMPLETE" && batch.cardCount === 0 ? (
         <EmptyState title={copy.emptyTitle} body={copy.emptyBody} icon="cards" />
       ) : null}
     </div>

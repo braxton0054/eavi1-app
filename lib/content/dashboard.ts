@@ -19,6 +19,7 @@ export type DashboardIcon =
   | "accounts"
   | "cards"
   | "reports"
+  | "jobs"
   | "communication"
   | "chat"
   | "profile";
@@ -174,6 +175,7 @@ export const superNavGroups: NavGroup[] = [
       { href: "/dashboard", label: "College overview", icon: "overview" },
       { href: "/dashboard/campuses", label: "Campuses", icon: "programs" },
       { href: "/dashboard/staff", label: "Staff approvals", icon: "tutors" },
+      { href: "/dashboard/jobs", label: "Background jobs", icon: "jobs" },
       { href: "/dashboard/profile", label: shell.account.profile, icon: "profile" },
     ],
   },
@@ -1934,6 +1936,10 @@ export const pages = {
       verifyHint: "The QR on the back opens this link: it is checked against the register, so a copied card fails.",
       noFileTitle: "The file was not kept",
       noFileBody: "Card storage is not configured, so this run cannot be reopened. Generate the cards again to print them.",
+      pendingTitle: "Still generating",
+      pendingBody: "The sheets are being rendered in the background. Refresh this page in a moment to see and print the file.",
+      failedTitle: "Generation failed",
+      failedBody: "The run did not complete after several attempts. Generate the cards again — the detail is on the background jobs screen.",
       emptyTitle: "No cards in this run",
       emptyBody: "Nobody was included, so there is nothing to print.",
     },
@@ -1950,6 +1956,34 @@ export const pages = {
       /** Shown on a proof when the record is missing something the artwork needs. */
       missing: (slots: string) => `The record has no value for: ${slots}.`,
     },
+  },
+
+  jobs: {
+    title: "Background jobs",
+    description: "What the queues are holding, and what has failed.",
+    summary: "Queue depth",
+    queueLabels: {
+      cards: "Card print runs",
+      maintenance: "Housekeeping",
+    } satisfies Record<string, string>,
+    unavailable: "unreachable",
+    counts: {
+      waiting: "Waiting",
+      active: "Running",
+      completed: "Completed",
+      failed: "Failed",
+      delayed: "Scheduled",
+    } satisfies Record<string, string>,
+    failedJobs: "Failed jobs",
+    noFailedTitle: "Nothing has failed",
+    noFailedBody: "Failed jobs are kept here for a week after their last attempt, alongside every print run they belong to.",
+    columns: [
+      { key: "job", label: "Job" },
+      { key: "queue", label: "Queue" },
+      { key: "attempts", label: "Attempts", align: "end" },
+      { key: "when", label: "When" },
+      { key: "reason", label: "Reason" },
+    ] satisfies Column[],
   },
 
   reports: {
