@@ -34,7 +34,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run db:generate && npm run build
-# The chat server, pre-compiled so the runtime needs no TypeScript tooling.
+# The portal's own entry points, pre-compiled so the runtime needs no TypeScript tooling:
+# the chat server (server.mjs) and the queue worker (worker.mjs).
 RUN npm run server:build
 
 # The app: only the traced standalone output plus static assets and public files.
@@ -73,6 +74,8 @@ COPY --from=build --chown=nextjs:nodejs /app/public ./public
 # it did for @prisma/driver-adapter-utils, then @prisma/debug, then postgres-array.
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build --chown=nextjs:nodejs /app/server.mjs ./server.mjs
+# The queue worker, built the same way as the chat server above.
+COPY --from=build --chown=nextjs:nodejs /app/worker.mjs ./worker.mjs
 COPY --from=build --chown=nextjs:nodejs /app/generated ./generated
 USER nextjs
 EXPOSE 3000

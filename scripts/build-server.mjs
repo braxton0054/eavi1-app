@@ -1,9 +1,9 @@
 /**
- * Bundles the custom server to plain JavaScript.
+ * Bundles the custom server and the queue worker to plain JavaScript.
  *
  * Next's App Router depends on AsyncLocalStorage, which breaks under `tsx`'s CJS transform,
  * and this Node build has no native TypeScript. Pre-compiling once removes both problems and
- * leaves a file the production image can simply `node` — no loader, no transform at runtime.
+ * leaves files the production image can simply `node` — no loader, no transform at runtime.
  */
 import { build } from "esbuild";
 
@@ -27,6 +27,20 @@ await build({
    */
   packages: "external",
 
+  sourcemap: false,
+  logLevel: "info",
+});
+
+await build({
+  entryPoints: ["scripts/worker.ts"],
+  outfile: "worker.mjs",
+  bundle: true,
+  platform: "node",
+  target: "node22",
+  // The worker has no Next dependency, but ESM keeps the bundling rules identical: one
+  // resolver configuration for both entry points, so a fix to one is a fix to both.
+  format: "esm",
+  packages: "external",
   sourcemap: false,
   logLevel: "info",
 });

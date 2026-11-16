@@ -49,5 +49,6 @@ test-data/
 # Local screenshot / PDF output from layout checks.
 .shots/
 
-# Compiled chat server (npm run server:build)
+# Compiled chat server and queue worker (npm run server:build)
 server.mjs
+worker.mjs
