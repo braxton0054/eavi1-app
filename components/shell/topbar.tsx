@@ -13,6 +13,7 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@/components/ui/menu";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 import styles from "./topbar.module.css";
 
@@ -81,6 +82,8 @@ export function Topbar({
       <span className={styles.note}>{note}</span>
 
       <div className={styles.actions}>
+        <NotificationBell />
+
         <Menu>
           <MenuTrigger asChild>
             <button type="button" className={styles.account} aria-label={`Account: ${fullName}`}>

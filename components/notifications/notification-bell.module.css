@@ -1,0 +1,156 @@
+@layer components {
+  /* The bell sits in the topbar's actions row, beside the account menu. */
+  .bell {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-target);
+    height: var(--touch-target);
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .bell:hover {
+    background: var(--surface-2);
+  }
+
+  .bell > svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .badge {
+    position: absolute;
+    inset-block-start: 4px;
+    inset-inline-end: 4px;
+    min-width: 16px;
+    padding-inline: 4px;
+    border-radius: 999px;
+    background: var(--danger, #dc2626);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+  }
+
+  /* The feed: a fixed-height column inside the menu, scrolling when long. */
+  .feed {
+    display: flex;
+    flex-direction: column;
+    max-height: min(60vh, 420px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .item {
+    display: block;
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .item:hover {
+    background: var(--surface-2);
+  }
+
+  .itemHead {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .itemTitle {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .itemTime {
+    flex: 1 1 auto;
+    text-align: end;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  .dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--accent, #800080);
+  }
+
+  .itemBody {
+    margin-block-start: 2px;
+    font-size: var(--text-xs);
+    line-height: var(--leading-normal);
+    color: var(--text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .empty {
+    padding: var(--space-6) var(--space-3);
+    text-align: center;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+
+  /* The push section at the bottom of the feed. */
+  .push {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3) var(--space-3);
+    border-block-start: 1px solid var(--border);
+  }
+
+  .pushStatus {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  .toggleRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+  }
+
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    border-block-start-color: transparent;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(1turn);
+    }
+  }
+}

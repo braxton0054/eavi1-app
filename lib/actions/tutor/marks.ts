@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireTutor } from "@/lib/session";
 import { fieldErrors, tutorPortal } from "@/lib/content/dashboard";
+import { notifyUsers } from "@/lib/notifications/service";
 import {
   FieldError,
   checked,
@@ -80,10 +81,27 @@ export async function tutorPublishAll(formData: FormData) {
 
     const exam = await prisma.exam.findFirst({
       where: { id: examId, invigilatorId: tutor.tutorId },
-      select: { id: true },
+      select: { id: true, title: true },
     });
     if (!exam) throw new FieldError(fieldErrors.notOnCampus);
 
     await prisma.grade.updateMany({ where: { examId: exam.id }, data: { published: true } });
+
+    // The same notice the office's publish sends — one per student with a mark on the paper.
+    const graded = await prisma.grade.findMany({
+      where: { examId: exam.id, published: true },
+      select: { enrollment: { select: { student: { select: { userId: true } } } } },
+      distinct: ["enrollmentId"],
+    });
+    await notifyUsers(
+      graded.map((row) => row.enrollment.student.userId),
+      {
+        title: "Results published",
+        body: `${exam.title} results are now available.`,
+        notificationType: "result",
+        targetUrl: "/student/units",
+        dedupeKey: `results:exam:${exam.id}`,
+      },
+    );
   });
 }

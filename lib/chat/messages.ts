@@ -11,6 +11,7 @@ import { MAX_BODY } from "@/lib/chat/conversations";
 import { limitMessages } from "@/lib/chat/rate-limit";
 import { chatProfiles } from "@/lib/chat/profile";
 import { storeAttachment } from "@/lib/chat/attachments";
+import { notifyUser } from "@/lib/notifications/service";
 
 /**
  * Sending is one function, called by the socket and by the HTTP fallback, so both paths agree
@@ -103,6 +104,32 @@ export async function sendMessage(
 
     return message;
   });
+
+  // The other members hear about it, each under their own privacy setting: someone who
+  // hides message text is told a message arrived, not what it says. One notification per
+  // message per person — a retried send cannot ring twice.
+  const others = await prisma.conversationMember.findMany({
+    where: { conversationId: input.conversationId, userId: { not: user.id } },
+    select: { userId: true, user: { select: { hideMessageText: true } } },
+  });
+  if (others.length > 0) {
+    const sender = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { fullName: true },
+    });
+    const preview = input.body.length > 120 ? `${input.body.slice(0, 119)}…` : input.body;
+    await Promise.all(
+      others.map((other) =>
+        notifyUser(other.userId, {
+          title: `New message from ${sender?.fullName ?? "someone"}`,
+          body: other.user.hideMessageText ? "Open the chat to read it." : preview || "Sent an attachment.",
+          notificationType: "chat",
+          targetUrl: "/portal/chat",
+          dedupeKey: `chat:message:${created.id}`,
+        }),
+      ),
+    );
+  }
 
   return serialize(user, created.id);
 }

@@ -24,6 +24,7 @@ import {
 import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
 import { recomputeInvoice } from "@/lib/fees/ledger";
 import { allocateStudentPayment } from "@/lib/fees/payment";
+import { notifyUser } from "@/lib/notifications/service";
 
 const METHODS = Object.keys(PaymentMethod) as (keyof typeof PaymentMethod)[];
 
@@ -164,11 +165,42 @@ export async function recordPayment(formData: FormData) {
     const paidAt = requiredDate(formData, "paidAt", fieldLabel("paidAt"));
 
     // The payer is whoever owns the bill, taken from the invoice row rather than the form.
-    await prisma.payment.create({
+    const payment = await prisma.payment.create({
       data: { invoiceId: invoice.id, studentId: invoice.studentId, amount, method, reference, paidAt },
     });
 
     await recompute(invoice.id);
+
+    // The student's portal hears the money is in, and what (if anything) is still owed —
+    // the balance is read back after the recompute, so the notice cannot drift from the ledger.
+    const owner = await prisma.studentProfile.findUnique({
+      where: { id: invoice.studentId },
+      select: { userId: true },
+    });
+    if (owner) {
+      const fresh = await prisma.invoice.findUnique({
+        where: { id: invoice.id },
+        select: {
+          number: true,
+          lines: { select: { amount: true } },
+          payments: { select: { amount: true } },
+        },
+      });
+      if (fresh) {
+        const remaining =
+          fresh.lines.reduce((sum, line) => sum + Number(line.amount.toString()), 0) -
+          fresh.payments.reduce((sum, row) => sum + Number(row.amount.toString()), 0);
+        await notifyUser(owner.userId, {
+          title: "Fee payment received",
+          body:
+            `${money(amount)} recorded on invoice ${fresh.number}.` +
+            (remaining > 0 ? ` Balance due: ${money(remaining)}.` : " Fully settled."),
+          notificationType: "fee",
+          targetUrl: "/student/fees",
+          dedupeKey: `fee:payment:${payment.id}`,
+        });
+      }
+    }
   });
 }
 
@@ -215,6 +247,22 @@ export async function recordStudentPayment(formData: FormData) {
           : new FieldError(pages.accounts.payment.student.nothingOwed);
       }
     });
+
+    // One notice per receipt, never one per invoice the receipt settled: the office
+    // records a receipt, the student hears about the receipt.
+    const owner = await prisma.studentProfile.findUnique({
+      where: { id: student.id },
+      select: { userId: true },
+    });
+    if (owner) {
+      await notifyUser(owner.userId, {
+        title: "Fee payment received",
+        body: `${money(amount)} received — receipt ${receiptNo}.`,
+        notificationType: "fee",
+        targetUrl: "/student/fees",
+        dedupeKey: `fee:receipt:${receiptNo}`,
+      });
+    }
   });
 }
 

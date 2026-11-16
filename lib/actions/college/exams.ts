@@ -3,6 +3,7 @@
 import { ExamStatus, ExamType } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
+import { notifyUsers } from "@/lib/notifications/service";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -154,11 +155,29 @@ export async function publishAll(formData: FormData) {
 
     const exam = await prisma.exam.findFirst({
       where: { id: examId, ...(scope.campusId === null ? {} : { campusId: scope.campusId }) },
-      select: { id: true },
+      select: { id: true, title: true },
     });
     if (!exam) throw new FieldError(fieldErrors.notOnCampus);
 
     await prisma.grade.updateMany({ where: { examId: exam.id }, data: { published: true } });
+
+    // Every student with a mark on this paper hears it once, as one batch. The link
+    // opens the units screen, where a published mark is read.
+    const graded = await prisma.grade.findMany({
+      where: { examId: exam.id, published: true },
+      select: { enrollment: { select: { student: { select: { userId: true } } } } },
+      distinct: ["enrollmentId"],
+    });
+    await notifyUsers(
+      graded.map((row) => row.enrollment.student.userId),
+      {
+        title: "Results published",
+        body: `${exam.title} results are now available.`,
+        notificationType: "result",
+        targetUrl: "/student/units",
+        dedupeKey: `results:exam:${exam.id}`,
+      },
+    );
   });
 }
 

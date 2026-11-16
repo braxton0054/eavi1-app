@@ -3,6 +3,7 @@
 import { Audience } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
+import { notifyEveryone, notifyStudents, notifyTutors } from "@/lib/notifications/service";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -45,7 +46,7 @@ export async function publishAnnouncement(formData: FormData) {
       campusId = scope.campusId;
     }
 
-    await prisma.announcement.create({
+    const notice = await prisma.announcement.create({
       data: {
         title,
         body,
@@ -55,6 +56,20 @@ export async function publishAnnouncement(formData: FormData) {
         pinned: checked(formData, "pinned"),
       },
     });
+
+    // Everyone the notice is for hears about it exactly once — the dedupe key is the
+    // notice itself. Delivery runs after the response, so saving a notice never waits
+    // on the postman.
+    const input = {
+      title,
+      body: body.length > 200 ? `${body.slice(0, 199)}…` : body,
+      notificationType: "announcement",
+      targetUrl: null,
+      dedupeKey: `announcement:${notice.id}`,
+    };
+    if (audience === Audience.STUDENTS) await notifyStudents(input, campusId);
+    else if (audience === Audience.TUTORS) await notifyTutors(input, campusId);
+    else await notifyEveryone(input, campusId);
   });
 }
 

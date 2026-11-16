@@ -248,6 +248,9 @@ model User {
   blocksReceived      UserBlock[]          @relation("BlockTarget")
   reports             MessageReport[]      @relation("ReportAuthor")
   chatRestrictions    ChatRestriction[]    @relation("RestrictedUser")
+  pushSubscriptions   PushSubscription[]
+  notifications       Notification[]
+  notificationPref    NotificationPreference?
 
   @@index([role, status])
   @@index([campusId])
@@ -1393,4 +1396,68 @@ model OfferLetter {
   @@unique([applicationId])
   @@index([campusId, issuedAt])
   @@map("offer_letters")
+}
+
+/// One browser (or installed PWA) registered to receive web push for one person.
+/// A user may hold several: a phone and a laptop are both theirs. The endpoint is the
+/// browser-minted address pushes are delivered to, unique so a re-subscription updates
+/// the same row instead of piling up duplicates.
+model PushSubscription {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  /// What was running when the subscription was created, so "Sign in on this device"
+  /// can name the phone or the laptop rather than a bare URL.
+  deviceName String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  /// The last time a push to this endpoint was accepted, or it was first registered.
+  lastUsedAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+/// One notification for one person. Delivered by web push to their devices and shown
+/// in the portal's bell, both reading the same row.
+model Notification {
+  id              String   @id @default(uuid())
+  recipient       User     @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  recipientUserId String
+  title           String
+  body            String
+  /// What kind of event it came from — announcement, fee, result, message — so
+  /// preferences can mute a kind and the bell can group them.
+  notificationType String
+  /// Where the notification opens when clicked. Null opens the portal home.
+  targetUrl       String?
+  /// Extra context a screen may use; deliberately small — nothing that must not
+  /// survive on a lock screen belongs in here.
+  data            Json?
+  isRead          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  /// One notification per person per event: the sender names the event, and the unique
+  /// index is what keeps a retried action from telling someone the same thing twice.
+  dedupeKey       String?
+
+  @@unique([recipientUserId, dedupeKey])
+  @@index([recipientUserId, createdAt])
+  @@index([recipientUserId, isRead])
+  @@map("notifications")
+}
+
+/// What a person does not want to hear about. Stored per person, not per device:
+/// muting a kind mutes it everywhere, while turning notifications off on one device is
+/// the browser's own permission, held by that device alone.
+model NotificationPreference {
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String   @id
+  mutedTypes String[] @default([])
+  updatedAt  DateTime @updatedAt
+
+  @@map("notification_preferences")
 }
