@@ -56,24 +56,27 @@ async function main() {
     await maintenance.waitUntilReady();
     check("cards queue is ready", true);
     check("maintenance queue is ready", true);
+  }
 
+  console.log("\nworker");
+  {
+    // The workers register the repeatable sweep as a job scheduler on start, so the
+    // scheduler assertion has to come after startWorkers() — asserting it first only ever
+    // passed on a machine where a worker had already run and left the schedule in Redis.
+    const workers = await startWorkers();
+
+    const maintenance = getMaintenanceQueue();
     const schedulers = await maintenance.getJobSchedulers();
     check(
       "the chat attachment sweep is registered as a job scheduler",
       schedulers.some((scheduler) => scheduler.name === SWEEP_JOB_NAME),
       schedulers.map((scheduler) => scheduler.name).join(", ") || "none",
     );
-  }
-
-  console.log("\nworker");
-  {
-    const workers = await startWorkers();
 
     // One-off run of the real sweep. The in-process worker picks it up, processes it and
     // the summary stays on the job as its return value.
     const events = new QueueEvents(QUEUES.maintenance, { connection: createConnection() });
 
-    const maintenance = getMaintenanceQueue();
     const job = await maintenance.add(`${SWEEP_JOB_NAME}-verify`, {}, { jobId: probeId });
 
     const result = await Promise.race([
