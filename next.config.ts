@@ -50,7 +50,9 @@ const nextConfig: NextConfig = {
       `connect-src 'self'${process.env.NODE_ENV === "production" ? "" : " ws: wss:"}`,
       // PDFs and card batches are rendered in an iframe from this origin.
       "frame-src 'self'",
-      "object-src 'none'",
+      // The card batch's PDF viewer is an <object> whose data comes from the portal's own
+      // /file route; 'none' here blocked the plugin data and broke the preview.
+      "object-src 'self'",
       "base-uri 'self'",
       // No form may post to another origin, which is the cheap way to exfiltrate a session.
       "form-action 'self'",
