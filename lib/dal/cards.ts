@@ -179,6 +179,8 @@ export type CardCandidate = {
   intakeLabel: string | null;
   classLabel: string | null;
   hasPhoto: boolean;
+  /** The student's own campus, so a college-wide run still issues cards to the right one. */
+  campusId: number;
 };
 
 /** The students a run would cover, so the office can see the list before printing it. */
@@ -207,6 +209,7 @@ export async function getCardCandidates(
       id: true,
       admissionNo: true,
       profilePhotoUrl: true,
+      campusId: true,
       user: { select: { fullName: true } },
       enrollments: {
         where: { status: "ACTIVE" },
@@ -237,6 +240,7 @@ export async function getCardCandidates(
         : null,
       classLabel: enrollment?.memberships[0]?.class.name ?? null,
       hasPhoto: Boolean(row.profilePhotoUrl),
+      campusId: row.campusId,
     };
   });
 }
@@ -270,16 +274,90 @@ export async function buildPrintableCards(target: CardTarget, campusId: number |
   // A card is created at enrolment, so a run should normally find every card already there.
   // Anyone missing one gets it now, which repairs a student imported or promoted before the
   // cards existed — the office is never told to "generate again".
+  const missing = candidates.filter((candidate) => !live.has(candidate.studentId));
   const created: string[] = [];
-  for (const candidate of candidates) {
-    if (live.has(candidate.studentId)) continue;
 
-    const card = await issueCard(
-      candidate.studentId,
-      campusId ?? (await campusOf(candidate.studentId)),
+  if (missing.length > 0) {
+    /*
+     * Each card's expiry comes from the student's own active programme measured from their
+     * intake, read once for the whole run rather than once per student — a full-cohort run
+     * issues around a thousand cards, and the per-student lookups had it issuing a thousand
+     * queries and re-reading every serial in the table a thousand times on top.
+     */
+    const enrollments = await prisma.enrollment.findMany({
+      where: { studentId: { in: missing.map((m) => m.studentId) }, status: "ACTIVE" },
+      orderBy: { enrolledAt: "desc" },
+      select: {
+        studentId: true,
+        programId: true,
+        period: { select: { startsAt: true } },
+        program: { select: { durationMonths: true } },
+      },
+    });
+
+    const active = new Map<string, (typeof enrollments)[number]>();
+    for (const enrollment of enrollments) {
+      if (!active.has(enrollment.studentId)) active.set(enrollment.studentId, enrollment);
+    }
+
+    /*
+     * Serials are sequential and unique; a lost card's number is never reissued. The free
+     * codes are allocated from one read of the serials, in issue order — exactly the
+     * sequence allocating them one at a time produced, without the per-card table read.
+     */
+    const taken = new Set(
+      (await prisma.idCard.findMany({ select: { serial: true } })).map((row) => row.serial),
     );
-    live.set(candidate.studentId, card);
-    created.push(card.id);
+
+    const year = new Date().getUTCFullYear();
+    let sequence = taken.size + 1;
+
+    const rows = missing.map((candidate) => {
+      let serial: string | null = null;
+      for (let attempt = 0; attempt < 10_000 && serial === null; attempt += 1, sequence += 1) {
+        const code = `IDC/${year}/${String(sequence).padStart(4, "0")}`;
+        if (!taken.has(code)) serial = code;
+      }
+      if (serial === null) throw new Error("Could not allocate a card serial.");
+      taken.add(serial);
+
+      // A student with no active enrollment still gets a card, just one with no expiry
+      // date and no programme: the same answer the per-student lookup gave.
+      const enrollment = active.get(candidate.studentId) ?? null;
+
+      return {
+        serial,
+        verifyToken: randomUUID(),
+        studentId: candidate.studentId,
+        campusId: campusId ?? candidate.campusId,
+        programId: enrollment?.programId ?? null,
+        status: "PENDING" as const,
+        expiresAt: enrollment
+          ? expiryForProgram(enrollment.period.startsAt, enrollment.program.durationMonths)
+          : null,
+        remarks: pages.cards.create.autoRemark,
+      };
+    });
+
+    /*
+     * One transaction, so a run that dies halfway does not leave half a cohort holding
+     * serials the retry cannot account for. A thousand creates is well inside a database
+     * transaction, but not inside the default five-second one — hence the generous limit.
+     */
+    const issued = await prisma.$transaction(
+      rows.map((data) =>
+        prisma.idCard.create({
+          data,
+          select: { id: true, studentId: true, status: true, serial: true, verifyToken: true },
+        }),
+      ),
+      { timeout: 60_000, maxWait: 10_000 },
+    );
+
+    for (const card of issued) {
+      live.set(card.studentId, card);
+      created.push(card.id);
+    }
   }
 
   const faces = await Promise.all(
@@ -292,64 +370,4 @@ export async function buildPrintableCards(target: CardTarget, campusId: number |
     cards: faces.filter((f): f is NonNullable<typeof f> => f !== null),
     created: created.length,
   };
-}
-
-/** The campus a student belongs to, for a card created outside a campus-scoped session. */
-async function campusOf(studentId: string) {
-  const row = await prisma.studentProfile.findUnique({
-    where: { id: studentId },
-    select: { campusId: true },
-  });
-  return row?.campusId ?? 1;
-}
-
-/**
- * Creates the card a student is entitled to the moment they enrol.
- *
- * The expiry comes from the programme's own duration measured from the intake, never from a
- * number chosen here: the card is proof of enrolment, so it runs as long as the programme
- * does. A programme with no duration recorded yields a card with no expiry date rather than
- * a guessed one.
- */
-export async function issueCard(studentId: string, campusId: number) {
-  const enrollment = await prisma.enrollment.findFirst({
-    where: { studentId, status: "ACTIVE" },
-    orderBy: { enrolledAt: "desc" },
-    select: {
-      programId: true,
-      period: { select: { startsAt: true } },
-      program: { select: { durationMonths: true } },
-    },
-  });
-
-  return prisma.idCard.create({
-    data: {
-      serial: await nextSerial(),
-      verifyToken: randomUUID(),
-      studentId,
-      campusId,
-      programId: enrollment?.programId ?? null,
-      status: "PENDING",
-      expiresAt: enrollment
-        ? expiryForProgram(enrollment.period.startsAt, enrollment.program.durationMonths)
-        : null,
-      remarks: pages.cards.create.autoRemark,
-    },
-    select: { id: true, studentId: true, status: true, serial: true, verifyToken: true },
-  });
-}
-
-/** Serials are sequential and unique; a lost card's number is never reissued. */
-async function nextSerial() {
-  const taken = new Set(
-    (await prisma.idCard.findMany({ select: { serial: true } })).map((row) => row.serial),
-  );
-
-  const year = new Date().getUTCFullYear();
-  let sequence = taken.size + 1;
-  for (let attempt = 0; attempt < 10_000; attempt += 1, sequence += 1) {
-    const code = `IDC/${year}/${String(sequence).padStart(4, "0")}`;
-    if (!taken.has(code)) return code;
-  }
-  throw new Error("Could not allocate a card serial.");
 }
