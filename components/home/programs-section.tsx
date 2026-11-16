@@ -14,21 +14,24 @@ import {
 } from "@/components/ui/card";
 import { ContentPlaceholder } from "@/components/home/content-placeholder";
 import { Section, SectionHeader } from "@/components/home/section";
-import { pending, programsSection } from "@/lib/content/home";
+import { pending, programsSection, type Program } from "@/lib/content/home";
 
-export function ProgramsSection() {
+export function ProgramsSection({ programs }: { programs?: Program[] }) {
+  // The page hands in the live programme list; the content file's (empty) array is the
+  // fallback so the section still renders if the caller has none.
+  const items = programs && programs.length > 0 ? programs : programsSection.items;
   const levels = useMemo(
     () => [
       programsSection.allLevels,
-      ...Array.from(new Set(programsSection.items.map((item) => item.level))),
+      ...Array.from(new Set(items.map((item) => item.level))),
     ],
-    [],
+    [items],
   );
   const [active, setActive] = useState<string>(programsSection.allLevels);
   const visible =
     active === programsSection.allLevels
-      ? programsSection.items
-      : programsSection.items.filter((item) => item.level === active);
+      ? items
+      : items.filter((item) => item.level === active);
 
   return (
     <Section id={programsSection.id} labelledBy="programs-heading">
@@ -40,7 +43,7 @@ export function ProgramsSection() {
         onBackground
       />
 
-      {programsSection.items.length === 0 ? (
+      {items.length === 0 ? (
         <div className="mt-6 flex flex-col gap-4 sm:mt-8">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2].map((slot) => (

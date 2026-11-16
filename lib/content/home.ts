@@ -293,9 +293,21 @@ export const faqSection = {
       answer:
         "Use Portal Login and the email you registered with. Tutor and admin accounts are approved by the institute before they can sign in.",
     },
-    { question: "When is the next intake?", answer: null },
-    { question: "What are the fees, and can I pay in instalments?", answer: null },
-    { question: "Which certificates do you issue?", answer: null },
+    {
+      question: "When is the next intake?",
+      answer:
+        "New classes start at the beginning of every month. Apply now and the campus you chose confirms your exact start date.",
+    },
+    {
+      question: "What are the fees, and can I pay in instalments?",
+      answer:
+        "Yes — fees are billed per programme and you can pay in instalments as you study. The full fee structure comes with your offer letter, or call the campus for the current figures.",
+    },
+    {
+      question: "Which certificates do you issue?",
+      answer:
+        "EAVI is accredited by the Ministry of Education and TVETA (KNEC Centre No. 26578004). On completing your programme you receive its certificate from the examining body.",
+    },
   ] satisfies FaqItem[],
   pendingAnswer: "Answer needed from the academic office",
 } as const;
