@@ -247,13 +247,18 @@ const link = (gl: WebGL2RenderingContext) => {
   const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX);
   const fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT);
   const program = gl.createProgram();
-  if (!vertex || !fragment || !program) return null;
+  if (!vertex || !fragment || !program) {
+    console.warn("[gallery] link: primitive failed", { vertex: !!vertex, fragment: !!fragment, program: !!program });
+    return null;
+  }
   gl.attachShader(program, vertex);
   gl.bindAttribLocation(program, 0, 'aPosition');
+  gl.attachShader(program, fragment);
   gl.linkProgram(program);
   gl.deleteShader(vertex);
   gl.deleteShader(fragment);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.warn("[gallery] link: LINK_STATUS false:", gl.getProgramInfoLog(program));
     gl.deleteProgram(program);
     return null;
   }
@@ -351,6 +356,10 @@ const CircularGallery = ({
   // The first render's settings seed the ref; later renders publish through the effect
   // below (writing a ref during render would break the rules of purity).
   const settingsRef = useRef(settings);
+  // Shader compilation can fail transiently (a busy GPU driver, a software renderer
+  // coming up); the engine retries rather than leaving the section blank forever.
+  const [attempt, setAttempt] = useState(0);
+  const [noWebGl, setNoWebGl] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -377,10 +386,30 @@ const CircularGallery = ({
       depth: false,
       stencil: false
     });
-    if (!container || !canvas || !labelLayer || !caption || !gl) return undefined;
+    if (!container || !canvas || !labelLayer || !caption || !gl) {
+      // No WebGL2 on this device: the CSS fallback grid below takes over.
+      if (container && !gl) {
+        const flag = setTimeout(() => setNoWebGl(true), 0);
+        return () => clearTimeout(flag);
+      }
+      console.warn("[gallery] mount skipped:", {
+        container: !!container, canvas: !!canvas, labelLayer: !!labelLayer, caption: !!caption, gl: !!gl,
+      });
+      return undefined;
+    }
 
     const program = link(gl);
-    if (!program) return undefined;
+    if (!program) {
+      console.warn("[gallery] shader program failed to compile/link — retrying");
+      // Transient driver state: drop the half-ready context and try again shortly.
+      // After a few failures, accept this device has no usable WebGL and fall back.
+      if (attempt < 4) {
+        const retry = setTimeout(() => setAttempt((n) => n + 1), 500);
+        return () => clearTimeout(retry);
+      }
+      const giveUp = setTimeout(() => setNoWebGl(true), 0);
+      return () => clearTimeout(giveUp);
+    }
     const u = program.uniforms;
 
     const vertices: number[] = [];
@@ -1112,7 +1141,7 @@ const CircularGallery = ({
       gl.deleteVertexArray(vao);
       if (!canvas.isConnected) gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
-  }, []);
+  }, [attempt]);
 
   // Publishes the latest settings after each commit and wakes the engine, exactly as the
   // render-time ref write this replaces used to do — without breaking purity.
@@ -1123,6 +1152,37 @@ const CircularGallery = ({
 
   const count = list.length;
   const current = list[active % count] || list[0];
+
+  // A device with no usable WebGL2 still gets the photographs — a plain, scrollable strip.
+  if (noWebGl) {
+    return (
+      <div
+        className={`${CLASSES.root}${className ? ` ${className}` : ''}`}
+        style={{ ...style, overflowX: 'auto' }}
+        role="region"
+        aria-roledescription="carousel"
+        aria-label="Image gallery"
+      >
+        <div style={{ display: 'flex', gap: 16, padding: '16px 20px', width: 'max-content' }}>
+          {list.map((item, index) => (
+            <figure key={`${item.image}-${index}`} style={{ margin: 0, width: 260, flex: 'none' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.image}
+                alt={item.alt ?? item.text ?? 'Gallery image'}
+                style={{ width: '100%', aspectRatio: '3 / 4', objectFit: 'cover', borderRadius: 12, display: 'block' }}
+              />
+              {item.text && (
+                <figcaption style={{ textAlign: 'center', fontSize: 13, marginTop: 6, color: textColor }}>
+                  {item.text}
+                </figcaption>
+              )}
+            </figure>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

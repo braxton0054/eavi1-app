@@ -16,7 +16,9 @@ import { gallerySection } from "@/lib/content/home";
 
 const TITLES = ["Campus life", "Around EAVI", "On campus", "Student life", "The college", "Campus scenes"];
 
-const items = Array.from({ length: 16 }, (_, index) => ({
+// Every photograph the college sent, in the order the folders give them.
+const PHOTO_COUNT = 25;
+const items = Array.from({ length: PHOTO_COUNT }, (_, index) => ({
   image: `/eavi-assets/web/${String(index + 1).padStart(2, "0")}.jpg`,
   text: TITLES[index % TITLES.length],
   alt: `A photograph of EAVI College — ${TITLES[index % TITLES.length].toLowerCase()}.`,
