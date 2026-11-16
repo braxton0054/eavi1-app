@@ -12,8 +12,8 @@ export default async function StudentCardPage() {
   const { profile, enrollment } = await getStudentProfile();
 
   // Compared on the server, once: reading the clock during render is not deterministic.
-  const now = Date.now();
-  const expired = card?.expiresAt ? card.expiresAt.getTime() < now : false;
+  const now = new Date();
+  const expired = card?.expiresAt ? card.expiresAt.getTime() < now.getTime() : false;
 
   // The same intake label the print merge uses, so the proof matches the card.
   const intake = enrollment?.period
@@ -60,7 +60,7 @@ export default async function StudentCardPage() {
         status: row.status,
         issuedAt: row.issuedAt ? formatDate(row.issuedAt) : null,
         expiresAt: row.expiresAt ? formatDate(row.expiresAt) : null,
-        expired: row.expiresAt ? row.expiresAt.getTime() < now : false,
+        expired: row.expiresAt ? row.expiresAt.getTime() < now.getTime() : false,
       }))}
     />
   );

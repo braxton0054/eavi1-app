@@ -8,7 +8,6 @@ import { useToast } from "@/components/ui/toast";
 import {
   Menu,
   MenuContent,
-  MenuItem,
   MenuLabel,
   MenuSeparator,
   MenuTrigger,
@@ -56,7 +55,6 @@ export function NotificationBell() {
   const toast = useToast();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [push, setPush] = useState<{ permission: string; subscribed: boolean }>({
     permission: "default",
@@ -90,21 +88,20 @@ export function NotificationBell() {
       firstLoad.current = false;
     } catch {
       // A poll that fails stays silent — the next one is 45 seconds away.
-    } finally {
-      setLoading(false);
     }
   }, [toast]);
 
   useEffect(() => {
-    setLoading(true);
-    void refresh();
-
+    // First load rides a callback too (same as every poll after it), so the effect
+    // body itself never sets state.
+    const initial = setTimeout(refresh, 0);
     const timer = setInterval(refresh, POLL_MS);
     const onVisible = () => {
       if (document.visibilityState === "visible") void refresh();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
+      clearTimeout(initial);
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
@@ -205,7 +202,7 @@ export function NotificationBell() {
         </MenuLabel>
         <MenuSeparator />
 
-        <div className={styles.feed} role="feed" aria-busy={loading}>
+        <div className={styles.feed} role="feed">
           {items.length === 0 ? (
             <p className={styles.empty}>Nothing yet — notices, results and fee updates land here.</p>
           ) : (
