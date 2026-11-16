@@ -12,6 +12,8 @@
 // Must be first: it populates the environment that every following import reads at load time.
 import "./load-env";
 
+import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import next from "next";
 import { Server } from "socket.io";
@@ -67,9 +69,55 @@ async function main() {
 
   attachChat(io);
 
+  startDevWorker();
+
   httpServer.listen(port, hostname, () => {
     console.log(`> EAVI portal ready on http://${hostname}:${port} (chat on the same port)`);
   });
+}
+
+/**
+ * Runs the queue worker beside the portal in development, so `npm run dev` needs no second
+ * terminal. Production is left alone: there the worker is its own container (the `worker`
+ * service in docker-compose) and must not be duplicated by the web process.
+ *
+ * If tsx cannot be resolved the portal still starts — the message says how to run the
+ * worker by hand, because a developer without a worker must not wonder why batches sit
+ * pending.
+ */
+let workerProcess: ReturnType<typeof spawn> | undefined;
+
+function startDevWorker() {
+  if (process.env.NODE_ENV === "production") return;
+
+  const require = createRequire(import.meta.url);
+  let tsxCli: string;
+  try {
+    tsxCli = require.resolve("tsx/cli");
+  } catch {
+    console.log("> queue worker not started (tsx not found) — run `npm run worker` separately");
+    return;
+  }
+
+  workerProcess = spawn(process.execPath, [tsxCli, "scripts/worker.ts"], {
+    cwd: process.cwd(),
+    stdio: "inherit",
+  });
+
+  workerProcess.on("error", (error) => {
+    console.error("> queue worker could not start:", error);
+    console.error("> run `npm run worker` separately until this is fixed");
+  });
+
+  // The child must not outlive the server that started it.
+  const stop = () => workerProcess?.kill();
+  process.on("exit", stop);
+  for (const signal of ["SIGTERM", "SIGINT"] as const) {
+    process.on(signal, () => {
+      stop();
+      process.exit(0);
+    });
+  }
 }
 
 main().catch((error) => {
