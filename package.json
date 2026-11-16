@@ -19,6 +19,7 @@
     "verify:classes": "tsx scripts/verify-classes.ts",
     "verify:cards": "tsx scripts/verify-cards.ts",
     "verify:chat": "tsx scripts/verify-chat.ts",
+    "verify:oauth": "tsx scripts/verify-google-oauth.ts",
     "chat:sweep": "tsx scripts/sweep-chat-attachments.ts",
     "verify:class-rooms": "tsx scripts/verify-class-rooms.ts",
     "verify:letters": "tsx scripts/verify-letters.ts",

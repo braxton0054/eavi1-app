@@ -11,9 +11,14 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
-  const { next } = await searchParams;
+  /*
+   * `error` is a short code from the Google callback, not a sentence: the form owns the
+   * wording, so a code that means nothing here simply shows the generic failure instead of
+   * putting an arbitrary string from the URL on the page.
+   */
+  const { next, error } = await searchParams;
 
-  return <LoginForm nextPath={next} />;
+  return <LoginForm nextPath={next} initialError={error} />;
 }

@@ -237,6 +237,11 @@ model User {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   sessions            Session[]
+  /// Google (and, if ever needed, other providers) linked to this account. Kept in a table
+  /// of its own rather than a `googleSub` column so a person can hold several identities,
+  /// the provider name is data rather than a column name, and the unique key is
+  /// (provider, providerAccountId) — which is exactly what the database must never allow twice.
+  oauthAccounts       OAuthAccount[]
   student             StudentProfile?
   tutor               TutorProfile?
   announcements       Announcement[]       @relation("AnnouncementAuthor")
@@ -268,6 +273,27 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+/// One external identity linked to an EAVI account.
+///
+/// `providerAccountId` is Google's `sub`, not the email: a Google address can be renamed,
+/// but the subject id cannot, so the link survives that. The unique key is scoped by
+/// provider so a second adapter (if one is ever added) cannot collide with a Google id.
+/// Nothing here is a credential — there is no token column, because sign-in is the only
+/// thing this app does with Google and it needs no durable access to the account.
+model OAuthAccount {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// "google" today; a literal rather than an enum so adding a second one is not a migration.
+  provider          String   @default("google")
+  providerAccountId String
+  createdAt         DateTime @default(now())
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
 }
 
 /// A teaching department. Created once and then reused by every programme that
