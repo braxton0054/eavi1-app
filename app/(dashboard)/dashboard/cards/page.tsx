@@ -13,19 +13,12 @@ import { prisma } from "@/lib/prisma";
 import { DisclosureForm, RowForm, type OptionSets } from "@/components/dashboard/record-form";
 import { ListFilters, Paginator, ResultCount } from "@/components/dashboard/list-tools";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
-import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
+import { StatusChip } from "@/components/dashboard/status-chip";
 import { formatDate } from "@/lib/format";
 
 
 const copy = pages.cards;
 
-const cardTone: Record<string, ChipTone> = {
-  PENDING: "warning",
-  PRINTING: "warning",
-  ISSUED: "success",
-  LOST: "danger",
-  REPLACED: "neutral",
-};
 
 /** The card face is a print layout, so it reuses the summary control from `RowForm`. */
 const detail =
@@ -167,7 +160,18 @@ export default async function CardsPage({
       title: card.student.user.fullName,
       subtitle: card.student.admissionNo,
       status: (
-        <StatusChip tone={cardTone[card.status] ?? "neutral"}>{labels.cardStatus[card.status]}</StatusChip>
+        // The chip is the STUDENT's state (enrolled or not) — the authoritative enrolment,
+        // never the card's print lifecycle. The print state stays as the small line under
+        // it, so the office still sees which cards await printing without an enrolled
+        // student ever being told "PENDING".
+        <span className="flex flex-col items-start gap-1">
+          <StatusChip tone={card.student.enrollments.length > 0 ? "success" : "neutral"}>
+            {card.student.enrollments.length > 0 ? "Enrolled" : "Not enrolled"}
+          </StatusChip>
+          <span className="text-[11px] text-eavi-muted-text">
+            Card: {labels.cardStatus[card.status] ?? card.status}
+          </span>
+        </span>
       ),
       facts: [
         { label: copy.print.programmeLabel, value: programme, showLabel: true },

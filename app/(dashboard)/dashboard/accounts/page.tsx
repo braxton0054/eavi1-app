@@ -1,8 +1,6 @@
 import {
   addInvoiceLine,
   createInvoice,
-  recordPayment,
-  recordStudentPayment,
   voidInvoice,
 } from "@/lib/actions/college/accounts";
 import {
@@ -20,6 +18,7 @@ import { DisclosureForm, RowForm, type OptionSets } from "@/components/dashboard
 import { ListFilters, Paginator, ResultCount } from "@/components/dashboard/list-tools";
 import { EmptyState, Notice, PageHeader, Panel, StatTile } from "@/components/dashboard/panel";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
+import { PaymentWizard } from "@/components/dashboard/payment-wizard";
 import { formatDate, money } from "@/lib/format";
 import type { Column } from "@/lib/content/dashboard";
 
@@ -294,28 +293,12 @@ export default async function AccountsPage({
         <Notice tone="neutral" title={copy.create.button} body={shell.chooseCampus} />
       )}
 
-      <div className="space-y-2">
-        <p className="text-xs text-eavi-muted-text">{copy.payment.student.hint}</p>
-        <DisclosureForm
-          id="new-student-payment"
-          button={copy.payment.student.button}
-          title={copy.payment.student.title}
-          fields={copy.payment.student.fields}
-          options={options}
-          action={recordStudentPayment}
-          submitLabel={common.record}
-        />
-      </div>
-
-      <DisclosureForm
-        id="new-payment"
-        button={copy.payment.button}
-        title={copy.payment.title}
-        fields={copy.payment.fields}
-        options={options}
-        action={recordPayment}
-        submitLabel={common.record}
-      />
+      {/* THE one payment flow: student, semester, money, review, record. The two forms
+          this page used to carry (and the copy on every student's page) are folded in
+          here — one entry point, one ledger. */}
+      <Panel title={copy.payment.student.title} description={copy.payment.student.hint}>
+        <PaymentWizard students={studentOptions} campusLocked={scope.campusId === null} />
+      </Panel>
 
       <Panel title={copy.title}>
         <div className="space-y-4 p-4">

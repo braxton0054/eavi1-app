@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { generateEnrollmentFees, recordStudentPayment } from "@/lib/actions/college/accounts";
+import { generateEnrollmentFees } from "@/lib/actions/college/accounts";
 import { registerUnitPeriod, saveUnitResult } from "@/lib/actions/college/program-units";
 import { recordStudentAttachment } from "@/lib/actions/college/attachments";
 import { getStudent } from "@/lib/dal/college";
@@ -702,20 +702,14 @@ export default async function StudentProfilePage({
               caption={feeCopy.obligations}
             />
             <div className="flex flex-wrap items-center gap-4 border-t border-eavi-border p-4">
-              <DisclosureForm
-                id={`student-payment-${student.id}`}
-                button={pages.accounts.payment.student.button}
-                title={pages.accounts.payment.student.title}
-                fields={pages.accounts.payment.student.fields.filter(
-                  (field) => field.name !== "studentId",
-                )}
-                hidden={{ studentId: student.id }}
-                action={recordStudentPayment}
-                submitLabel={common.record}
-              />
+              {/* Payments are recorded in ONE place: the Accounts page's guided wizard.
+                  The overdue line stays here so the eye lands on the debt it belongs to. */}
               {overdueRows.length > 0 ? (
                 <p className="text-sm text-eavi-destructive">
-                  {feeCopy.overdue}: {money(overdueAmount)}
+                  {feeCopy.overdue}: {money(overdueAmount)} —{" "}
+                  <a href="/dashboard/accounts" className="underline underline-offset-4">
+                    record the payment there
+                  </a>
                 </p>
               ) : null}
             </div>

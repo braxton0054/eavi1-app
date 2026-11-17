@@ -36,7 +36,16 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
       createdAt: true,
       remarks: true,
       student: {
-        select: { id: true, admissionNo: true, user: { select: { fullName: true } } },
+        select: {
+          id: true,
+          admissionNo: true,
+          user: { select: { fullName: true } },
+          enrollments: {
+            where: { status: "ACTIVE" },
+            take: 1,
+            select: { id: true },
+          },
+        },
       },
     },
   });
@@ -51,7 +60,18 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
     { label: copy.serial, value: card.serial },
     {
       label: copy.status,
-      value: <StatusChip tone={tone[card.status] ?? "neutral"}>{labels.cardStatus[card.status]}</StatusChip>,
+      // The student's enrolment is the headline state; the card's own print lifecycle
+      // stays as the small line under it. No enrolled student is told "PENDING".
+      value: (
+        <span className="flex flex-col items-start gap-1">
+          <StatusChip tone={card.student.enrollments.length > 0 ? "success" : "neutral"}>
+            {card.student.enrollments.length > 0 ? "Enrolled" : "Not enrolled"}
+          </StatusChip>
+          <span className="text-[11px] text-eavi-muted-text">
+            Card: {labels.cardStatus[card.status] ?? card.status}
+          </span>
+        </span>
+      ),
     },
     { label: copy.issued, value: card.issuedAt ? formatDate(card.issuedAt) : common.notSet },
     { label: copy.expires, value: card.expiresAt ? formatDate(card.expiresAt) : common.notSet },

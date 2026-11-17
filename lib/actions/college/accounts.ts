@@ -14,6 +14,7 @@ import {
   nextInvoiceNumbers,
   nextReceiptNumber,
   onSave,
+  refresh,
   requiredDate,
   requiredNumber,
   requiredText,
@@ -264,6 +265,74 @@ export async function recordStudentPayment(formData: FormData) {
       });
     }
   });
+}
+
+/**
+ * The payment wizard's own entry: the same ledger writes as `recordStudentPayment`,
+ * but it RETURNS the receipt instead of redirecting, so the guided flow can show the
+ * receipt number and the document links without losing the page, and a refusal shows
+ * next to the step instead of bouncing the administrator. A retried submit is refused
+ * by the wizard's one-shot state, and the receipt's uniqueness is the ledger's.
+ */
+export async function recordWizardPayment(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+
+  try {
+    const studentId = requiredText(formData, "studentId", fieldLabel("studentId"));
+    const amount = requiredNumber(formData, "amount", fieldLabel("amount"));
+    if (amount <= 0) throw new FieldError(fieldErrors.number(fieldLabel("amount")));
+
+    const method = enumField(formData, "method", METHODS, fieldLabel("method"));
+    const reference = text(formData, "reference");
+    const paidAt = requiredDate(formData, "paidAt", fieldLabel("paidAt"));
+
+    const student = await prisma.studentProfile.findFirst({
+      where: { id: studentId, ...(scope.campusId === null ? {} : { campusId: scope.campusId }) },
+      select: { id: true },
+    });
+    if (!student) throw new FieldError(fieldErrors.notOnCampus);
+
+    const receiptNo = await nextReceiptNumber();
+
+    await prisma.$transaction(async (tx) => {
+      const outcome = await allocateStudentPayment(tx, {
+        studentId: student.id,
+        amount,
+        method,
+        reference,
+        paidAt,
+        receiptNo,
+      });
+
+      if (!outcome.ok) {
+        throw outcome.reason === "overpay"
+          ? new FieldError(pages.accounts.payment.student.overpay(money(outcome.outstanding)))
+          : new FieldError(pages.accounts.payment.student.nothingOwed);
+      }
+    });
+
+    const owner = await prisma.studentProfile.findUnique({
+      where: { id: student.id },
+      select: { userId: true },
+    });
+    if (owner) {
+      await notifyUser(owner.userId, {
+        title: "Fee payment received",
+        body: `${money(amount)} received — receipt ${receiptNo}.`,
+        notificationType: "fee",
+        targetUrl: "/student/fees",
+        dedupeKey: `fee:receipt:${receiptNo}`,
+      });
+    }
+
+    for (const path of AFFECTED) refresh(path);
+    return { ok: true as const, receiptNo };
+  } catch (error) {
+    if (error instanceof FieldError) {
+      return { ok: false as const, error: error.message };
+    }
+    throw error;
+  }
 }
 
 /**
