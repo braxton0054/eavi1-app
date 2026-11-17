@@ -53,6 +53,7 @@ export function Sidebar({
         <button
           type="button"
           className={styles.overlay}
+          data-slot="sidebar-overlay"
           aria-label="Close section menu"
           onClick={onClose}
         />

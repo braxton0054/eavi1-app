@@ -9,7 +9,6 @@
       var(--surface-2) 63%
     );
     background-size: 400% 100%;
-    animation: eavi-shimmer 1.4s ease infinite;
   }
 
   /* The global reduced-motion guard already freezes this; the static fill keeps the

@@ -531,6 +531,95 @@ async function main() {
     console.log("  skip only one programme in this database, so the cross-programme check is moot");
   }
 
+  console.log("\n11. A class ID is reused, not duplicated, when the same class runs again");
+
+  /*
+   * The office archives a class at the end of its intake and later opens the same class
+   * again (a late cohort, a corrected archive, a re-run). The row — and therefore the ID
+   * every document, membership and chat room points at — must be reused: a twin class
+   * would split the roster's history in two.
+   */
+  const { resolveClassForName, renameClash } = await import("@/lib/academics/class-reuse");
+
+  const again = await resolveClassForName({
+    campusId: campus.id,
+    programId: program.id,
+    periodId: mayIntake.id,
+    year: mayIntake.year,
+    name: "ICT/REUSE/2027",
+  });
+  check("a new name creates one class", again.reuse === "created");
+
+  const sameAgain = await resolveClassForName({
+    campusId: campus.id,
+    programId: program.id,
+    periodId: mayIntake.id,
+    year: mayIntake.year,
+    name: "ICT/REUSE/2027",
+  });
+  check(
+    "the same name in the same identity reuses the class ID",
+    sameAgain.reuse === "reused" && sameAgain.id === again.id,
+    `${sameAgain.reuse} ${sameAgain.id === again.id}`,
+  );
+
+  await prisma.academicClass.update({
+    where: { id: again.id },
+    data: { status: "ARCHIVED", archivedAt: new Date() },
+  });
+
+  const reopened = await resolveClassForName({
+    campusId: campus.id,
+    programId: program.id,
+    periodId: mayIntake.id,
+    year: mayIntake.year,
+    name: "ICT/REUSE/2027",
+  });
+  check(
+    "an archived class is reopened under its own ID",
+    reopened.reuse === "reactivated" && reopened.id === again.id,
+    `${reopened.reuse} ${reopened.id === again.id}`,
+  );
+  const reopenedRow = await prisma.academicClass.findUnique({
+    where: { id: again.id },
+    select: { status: true, archivedAt: true },
+  });
+  check("the reopened class is active and no longer archived", reopenedRow?.status === "ACTIVE" && reopenedRow?.archivedAt === null);
+
+  // A name reused in a DIFFERENT intake is a different class: it must create, not reuse.
+  const otherIntake = await resolveClassForName({
+    campusId: campus.id,
+    programId: program.id,
+    periodId: januaryIntake.id,
+    year: januaryIntake.year,
+    name: "ICT/REUSE/2027",
+  });
+  check("the same name in another intake is its own class", otherIntake.reuse === "created" && otherIntake.id !== again.id);
+
+  // Renaming onto a name used by another intake is allowed; the identity is per intake.
+  const crossIntake = await renameClash({
+    id: otherIntake.id,
+    campusId: campus.id,
+    programId: program.id,
+    periodId: januaryIntake.id,
+    name: "ICT/REUSE/2027",
+  });
+  check(
+    "a rename may use a name another intake already has",
+    crossIntake === null || crossIntake.id === otherIntake.id,
+    crossIntake?.id ?? "none",
+  );
+
+  // ...but renaming onto a name inside its own identity is refused.
+  const sameScope = await renameClash({
+    id: otherIntake.id,
+    campusId: campus.id,
+    programId: program.id,
+    periodId: januaryIntake.id,
+    name: janClass.name,
+  });
+  check("a rename colliding inside its own class is refused", sameScope !== null && sameScope.id !== otherIntake.id);
+
   console.log(`\n${failures === 0 ? "All checks passed." : `${failures} check(s) failed.`}`);
   await prisma.$disconnect();
   if (failures > 0) process.exitCode = 1;

@@ -104,15 +104,86 @@
 }
 
 /*
- * EMERGENCY HOTFIX — remove when the popup animations move out of the CSS Modules.
+ * Overlay motion — declared globally and keyed by `data-slot`, never in a CSS Module.
  *
- * CSS Modules hash animation names, so the modules' `animation: eavi-pop-out` rules
- * reference hashed keyframes that do not exist. Radix Presence waits for the matching
- * animationend before unmounting a closing popup; with no real keyframes the event
- * never fires, the popup never unmounts, and the body scroll/pointer lock it holds
- * freezes the whole page until a reload. This rule makes every closing popup finish
- * immediately: no exit animation, but the lock is always released.
+ * A module's `animation: eavi-pop-out` did not resolve: CSS Modules hash `@keyframes`
+ * names, so the rule pointed at keyframes that do not exist. Nothing animated, Radix
+ * Presence never saw the `animationend` it waits for before unmounting, and a closing
+ * popup stayed mounted holding the body's pointer and scroll lock — the page froze until
+ * a reload. These rules live in the global sheet, where the names are intact, and target
+ * the components' stable `data-slot` attributes rather than their hashed class names.
+ *
+ * The `[data-state]` rules are what make the exit work, so they are the part that matters:
+ * opening and closing a panel are mirrored pairs, and both must be real animations.
  */
-[data-state="closed"] {
-  animation: none !important;
+@layer components {
+  /* --- popups: menus, selects, popovers, tooltips, dialogs ------------------------- */
+  [data-slot="menu-content"],
+  [data-slot="select-content"],
+  [data-slot="popover-content"],
+  [data-slot="tooltip-content"] {
+    animation: eavi-pop-in var(--dur-fast) var(--ease-out);
+  }
+
+  [data-slot="menu-content"][data-state="closed"],
+  [data-slot="select-content"][data-state="closed"],
+  [data-slot="popover-content"][data-state="closed"],
+  [data-slot="tooltip-content"][data-state="closed"] {
+    animation: eavi-pop-out var(--dur-fast) var(--ease-out);
+  }
+
+  [data-slot="dialog-overlay"],
+  [data-slot="sheet-overlay"],
+  [data-slot="sidebar-overlay"] {
+    animation: eavi-fade-in var(--dur-base) var(--ease-out);
+  }
+
+  [data-slot="dialog-overlay"][data-state="closed"],
+  [data-slot="sheet-overlay"][data-state="closed"] {
+    animation: eavi-fade-out var(--dur-base) var(--ease-out);
+  }
+
+  [data-slot="dialog-content"] {
+    animation: eavi-pop-in var(--dur-base) var(--ease-out);
+  }
+
+  [data-slot="dialog-content"][data-state="closed"] {
+    animation: eavi-pop-out var(--dur-fast) var(--ease-out);
+  }
+
+  [data-slot="sheet-content"] {
+    animation: eavi-sheet-in var(--dur-base) var(--ease-in-out);
+  }
+
+  [data-slot="sheet-content"][data-state="closed"] {
+    animation: eavi-sheet-out var(--dur-base) var(--ease-in-out);
+  }
+
+  /* A phone sheet rises from the bottom edge; the direction is a token on the artwork. */
+  [data-slot="sheet-content"][data-side="right"] {
+    --sheet-from-x: 100%;
+  }
+
+  [data-slot="sheet-content"][data-side="left"] {
+    --sheet-from-x: -100%;
+  }
+
+  [data-slot="sheet-content"][data-side="bottom"] {
+    --sheet-from-y: 100%;
+  }
+
+  /* --- toasts and loading -------------------------------------------------------- */
+  [data-slot="toast"] {
+    animation: eavi-slide-up var(--dur-base) var(--ease-out);
+  }
+
+  [data-slot="spinner"],
+  [data-slot="button-spinner"] > svg,
+  [data-slot="scope-picker-spinner"] {
+    animation: eavi-spin 0.9s linear infinite;
+  }
+
+  [data-slot="skeleton"] {
+    animation: eavi-shimmer 1.4s ease infinite;
+  }
 }

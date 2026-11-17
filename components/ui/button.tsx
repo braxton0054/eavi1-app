@@ -57,7 +57,7 @@ function Button({
         <>
           <span className={styles.label}>{children}</span>
           {loading && (
-            <span className={styles.spinner} aria-hidden="true">
+            <span className={styles.spinner} data-slot="button-spinner" aria-hidden="true">
               <Loader2Icon />
             </span>
           )}

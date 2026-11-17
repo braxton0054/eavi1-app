@@ -53,7 +53,7 @@ export function ScopePicker({
       </select>
 
       <span className={styles.chevron} aria-hidden="true">
-        {pending ? <Loader2Icon className={styles.spinner} /> : <ChevronDownIcon />}
+        {pending ? <Loader2Icon className={styles.spinner} data-slot="scope-picker-spinner" /> : <ChevronDownIcon />}
       </span>
 
       {/* The current pathname is only read so the control re-renders after a scope change. */}

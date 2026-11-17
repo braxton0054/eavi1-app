@@ -4,12 +4,8 @@
     inset: 0;
     z-index: var(--z-overlay);
     background: var(--overlay);
-    animation: eavi-fade-in var(--dur-base) var(--ease-out);
   }
 
-  .overlay[data-state="closed"] {
-    animation: eavi-fade-out var(--dur-base) var(--ease-out);
-  }
 
   .content {
     position: fixed;
@@ -30,12 +26,8 @@
     color: var(--text);
     font-size: var(--text-sm);
     box-shadow: var(--shadow-lg);
-    animation: eavi-pop-in var(--dur-base) var(--ease-out);
   }
 
-  .content[data-state="closed"] {
-    animation: eavi-pop-out var(--dur-fast) var(--ease-out);
-  }
 
   .content:focus-visible {
     outline: 2px solid var(--focus);

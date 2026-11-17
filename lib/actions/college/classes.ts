@@ -5,6 +5,7 @@ import { requireCollegeAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import { FieldError, onSave, requiredText, text } from "@/lib/actions/college/_shared";
 import { intakeValueForMonth, mergeBlockages, normaliseClassName } from "@/lib/academics/classes";
+import { renameClash, resolveClassForName } from "@/lib/academics/class-reuse";
 import { recordAudit } from "@/lib/academics/audit";
 import { redirect } from "next/navigation";
 import { refresh } from "@/lib/actions/college/_shared";
@@ -51,41 +52,46 @@ export async function createClass(formData: FormData) {
       throw new FieldError(pages.classes.officialMonthsOnly);
     }
 
-    const clash = await prisma.academicClass.findFirst({
-      where: { programId, periodId: intake.id, name },
-      select: { id: true },
-    });
-    if (clash) throw new FieldError(pages.classes.nameTaken);
-
-    const created = await prisma.academicClass.create({
-      data: {
-        campusId,
-        programId,
-        periodId: intake.id,
-        year: intake.year,
-        name,
-        note,
-      },
+    /*
+     * The name is resolved inside the class's real identity — campus, programme, intake and
+     * name. The same name in another intake or on another campus is a different class, not a
+     * collision; and a class that was archived is brought back under its own ID instead of
+     * being duplicated, so its memberships, room and history stay attached to it.
+     */
+    const resolved = await resolveClassForName({
+      campusId,
+      programId,
+      periodId: intake.id,
+      year: intake.year,
+      name,
+      note,
     });
 
     await recordAudit({
       campusId,
       actorId: scope.userId,
       actorEmail: scope.email,
-      action: "class.create",
+      action: resolved.reuse === "reactivated" ? "class.reuse" : "class.create",
       entityType: "class",
-      entityId: created.id,
-      detail: { name, program: program.code, intakeMonth, year: intake.year, period: intake.name },
+      entityId: resolved.id,
+      detail: {
+        name,
+        program: program.code,
+        intakeMonth,
+        year: intake.year,
+        period: intake.name,
+        resolution: resolved.reuse,
+      },
     });
 
     /*
      * The class group is not a separate thing to make: a class is a grouping, so its room is
-     * derived from the roster. Creating the class creates the room.
+     * derived from the roster. Creating or reopening the class makes the room match.
      */
-    await syncClassConversation(created.id).catch(() => null);
+    await syncClassConversation(resolved.id).catch(() => null);
 
     refresh(...AFFECTED);
-    redirect(`/dashboard/classes/${created.id}`);
+    redirect(`/dashboard/classes/${resolved.id}`);
   });
 }
 
@@ -100,13 +106,20 @@ export async function updateClass(formData: FormData) {
 
     const existing = await prisma.academicClass.findFirst({
       where: { id, ...(scope.campusId === null ? {} : { campusId: scope.campusId }) },
-      select: { id: true, name: true, programId: true, campusId: true },
+      select: { id: true, name: true, programId: true, periodId: true, campusId: true },
     });
     if (!existing) throw new FieldError(fieldErrors.notOnCampus);
 
-    const clash = await prisma.academicClass.findFirst({
-      where: { programId: existing.programId, name, id: { not: id } },
-      select: { id: true },
+    /*
+     * A rename may only collide inside the class's own identity. Comparing on the programme
+     * alone refused a name that another intake already used, which is a legitimate class.
+     */
+    const clash = await renameClash({
+      id,
+      campusId: existing.campusId,
+      programId: existing.programId,
+      periodId: existing.periodId,
+      name,
     });
     if (clash) throw new FieldError(pages.classes.nameTaken);
 

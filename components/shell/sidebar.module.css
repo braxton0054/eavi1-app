@@ -247,7 +247,6 @@
       border: 0;
       padding: 0;
       background: var(--overlay);
-      animation: eavi-fade-in var(--dur-fast) var(--ease-out);
     }
   }
 

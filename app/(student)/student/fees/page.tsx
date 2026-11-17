@@ -51,7 +51,7 @@ export default async function StudentFeesPage() {
               download lives beside them rather than buried in a menu. */}
           <div className="flex justify-end">
             <Button asChild variant="secondary" size="sm">
-              <a href="/student/fees/statement">Download statement (PDF)</a>
+              <a href="/student/fees/statement?download=1">{copy.statement}</a>
             </Button>
           </div>
 
@@ -70,6 +70,20 @@ export default async function StudentFeesPage() {
                           : copy.title}
                         {invoice.dueAt ? ` · ${formatDate(invoice.dueAt)}` : ""}
                       </p>
+                      {/* The invoice is the college's own document design, built from this
+                          invoice when it is asked for — nothing is stored per view. */}
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Button asChild variant="secondary" size="sm">
+                          <a href={`/student/fees/invoice/${encodeURIComponent(invoice.number)}`}>
+                            {copy.invoiceView}
+                          </a>
+                        </Button>
+                        <Button asChild variant="ghost" size="sm">
+                          <a href={`/student/fees/invoice/${encodeURIComponent(invoice.number)}?download=1`}>
+                            {copy.invoiceDownload}
+                          </a>
+                        </Button>
+                      </div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <span className="font-semibold text-eavi-on-bg tabular-nums">
@@ -97,6 +111,22 @@ export default async function StudentFeesPage() {
                       <p className="text-sm text-eavi-muted-text">{formatDate(payment.paidAt)}</p>
                       {payment.reference ? (
                         <p className="mt-0.5 text-xs text-eavi-muted-text">{payment.reference}</p>
+                      ) : null}
+                      {payment.receiptNo ? (
+                        <p className="mt-1 -mb-2 flex flex-wrap items-center gap-x-3 text-xs">
+                          <a
+                            href={`/student/fees/receipt/${encodeURIComponent(payment.receiptNo)}`}
+                            className="inline-flex min-h-9 items-center text-eavi-primary-text underline-offset-4 hover:underline"
+                          >
+                            {copy.receipt} {payment.receiptNo}
+                          </a>
+                          <a
+                            href={`/student/fees/receipt/${encodeURIComponent(payment.receiptNo)}?download=1`}
+                            className="inline-flex min-h-9 items-center text-eavi-muted-text underline-offset-4 hover:underline"
+                          >
+                            {copy.receiptDownload}
+                          </a>
+                        </p>
                       ) : null}
                     </div>
                     <span className="shrink-0 font-medium text-eavi-on-bg tabular-nums">

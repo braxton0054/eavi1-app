@@ -80,12 +80,8 @@
     color: var(--text);
     box-shadow: var(--shadow-md);
     transform-origin: var(--radix-select-content-transform-origin);
-    animation: eavi-pop-in var(--dur-fast) var(--ease-out);
   }
 
-  .content[data-state="closed"] {
-    animation: eavi-pop-out var(--dur-fast) var(--ease-out);
-  }
 
   .content[data-side="bottom"] {
     --pop-from-y: -0.25rem;
