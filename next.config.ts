@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
     agentFeedback: true,
+    agentUpgrade: "security",
     // A curriculum or fee-structure PDF is uploaded through a Server Action, and the
     // default 1MB body cap rejects most real ones. Files are additionally capped in
     // code at UPLOAD_MAX_BYTES, which leaves room for the multipart overhead this
