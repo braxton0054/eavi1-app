@@ -171,6 +171,20 @@ async function ensureCampusAdmins() {
     console.log(`  email:    ${account.email}`);
     console.log(`  password: ${value}`);
   }
+
+  // No demo or leftover admins: an account holding CAMPUS_ADMIN whose email the .env
+  // does not name is demoted to a plain student, the same rule the production database
+  // follows. The identity of an administrator is the deployment's decision, made in one
+  // place.
+  const named = adminAccounts.map((account) => account.email);
+  const strays = await prisma.user.findMany({
+    where: { role: "CAMPUS_ADMIN", email: { notIn: named } },
+    select: { id: true, email: true },
+  });
+  for (const stray of strays) {
+    await prisma.user.update({ where: { id: stray.id }, data: { role: "STUDENT" } });
+    console.log(`demoted ${stray.email}: not named in the .env admin emails`);
+  }
 }
 
 async function main() {
