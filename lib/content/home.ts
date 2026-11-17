@@ -153,6 +153,8 @@ export const whySection = {
 } as const;
 
 export type Program = {
+  /** Stable identity, not the name: two programmes may share a display name. */
+  id: string;
   title: string;
   level: string;
   duration: string;

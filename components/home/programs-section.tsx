@@ -91,7 +91,7 @@ export function ProgramsSection({ programs }: { programs?: Program[] }) {
 
           <ul className="mt-6 grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((program) => (
-              <li key={program.title} className="flex">
+              <li key={program.id} className="flex">
                 <Card size="sm" className="eavi-lift h-full w-full">
                   <CardHeader>
                     <CardTitle className="text-base">{program.title}</CardTitle>

@@ -25,6 +25,7 @@ async function programCards(): Promise<Program[]> {
     where: { archivedAt: null },
     orderBy: { name: "asc" },
     select: {
+      id: true,
       name: true,
       description: true,
       durationMonths: true,
@@ -34,6 +35,7 @@ async function programCards(): Promise<Program[]> {
   });
 
   return rows.map((row) => ({
+    id: row.id,
     title: row.name,
     level: row.type.name,
     duration: `${row.durationMonths} ${row.durationMonths === 1 ? "month" : "months"}`,
