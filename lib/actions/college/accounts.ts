@@ -294,22 +294,64 @@ export async function recordWizardPayment(formData: FormData) {
 
     const receiptNo = await nextReceiptNumber();
 
-    await prisma.$transaction(async (tx) => {
-      const outcome = await allocateStudentPayment(tx, {
-        studentId: student.id,
-        amount,
-        method,
-        reference,
-        paidAt,
-        receiptNo,
+    // The allocation: the SELECTED semester's invoice is paid first; anything beyond its
+    // outstanding cascades to the student's next unpaid semesters, oldest first — the
+    // way the college has always counted money, now without a clerk doing the arithmetic.
+    // The whole payment rides ONE receipt number, however many invoices it settles, and
+    // the entire allocation lands in one transaction: a failure leaves no part-paid mess.
+    const result = await prisma.$transaction(async (tx) => {
+      const open = await tx.invoice.findMany({
+        where: { studentId: student.id, status: { in: ["OPEN", "PARTIAL"] } },
+        orderBy: [{ periodYear: "asc" }, { periodSemester: "asc" }, { dueAt: "asc" }],
+        select: { id: true },
       });
+      const lead = String(formData.get("invoiceId") ?? "");
+      const ordered = [
+        ...open.filter((inv) => inv.id === lead),
+        ...open.filter((inv) => inv.id !== lead),
+      ];
+      if (ordered.length === 0) throw new FieldError(pages.accounts.payment.student.nothingOwed);
 
-      if (!outcome.ok) {
-        throw outcome.reason === "overpay"
-          ? new FieldError(pages.accounts.payment.student.overpay(money(outcome.outstanding)))
-          : new FieldError(pages.accounts.payment.student.nothingOwed);
+      let remaining = amount;
+      const applied: Array<{ invoice: string; amount: number }> = [];
+      for (const invoice of ordered) {
+        if (remaining <= 0) break;
+        const fresh = await tx.invoice.findUnique({
+          where: { id: invoice.id },
+          select: { number: true, lines: { select: { amount: true } }, payments: { select: { amount: true } } },
+        });
+        if (!fresh) continue;
+        const outstanding =
+          fresh.lines.reduce((sum, line) => sum + Number(line.amount.toString()), 0) -
+          fresh.payments.reduce((sum, row) => sum + Number(row.amount.toString()), 0);
+        if (outstanding <= 0) continue;
+
+        const appliedNow = Math.min(remaining, outstanding);
+        await tx.payment.create({
+          data: {
+            invoiceId: invoice.id,
+            studentId: student.id,
+            amount: appliedNow,
+            method,
+            reference,
+            paidAt,
+            receiptNo,
+          },
+        });
+        await recomputeInvoice(tx, invoice.id);
+        remaining -= appliedNow;
+        applied.push({ invoice: fresh.number, amount: appliedNow });
       }
+
+      // Money beyond the ENTIRE ledger is refused: an overpayment needs the office's
+      // decision, not a silent credit. The transaction rolls the whole allocation back.
+      if (remaining > 0) {
+        throw new FieldError(pages.accounts.payment.student.overpay(money(remaining)));
+      }
+      return applied;
     });
+
+    const appliedRows = result;
 
     const owner = await prisma.studentProfile.findUnique({
       where: { id: student.id },
@@ -326,7 +368,7 @@ export async function recordWizardPayment(formData: FormData) {
     }
 
     for (const path of AFFECTED) refresh(path);
-    return { ok: true as const, receiptNo };
+    return { ok: true as const, receiptNo, applied: appliedRows };
   } catch (error) {
     if (error instanceof FieldError) {
       return { ok: false as const, error: error.message };

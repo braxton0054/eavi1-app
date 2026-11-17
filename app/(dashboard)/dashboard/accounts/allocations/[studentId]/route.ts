@@ -47,7 +47,7 @@ export async function GET(
   }
 
   const invoices = await prisma.invoice.findMany({
-    where: { studentId: student.id, status: { in: ["OPEN", "PARTIAL"] } },
+    where: { studentId: student.id, status: { in: ["OPEN", "PARTIAL", "PAID"] } },
     orderBy: [{ periodYear: "asc" }, { periodSemester: "asc" }, { dueAt: "asc" }],
     select: {
       id: true,
@@ -56,6 +56,7 @@ export async function GET(
       periodSemester: true,
       status: true,
       dueAt: true,
+      feePeriod: { select: { label: true } },
       lines: { select: { amount: true } },
       payments: { select: { amount: true } },
     },
@@ -64,20 +65,25 @@ export async function GET(
   const allocations = invoices.map((invoice) => {
     const billed = invoice.lines.reduce((sum, line) => sum + Number(line.amount.toString()), 0);
     const paid = invoice.payments.reduce((sum, row) => sum + Number(row.amount.toString()), 0);
+    const outstanding = Math.max(0, billed - paid);
     return {
       invoiceId: invoice.id,
       number: invoice.number,
       year: invoice.periodYear,
       semester: invoice.periodSemester,
-      label:
-        invoice.periodYear && invoice.periodSemester
+      // The fee period's own label — "Year 1 · Semester 1" on a semester programme,
+      // "Module 1" on a module cadence — the programme's fee type decides the words.
+      label: invoice.feePeriod?.label ??
+        (invoice.periodYear && invoice.periodSemester
           ? `Year ${invoice.periodYear} · Semester ${invoice.periodSemester}`
-          : invoice.number,
+          : invoice.number),
       dueAt: invoice.dueAt,
       billed,
       paid,
-      outstanding: Math.max(0, billed - paid),
+      outstanding,
       status: invoice.status,
+      // Completed semesters are settled: shown for the record, never selectable.
+      settled: outstanding === 0,
     };
   });
 

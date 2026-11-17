@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CheckIcon, ChevronRightIcon, Loader2Icon, SearchIcon } from "lucide-react";
 
 import { recordWizardPayment } from "@/lib/actions/college/accounts";
 import { money } from "@/lib/format";
+import { StatusChip } from "@/components/dashboard/status-chip";
 
 import styles from "./payment-wizard.module.css";
 
@@ -31,6 +32,8 @@ type Allocation = {
   billed: number;
   paid: number;
   outstanding: number;
+  status: string;
+  settled: boolean;
 };
 
 type StudentSummary = {
@@ -51,7 +54,7 @@ type Props = {
 const STEPS = ["Student", "Semester", "Payment", "Review", "Done"] as const;
 
 export function PaymentWizard({ students, campusLocked }: Props) {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(-1); // -1 = the entry button; 0..4 = the flow.
   const [student, setStudent] = useState<StudentSummary | null>(null);
   const [allocations, setAllocations] = useState<Allocation[] | null>(null);
   const [loadingAllocations, setLoadingAllocations] = useState(false);
@@ -62,6 +65,7 @@ export function PaymentWizard({ students, campusLocked }: Props) {
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [submitting, setSubmitting] = useState(false);
   const [receiptNo, setReceiptNo] = useState<string | null>(null);
+  const [applied, setApplied] = useState<Array<{ invoice: string; amount: number }>>([]);
   const [error, setError] = useState<string | null>(null);
 
   // The student picker: the full list arrives as props; a short filter narrows it.
@@ -124,7 +128,7 @@ export function PaymentWizard({ students, campusLocked }: Props) {
   };
 
   const reset = () => {
-    setStep(0);
+    setStep(-1);
     setStudent(null);
     setAllocations(null);
     setAllocation(null);
@@ -132,6 +136,7 @@ export function PaymentWizard({ students, campusLocked }: Props) {
     setMethod("");
     setReference("");
     setReceiptNo(null);
+    setApplied([]);
     setError(null);
   };
 
@@ -150,6 +155,27 @@ export function PaymentWizard({ students, campusLocked }: Props) {
       ))}
     </ol>
   );
+
+  // The entry state: one clear button — the flow starts when the office asks for it.
+  if (step === -1) {
+    return (
+      <div className={styles.root}>
+        {campusLocked ? (
+          <p className={styles.note}>Choose a campus from the College overview to record payments.</p>
+        ) : (
+          <>
+            <p className={styles.note}>
+              Guided flow: find the student, see their fee status per term, pay against a
+              semester or module, review, record. The receipt number appears at the end.
+            </p>
+            <button type="button" className={styles.confirm} onClick={() => setStep(0)}>
+              <SearchIcon aria-hidden /> Record fee payment
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.root}>
@@ -230,33 +256,50 @@ export function PaymentWizard({ students, campusLocked }: Props) {
         </div>
       )}
 
-      {/* Step 2 — the semester */}
+      {/* Step 2 — the fee status per term, and where this payment lands */}
       {step === 1 && (
         <div className={styles.stepBody}>
           <p className={styles.stepTitle}>
-            Which semester is this payment for? — {student?.name}
+            {student?.name} — fee status per term. Pick the term this payment starts at
           </p>
           <ul className={styles.allocations}>
             {allocations?.map((a) => (
               <li key={a.invoiceId}>
-                <button
-                  type="button"
-                  className={styles.allocation}
-                  aria-pressed={allocation?.invoiceId === a.invoiceId}
-                  onClick={() => setAllocation(a)}
-                >
-                  <span className={styles.allocLabel}>
-                    {a.label}
-                    <span className={styles.allocNumber}>{a.number}</span>
-                  </span>
-                  <span className={styles.allocOutstanding}>{money(a.outstanding)} outstanding</span>
-                </button>
+                {a.settled ? (
+                  <div className={styles.allocation} data-settled="true">
+                    <span className={styles.allocLabel}>
+                      {a.label}
+                      <span className={styles.allocNumber}>{a.number}</span>
+                    </span>
+                    <span className={styles.allocOutstanding} data-done="true">
+                      <StatusChip tone="success">Completed</StatusChip>
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.allocation}
+                    aria-pressed={allocation?.invoiceId === a.invoiceId}
+                    onClick={() => setAllocation(a)}
+                  >
+                    <span className={styles.allocLabel}>
+                      {a.label}
+                      <span className={styles.allocNumber}>{a.number}</span>
+                    </span>
+                    <span className={styles.allocOutstanding}>
+                      {a.status === "PARTIAL" ? "Part paid · " : "Unpaid · "}
+                      {money(a.outstanding)}
+                    </span>
+                  </button>
+                )}
               </li>
             ))}
           </ul>
           {selected && (
             <p className={styles.summaryLine}>
-              {money(selected.billed)} billed · {money(selected.paid)} paid · {money(selected.outstanding)} outstanding
+              {money(selected.billed)} billed · {money(selected.paid)} paid ·{" "}
+              {money(selected.outstanding)} outstanding on {selected.label}. Anything above
+              the outstanding rolls to the next term automatically.
             </p>
           )}
           <div className={styles.buttons}>
@@ -274,10 +317,10 @@ export function PaymentWizard({ students, campusLocked }: Props) {
       {step === 2 && (
         <div className={styles.stepBody}>
           <p className={styles.stepTitle}>
-            {selected?.label} — {money(selected?.outstanding ?? 0)} outstanding
+            Paying {selected?.label} — {money(selected?.outstanding ?? 0)} outstanding on it
           </p>
           <label className={styles.label} htmlFor="wizard-amount">
-            Amount received (KES)
+            Amount received (KES) — any extra moves to the next term
           </label>
           <input
             id="wizard-amount"
@@ -290,8 +333,8 @@ export function PaymentWizard({ students, campusLocked }: Props) {
           />
           {selected && amountValid && amountValue > selected.outstanding && (
             <p className={styles.warn}>
-              This is more than the outstanding for this semester ({money(selected.outstanding)}). The ledger
-              refuses overpayment of a single semester.
+              More than the outstanding on {selected.label} ({money(selected.outstanding)}) — the
+              balance rolls to the student&apos;s next unpaid term automatically.
             </p>
           )}
           <label className={styles.label} htmlFor="wizard-method">
@@ -331,7 +374,7 @@ export function PaymentWizard({ students, campusLocked }: Props) {
             <button
               type="button"
               className={styles.primary}
-              disabled={!amountValid || !method || amountValue > (selected?.outstanding ?? 0)}
+              disabled={!amountValid || !method}
               onClick={() => setStep(3)}
             >
               Review
@@ -415,6 +458,12 @@ export function PaymentWizard({ students, campusLocked }: Props) {
               <dt>Receipt number</dt>
               <dd>{receiptNo}</dd>
             </div>
+            {applied.map((row) => (
+              <div key={row.invoice}>
+                <dt>{row.invoice}</dt>
+                <dd>{money(row.amount)}</dd>
+              </div>
+            ))}
           </dl>
           <div className={styles.buttons}>
             <a className={styles.primary} href={`/dashboard/accounts/receipt/${encodeURIComponent(receiptNo ?? "")}`}>

@@ -4,6 +4,7 @@
  * the reference numbers the college expects to see on paper.
  */
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -222,9 +223,14 @@ export function assertStorageFor(files: readonly (File | null)[]) {
 /** The original filename never reaches a storage path; only the safe characters of it do. */
 export async function putFile(file: File, folder: string, keySeed: string) {
   const buffer = Buffer.from(await file.arrayBuffer());
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  // Every upload gets its OWN id: two administrators uploading the same picture, or the
+  // same administrator uploading it twice, land on two distinct objects — a cached copy
+  // of one can never be served for the other, and replacing a photo is a new id, not an
+  // overwrite.
+  const photoId = randomUUID();
+  const ext = (file.name.match(/\.(jpg|jpeg|png|webp|gif)$/i)?.[1] ?? "png").toLowerCase();
   return uploadFile(
-    `${folder}/${keySeed}/${Date.now()}-${safeName}`,
+    `${folder}/${keySeed}/${photoId}.${ext}`,
     buffer,
     file.type || "application/octet-stream",
   );

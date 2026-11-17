@@ -28,7 +28,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // Only a super admin switches campus; a campus admin's scope is fixed on their account.
   const campuses =
     scope.role === "SUPERADMIN"
-      ? await prisma.campus.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
+    // Only teaching campuses: the Town Office is paperwork, not a campus, so it never
+    // appears in the scope dropdown (its records stay reachable through its own admin).
+    ? await prisma.campus.findMany({
+        where: { takesApplicants: true },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      })
       : [];
 
   return (

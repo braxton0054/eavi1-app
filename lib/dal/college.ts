@@ -947,6 +947,7 @@ async function campusContext(scope: AdminScope, requested?: string) {
   }
 
   const rows = await prisma.campus.findMany({
+    where: { takesApplicants: true },
     orderBy: { id: "asc" },
     select: { id: true, name: true },
   });
