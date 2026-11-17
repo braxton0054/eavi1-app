@@ -28,6 +28,7 @@ import {
 } from "@/lib/actions/college/_shared";
 import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
 import { normaliseClassName } from "@/lib/academics/classes";
+import { resolveClassForName } from "@/lib/academics/class-reuse";
 import { recordAudit } from "@/lib/academics/audit";
 import { registerEnrolmentUnits } from "@/lib/academics/registration";
 import { syncClassConversation } from "@/lib/chat/class-rooms";
@@ -206,38 +207,29 @@ export async function enrolStudent(formData: FormData) {
     if (classId && !classRecord) throw new FieldError(fieldErrors.choice(pages.classes.fields.class));
     if (className) {
       /*
-       * Scoped to this campus, programme and intake. Scoping to the programme alone meant a name
-       * that already existed in a *different* intake was reused, so typing "ICT/JAN/2026" for a
-       * May joiner could quietly enrol them into the January class.
+       * The name resolves inside the class's real identity — this campus, programme, intake
+       * and name — through the same helper the classes screen uses, so admission cannot grow
+       * a second set of rules. An existing class is reused (an archived one is reopened under
+       * its own ID); a name used by another intake is a different class and does not block.
        */
-      const clash = await prisma.academicClass.findFirst({
-        where: { programId, campusId, periodId: intake.id, name: className },
-        select: { id: true, campusId: true, name: true, status: true },
+      const resolved = await resolveClassForName({
+        campusId,
+        programId,
+        periodId: intake.id,
+        year: intake.year,
+        name: className,
       });
-      if (clash) {
-        // An existing class of that name in this same intake is reused rather than duplicated.
-        if (clash.status !== "ACTIVE") throw new FieldError(pages.classes.nameTaken);
-        classRecord = { id: clash.id, name: clash.name, campusId: clash.campusId };
-      } else {
-        const created = await prisma.academicClass.create({
-          data: {
-            campusId,
-            programId,
-            periodId: intake.id,
-            year: intake.year,
-            name: className,
-          },
-          select: { id: true, name: true, campusId: true },
-        });
-        classRecord = created;
+      classRecord = { id: resolved.id, name: resolved.name, campusId: resolved.campusId };
+
+      if (resolved.reuse !== "reused") {
         await recordAudit({
           campusId,
           actorId: scope.userId,
           actorEmail: scope.email,
-          action: "class.create",
+          action: resolved.reuse === "reactivated" ? "class.reuse" : "class.create",
           entityType: "class",
-          entityId: created.id,
-          detail: { name: className, duringAdmission: true },
+          entityId: resolved.id,
+          detail: { name: className, duringAdmission: true, resolution: resolved.reuse },
         });
       }
     }
