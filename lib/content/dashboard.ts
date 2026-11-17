@@ -1761,6 +1761,13 @@ export const pages = {
       void: "Void",
       noLines: "No items on this invoice yet.",
       noPayments: "Nothing received yet.",
+      /* The invoice and the receipt are one printed design, filled from one record each;
+         these links are where the paper is asked for. */
+      view: "View invoice PDF",
+      download: "Download invoice",
+      receipt: "Receipt",
+      receiptView: "view",
+      receiptDownload: "download",
     },
     empty: {
       title: "No invoices match",
@@ -2373,6 +2380,12 @@ export const studentPortal = {
     ] satisfies Column[],
     paymentsTitle: "Payments received",
     paymentsEmpty: "No payments recorded yet.",
+    /* The documents are built on demand from these same rows, never stored. */
+    invoiceView: "View",
+    invoiceDownload: "Download",
+    receipt: "Receipt",
+    receiptDownload: "download",
+    statement: "Download statement (PDF)",
     paymentColumns: [
       { key: "date", label: "Date" },
       { key: "reference", label: "Reference" },

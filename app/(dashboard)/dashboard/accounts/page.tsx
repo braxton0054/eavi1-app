@@ -77,6 +77,23 @@ export default async function AccountsPage({
 
     const action = (
       <div className="flex w-full flex-wrap items-center gap-2">
+        {/* The invoice document, and every receipt recorded against it, are built from
+            the records on demand — no stored copy to fall out of date. */}
+        <span className="flex flex-wrap items-center gap-1 text-xs">
+          <a
+            href={`/dashboard/accounts/invoice/${encodeURIComponent(invoice.number)}`}
+            className="inline-flex min-h-9 items-center rounded-md px-2 text-eavi-primary-text underline-offset-4 hover:bg-eavi-muted hover:underline"
+          >
+            {copy.card.view}
+          </a>
+          <a
+            href={`/dashboard/accounts/invoice/${encodeURIComponent(invoice.number)}?download=1`}
+            className="inline-flex min-h-9 items-center rounded-md px-2 text-eavi-muted-text underline-offset-4 hover:bg-eavi-muted hover:underline"
+          >
+            {copy.card.download}
+          </a>
+        </span>
+
         <details className="min-w-0">
           <summary className={detail}>
             {copy.card.details}
@@ -109,6 +126,14 @@ export default async function AccountsPage({
                       <span className="text-eavi-muted-text">{payment.reference}</span>
                     ) : null}
                     <span className="text-eavi-muted-text tabular-nums">{formatDate(payment.paidAt)}</span>
+                    {payment.receiptNo ? (
+                      <a
+                        href={`/dashboard/accounts/receipt/${encodeURIComponent(payment.receiptNo)}`}
+                        className="inline-flex min-h-9 items-center text-eavi-primary-text underline-offset-4 hover:underline"
+                      >
+                        {copy.card.receipt} {payment.receiptNo}
+                      </a>
+                    ) : null}
                   </li>
                 ))}
               </ul>

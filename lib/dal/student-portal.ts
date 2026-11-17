@@ -258,6 +258,7 @@ export async function getStudentFees() {
         number: true,
         status: true,
         dueAt: true,
+        createdAt: true,
         periodYear: true,
         periodSemester: true,
         lines: { select: { label: true, amount: true } },
@@ -266,7 +267,7 @@ export async function getStudentFees() {
     prisma.payment.findMany({
       where: { studentId: student.studentId },
       orderBy: { paidAt: "desc" },
-      select: { id: true, amount: true, paidAt: true, reference: true, method: true },
+      select: { id: true, invoiceId: true, amount: true, paidAt: true, reference: true, method: true, receiptNo: true },
     }),
   ]);
 
