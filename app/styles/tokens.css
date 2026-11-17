@@ -223,21 +223,8 @@
  * deleted, these few names are restated here at a higher specificity so the rebuilt
  * tokens are the ones the interface actually reads. This block disappears in Phase 6.
  */
-:root:root {
-  --border: var(--gray-250);
-  --primary: var(--violet-600);
-  --primary-hover: var(--violet-700);
-  --radius-xs: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1.25rem;
-  /* Tailwind's default theme also names these, with its own values. */
-  --shadow-sm: 0 1px 2px rgb(22 28 38 / 0.06);
-  --shadow-md: 0 4px 12px rgb(22 28 38 / 0.08);
-  --shadow-lg: 0 12px 32px rgb(22 28 38 / 0.12);
-  --leading-tight: 1.2;
-  --leading-snug: 1.4;
-  --leading-normal: 1.6;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-}
+/* The old :root:root re-declaration of the shared token names (--border, --primary,
+   --radius-*, --shadow-*, --leading-*, --ease-*) is gone: the layer order above puts
+   this tokens layer after Tailwind's theme layer, so these values win on their own.
+   Note for old screens: legacy rounded-md/lg and shadow-* now use these new values. */
 

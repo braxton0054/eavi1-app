@@ -1,17 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { BellIcon } from "lucide-react";
 
 import { disablePush, enablePush, pushStatus, pushSupported } from "@/lib/notifications/client";
 import { useToast } from "@/components/ui/toast";
 import {
-  Menu,
-  MenuContent,
-  MenuLabel,
-  MenuSeparator,
-  MenuTrigger,
-} from "@/components/ui/menu";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 import styles from "./notification-bell.module.css";
 
@@ -22,6 +21,10 @@ import styles from "./notification-bell.module.css";
  * device's push toggle, and per-kind mutes. The feed is polled lightly (45s, and on
  * return to the tab) — the portal's real-time convention, which needs no extra
  * infrastructure and behaves the same behind any office proxy.
+ *
+ * It is a non-modal Popover rather than the kit's DropdownMenu: the menu variant is
+ * modal — it locks the body while open — and this panel's rows are working controls
+ * (mark read, toggles) that the user must be able to mix with the page behind.
  */
 
 type NotificationItem = {
@@ -53,6 +56,8 @@ function ago(iso: string) {
 
 export function NotificationBell() {
   const toast = useToast();
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -107,13 +112,26 @@ export function NotificationBell() {
     };
   }, [refresh]);
 
-  const openBell = () => {
-    void refresh();
-    void pushStatus().then(setPush);
-    void fetch("/api/notifications/preferences", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { mutedTypes: [] }))
-      .then((d) => setMuted(d.mutedTypes ?? []))
-      .catch(() => undefined);
+  // Any navigation closes the panel: a notification list has nothing to do with the
+  // page the person just moved to, and a stuck popover steals clicks from the new page.
+  const pathnameRef = useRef(pathname);
+  useEffect(() => {
+    if (pathnameRef.current !== pathname) {
+      pathnameRef.current = pathname;
+      setOpen(false);
+    }
+  }, [pathname]);
+
+  const openBell = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen) {
+      void refresh();
+      void pushStatus().then(setPush);
+      void fetch("/api/notifications/preferences", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { mutedTypes: [] }))
+        .then((d) => setMuted(d.mutedTypes ?? []))
+        .catch(() => undefined);
+    }
   };
 
   const markRead = async (ids?: string[]) => {
@@ -127,6 +145,7 @@ export function NotificationBell() {
 
   const openItem = async (item: NotificationItem) => {
     if (!item.isRead) void markRead([item.id]);
+    setOpen(false);
     if (item.targetUrl && item.targetUrl.startsWith("/")) {
       // A hard navigation: the portal re-renders the target page with the session intact.
       window.location.assign(item.targetUrl);
@@ -177,30 +196,32 @@ export function NotificationBell() {
         : "Off for this device.";
 
   return (
-    <Menu>
-      <MenuTrigger asChild>
-        <button type="button" className={styles.bell} aria-label={`Notifications, ${unread} unread`} onClick={openBell}>
+    <Popover open={open} onOpenChange={openBell}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={styles.bell}
+          aria-label={`Notifications, ${unread} unread`}
+          aria-expanded={open}
+        >
           <BellIcon aria-hidden="true" />
           {unread > 0 && <span className={styles.badge}>{unread > 99 ? "99+" : unread}</span>}
         </button>
-      </MenuTrigger>
+      </PopoverTrigger>
 
-      <MenuContent align="end" style={{ width: "min(92vw, 380px)" }}>
-        <MenuLabel>
-          <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-            Notifications
-            {unread > 0 && (
-              <button
-                type="button"
-                onClick={() => void markRead()}
-                style={{ marginLeft: "auto", fontSize: "var(--text-xs)", cursor: "pointer" }}
-              >
-                Mark all as read
-              </button>
-            )}
-          </span>
-        </MenuLabel>
-        <MenuSeparator />
+      <PopoverContent align="end" sideOffset={8} style={{ width: "min(92vw, 380px)" }}>
+        <div className={styles.head} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", padding: "var(--space-2) var(--space-3) 0" }}>
+          <strong style={{ fontSize: "var(--text-sm)" }}>Notifications</strong>
+          {unread > 0 && (
+            <button
+              type="button"
+              onClick={() => void markRead()}
+              style={{ marginLeft: "auto", fontSize: "var(--text-xs)", cursor: "pointer" }}
+            >
+              Mark all as read
+            </button>
+          )}
+        </div>
 
         <div className={styles.feed} role="feed">
           {items.length === 0 ? (
@@ -219,8 +240,6 @@ export function NotificationBell() {
           )}
         </div>
 
-        <MenuSeparator />
-        <MenuLabel>Push notifications</MenuLabel>
         <div className={styles.push}>
           <div className={styles.toggleRow}>
             <span className={styles.pushStatus}>{statusLine}</span>
@@ -236,12 +255,11 @@ export function NotificationBell() {
                 type="checkbox"
                 checked={!muted.includes(type)}
                 onChange={() => void toggleType(type)}
-                disabled={muted === null}
               />
             </label>
           ))}
         </div>
-      </MenuContent>
-    </Menu>
+      </PopoverContent>
+    </Popover>
   );
 }

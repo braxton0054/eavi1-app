@@ -29,6 +29,9 @@
     min-width: 0;
     width: 100%;
     max-width: 90rem;
+    /* Wide screens: the reading column sits centred between the sidebar and the
+       viewport edge instead of hugging the rail. */
+    margin-inline: auto;
     padding-block: var(--space-6);
     padding-inline: var(--space-4);
   }

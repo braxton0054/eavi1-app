@@ -1,0 +1,155 @@
+@layer components {
+  /* The dashboard panel: the kit Card's look, with a flush body — the rows and blocks
+     inside provide their own padding so headers, tables and lists line up exactly. */
+  .root {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--card-pad);
+    border-block-end: 1px solid var(--border);
+  }
+
+  .header[data-row="true"] {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
+  .heading {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .title {
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  .header[data-row="true"] .title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .description {
+    margin-block-start: 2px;
+    font-size: var(--text-sm);
+    line-height: var(--leading-snug);
+    color: var(--text-muted);
+  }
+
+  .aside {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .body {
+    padding: 0;
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--card-pad);
+  }
+
+  /* Stat tiles: the same figures as the kit's StatCard, with an icon and the compact
+     reading the overview grids use. */
+  .tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .tileHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .tileLabel {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--text-muted);
+  }
+
+  .tileIcon {
+    width: 1rem;
+    height: 1rem;
+    color: var(--primary);
+  }
+
+  .tileIcon[data-tone="money"] {
+    color: var(--success, var(--eavi-secondary-text));
+  }
+
+  .tileIcon[data-tone="attention"] {
+    color: var(--warning, var(--eavi-warn-text));
+  }
+
+  .tileValue {
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+
+  .tileValue[data-tone="money"] {
+    color: var(--eavi-secondary-text);
+  }
+
+  .tileValue[data-tone="attention"] {
+    color: var(--eavi-warn-text);
+  }
+
+  .tileHint {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  .tileCompact {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+    padding: calc(var(--space-2) + 2px) var(--space-3);
+    border-radius: var(--radius-md);
+  }
+
+  .tileCompact .tileIcon {
+    flex-shrink: 0;
+  }
+
+  .tileCompact .tileValue {
+    font-size: var(--text-xl);
+    line-height: 1;
+  }
+
+  .tileCompactBody {
+    display: grid;
+    min-width: 0;
+  }
+}

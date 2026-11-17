@@ -1,10 +1,11 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { icons } from "@/components/dashboard/icons";
 import { common, type DashboardIcon } from "@/lib/content/dashboard";
+
+import styles from "./panel.module.css";
 
 export function PageHeader({
   title,
@@ -40,27 +41,24 @@ export function Panel({
   description?: string;
   aside?: ReactNode;
   children: ReactNode;
-} & ComponentPropsWithoutRef<typeof Card>) {
+} & ComponentPropsWithoutRef<"section">) {
+  const hasHeader = Boolean(title || aside);
   return (
-    <Card className={cn("gap-0 py-0 shadow-eavi-card ring-0", props.className)}>
-      {(title || aside) && (
-        <CardHeader
-          className={cn(
-            "flex flex-col items-start gap-3 border-b border-eavi-border py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4",
-            // The registry header is a two-column grid; this layout is a flex row, so the
-            // grid template has to be dropped or the title and the aside become columns.
-            "grid-cols-none grid-rows-none",
-          )}
-        >
-          <div className="min-w-0 sm:flex-1">
-            {title ? <CardTitle className="text-base sm:truncate">{title}</CardTitle> : null}
-            {description ? <CardDescription className="mt-0.5">{description}</CardDescription> : null}
+    <section
+      {...props}
+      className={cn(styles.root, props.className)}
+    >
+      {hasHeader && (
+        <div className={styles.header} data-row={Boolean(aside) || undefined}>
+          <div className={styles.heading}>
+            {title ? <h2 className={styles.title}>{title}</h2> : null}
+            {description ? <p className={styles.description}>{description}</p> : null}
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{aside}</div>
-        </CardHeader>
+          {aside ? <div className={styles.aside}>{aside}</div> : null}
+        </div>
       )}
-      <CardContent className="p-0">{children}</CardContent>
-    </Card>
+      <div className={styles.body}>{children}</div>
+    </section>
   );
 }
 
@@ -106,38 +104,32 @@ export function StatTile({
   hint?: string;
 }) {
   const Icon = icons[icon];
-  const valueTone =
-    tone === "money" ? "text-eavi-secondary-text" : tone === "attention" ? "text-eavi-warn-text" : undefined;
 
   if (compact) {
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-eavi-border bg-eavi-card px-3 py-2.5 shadow-eavi-card">
-        <Icon
-          aria-hidden
-          className={cn(
-            "size-4 shrink-0",
-            tone === "attention" ? "text-eavi-warn-text" : tone === "money" ? "text-eavi-secondary-text" : "text-eavi-primary-text",
-          )}
-        />
-        <p className={cn("min-w-0 text-xl leading-none font-semibold tabular-nums tracking-tight", valueTone)}>{value}</p>
-        <div className="min-w-0">
-          <p className="truncate text-xs leading-tight text-eavi-muted-text">{label}</p>
-          {hint ? <p className="truncate text-[11px] leading-tight text-eavi-muted-text">{hint}</p> : null}
+      <div className={cn(styles.tile, styles.tileCompact)}>
+        <Icon aria-hidden className={cn(styles.tileIcon)} data-tone={tone} />
+        <p className={cn(styles.tileValue)} data-tone={tone === "neutral" ? undefined : tone}>
+          {value}
+        </p>
+        <div className={styles.tileCompactBody}>
+          <p className={styles.tileLabel}>{label}</p>
+          {hint ? <p className={styles.tileHint}>{hint}</p> : null}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-eavi-border bg-eavi-card p-4 shadow-eavi-card">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-eavi-muted-text">{label}</span>
-        <Icon aria-hidden className={cn("size-4", tone === "money" ? "text-eavi-secondary-text" : tone === "attention" ? "text-eavi-warn-text" : "text-eavi-primary-text")} />
+    <div className={styles.tile}>
+      <div className={styles.tileHead}>
+        <span className={styles.tileLabel}>{label}</span>
+        <Icon aria-hidden className={styles.tileIcon} data-tone={tone === "neutral" ? undefined : tone} />
       </div>
-      <p className={cn("text-2xl font-semibold tabular-nums tracking-tight", valueTone)}>
+      <p className={styles.tileValue} data-tone={tone === "neutral" ? undefined : tone}>
         {value}
       </p>
-      {hint ? <p className="text-xs text-eavi-muted-text">{hint}</p> : null}
+      {hint ? <p className={styles.tileHint}>{hint}</p> : null}
     </div>
   );
 }
@@ -152,7 +144,8 @@ export function DetailList({ items }: { items: { label: string; value: ReactNode
       {items.map((item) => (
         <div
           key={item.label}
-          className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-4 py-2.5 sm:px-5"
+          className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2.5"
+          style={{ paddingInline: "var(--card-pad)" }}
         >
           <dt className="text-xs text-eavi-muted-text sm:text-sm">{item.label}</dt>
           <dd className="min-w-0 text-sm font-medium break-words text-right">{item.value}</dd>
@@ -212,7 +205,7 @@ export function Notice({
 
 export function PanelSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="space-y-3 p-5" role="status" aria-label={common.loading}>
+    <div className={styles.skeleton} role="status" aria-label={common.loading}>
       {Array.from({ length: rows }, (_, index) => (
         <Skeleton key={index} className="h-10 w-full rounded-lg" />
       ))}
