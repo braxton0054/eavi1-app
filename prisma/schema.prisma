@@ -125,14 +125,6 @@ enum UnitStatus {
 }
 
 /// The three admission windows EAVI runs each year. Admissions happen every month, but
-/// every student is placed in one of these — a February admission joins the January
-/// intake. Nothing else may be used as an intake month.
-enum OfficialIntake {
-  JANUARY
-  MAY
-  SEPTEMBER
-}
-
 /// What a class record is allowed to represent. A regular class is the default; the other
 /// two exist so offices do not have to invent ad-hoc programmes to hold unusual groups.
 /// Merging is only ever done between classes of the same programme and campus.
@@ -364,7 +356,9 @@ model FeeCadence {
 model Program {
   id                     String                  @id @default(uuid())
   code                   String                  @unique
-  name                   String
+  /// Unique among live programmes: a duplicate name is the same programme entered twice,
+  /// and the office must never bill a student on a row their fee plan is not attached to.
+  name                   String                  @unique
   departmentId           String
   department             Department              @relation(fields: [departmentId], references: [id])
   bodyId                 String

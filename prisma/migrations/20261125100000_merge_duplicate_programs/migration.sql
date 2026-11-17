@@ -46,4 +46,9 @@ SET "name" = p.name || ' (archived ' || to_char(now(), 'YYYY-MM-DD') || ')',
 WHERE p.id IN (SELECT twin_id FROM _twins);
 
 -- A programme's name is unique among live programmes.
-CREATE UNIQUE INDEX "programs_name_key" ON "programs"("name");
+--
+-- `IF NOT EXISTS` because the index is declared on the model (`Program.name @unique`): a
+-- database migrated from scratch already has it from the table's own constraint, while a
+-- database that ran the merge by hand has it from that run. Either way this is a no-op or
+-- the one place the index is born, never a duplicate.
+CREATE UNIQUE INDEX IF NOT EXISTS "programs_name_key" ON "programs"("name");

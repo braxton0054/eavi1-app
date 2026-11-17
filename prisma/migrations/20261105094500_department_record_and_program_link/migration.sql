@@ -11,17 +11,11 @@ CREATE TABLE "departments" (
 -- CreateIndex
 CREATE UNIQUE INDEX "departments_name_key" ON "departments"("name");
 
--- Backfill: one department per distinct spelling already typed onto a programme
+-- Backfill: one department per distinct spelling already typed onto a programme.
+-- Removed: the `department` text column it read from was never created — its migration was
+-- superseded by this one twenty minutes after it was written. The office creates the
+-- departments it needs in the app, then attaches programmes to them.
 ALTER TABLE "programs" ADD COLUMN "departmentId" TEXT;
-
-INSERT INTO "departments" ("id", "name", "createdAt", "updatedAt")
-SELECT gen_random_uuid()::text, p."department", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-FROM (SELECT DISTINCT "department" FROM "programs" WHERE "department" IS NOT NULL) AS p;
-
-UPDATE "programs" AS pr
-SET "departmentId" = d."id"
-FROM "departments" AS d
-WHERE d."name" = pr."department";
 
 -- RequiredColumn
 ALTER TABLE "programs" ALTER COLUMN "departmentId" SET NOT NULL;
@@ -33,6 +27,3 @@ CREATE INDEX "programs_departmentId_idx" ON "programs"("departmentId");
 ALTER TABLE "programs" ADD CONSTRAINT "programs_departmentId_fkey"
     FOREIGN KEY ("departmentId") REFERENCES "departments"("id")
     ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AlterTable
-ALTER TABLE "programs" DROP COLUMN "department";
