@@ -102,3 +102,17 @@
     }
   }
 }
+
+/*
+ * EMERGENCY HOTFIX — remove when the popup animations move out of the CSS Modules.
+ *
+ * CSS Modules hash animation names, so the modules' `animation: eavi-pop-out` rules
+ * reference hashed keyframes that do not exist. Radix Presence waits for the matching
+ * animationend before unmounting a closing popup; with no real keyframes the event
+ * never fires, the popup never unmounts, and the body scroll/pointer lock it holds
+ * freezes the whole page until a reload. This rule makes every closing popup finish
+ * immediately: no exit animation, but the lock is always released.
+ */
+[data-state="closed"] {
+  animation: none !important;
+}
