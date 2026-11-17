@@ -12,6 +12,20 @@ function client() {
   });
 }
 
+/**
+ * The bucket name the API calls must use.
+ *
+ * Contabo scopes buckets per account: the API form is `<accountId>:<bucket>` whenever the
+ * account id is set. The plain name answers a HEAD but rejects a PUT with
+ * InvalidAccessKeyId, which reads like bad credentials and sends you hunting in the wrong
+ * panel — the public URL already carries the same prefix (see uploadFile).
+ */
+function apiBucket() {
+  const bucket = process.env.S3_BUCKET!;
+  const accountId = process.env.S3_ACCOUNT_ID;
+  return accountId ? `${accountId}:${bucket}` : bucket;
+}
+
 /** Identifies an object without exposing how to reach it. */
 function keyFromUrl(url: string): string {
   const endpoint = process.env.S3_ENDPOINT?.replace(/\/$/, "") ?? "";
@@ -31,10 +45,9 @@ export function storageConfigured() {
 }
 
 export async function uploadFile(key: string, body: Buffer, contentType: string) {
-  const bucket = process.env.S3_BUCKET!;
   await client().send(
     new PutObjectCommand({
-      Bucket: bucket,
+      Bucket: apiBucket(),
       Key: key,
       Body: body,
       ContentType: contentType,
@@ -45,10 +58,10 @@ export async function uploadFile(key: string, body: Buffer, contentType: string)
   // Contabo public object URLs include the account id prefix.
   const accountId = process.env.S3_ACCOUNT_ID;
   if (accountId) {
-    return `${endpoint}/${accountId}:${bucket}/${key}`;
+    return `${endpoint}/${accountId}:${process.env.S3_BUCKET}/${key}`;
   }
   if (process.env.S3_FORCE_PATH_STYLE === "true") {
-    return `${endpoint}/${bucket}/${key}`;
+    return `${endpoint}/${process.env.S3_BUCKET}/${key}`;
   }
   return `${endpoint}/${key}`;
 }
@@ -62,7 +75,7 @@ export async function uploadFile(key: string, body: Buffer, contentType: string)
 export async function uploadPrivateFile(key: string, body: Buffer, contentType: string) {
   await client().send(
     new PutObjectCommand({
-      Bucket: process.env.S3_BUCKET!,
+      Bucket: apiBucket(),
       Key: key,
       Body: body,
       ContentType: contentType,
@@ -75,7 +88,7 @@ export async function uploadPrivateFile(key: string, body: Buffer, contentType: 
 /** Streams an object back for a server-side download. The browser never sees the bucket URL. */
 export async function readFile(key: string) {
   const response = await client().send(
-    new GetObjectCommand({ Bucket: process.env.S3_BUCKET!, Key: key }),
+    new GetObjectCommand({ Bucket: apiBucket(), Key: key }),
   );
   if (!response.Body) return null;
   const bytes = await response.Body.transformToByteArray();
@@ -88,7 +101,7 @@ export async function readFile(key: string) {
  */
 export async function deleteFile(key: string): Promise<boolean> {
   try {
-    await client().send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET!, Key: key }));
+    await client().send(new DeleteObjectCommand({ Bucket: apiBucket(), Key: key }));
     return true;
   } catch (error) {
     const name = (error as { name?: string }).name ?? "";
