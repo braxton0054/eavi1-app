@@ -15,12 +15,8 @@
     line-height: var(--leading-snug);
     box-shadow: var(--shadow-md);
     transform-origin: var(--radix-tooltip-content-transform-origin);
-    animation: eavi-pop-in var(--dur-fast) var(--ease-out);
   }
 
-  .content[data-state="closed"] {
-    animation: eavi-pop-out var(--dur-fast) var(--ease-out);
-  }
 
   /* The panel settles in from the side it is attached to. */
   .content[data-side="bottom"] {

@@ -11,12 +11,8 @@
     box-shadow: var(--shadow-md);
     color: var(--text);
     transform-origin: var(--radix-dropdown-menu-content-transform-origin);
-    animation: eavi-pop-in var(--dur-fast) var(--ease-out);
   }
 
-  .content[data-state="closed"] {
-    animation: eavi-pop-out var(--dur-fast) var(--ease-out);
-  }
 
   .item {
     position: relative;
@@ -122,10 +118,6 @@
     box-shadow: var(--shadow-md);
     color: var(--text);
     transform-origin: var(--radix-dropdown-menu-content-transform-origin);
-    animation: eavi-pop-in var(--dur-fast) var(--ease-out);
   }
 
-  .subContent[data-state="closed"] {
-    animation: eavi-pop-out var(--dur-fast) var(--ease-out);
-  }
 }

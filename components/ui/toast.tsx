@@ -120,6 +120,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <div
             key={item.id}
             className={styles.toast}
+            data-slot="toast"
             data-variant={item.variant ?? "default"}
             onMouseEnter={() => pause(item.id)}
             onMouseLeave={() => resume(item.id)}
