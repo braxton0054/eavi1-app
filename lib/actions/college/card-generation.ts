@@ -1,5 +1,7 @@
 "use server";
 
+import { createHash } from "node:crypto";
+
 import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
@@ -12,6 +14,18 @@ const copy = pages.cards.generate;
 
 /** A run larger than this is refused rather than left to spin until the request times out. */
 const MAX_CARDS = 400;
+
+const targetKey = (target: CardTarget) =>
+  target.kind === "student" ? target.studentId : target.kind === "class" ? target.classId : target.intakeId;
+
+/**
+ * How long a repeated request is treated as the same request.
+ *
+ * Long enough to cover a double click, a slow network and two officers printing the same
+ * class in the same coffee break; short enough that next week's reprint after a correction
+ * is a new run rather than a silent return of the old one.
+ */
+const REQUEST_WINDOW_MS = 10 * 60_000;
 
 /** Reads the picker into a target, so the action never guesses who is included. */
 function readTarget(formData: FormData): CardTarget | null {
@@ -77,6 +91,33 @@ export async function generateCards(formData: FormData) {
   if (candidates.length === 0) redirect("/dashboard/cards?empty=1");
   if (candidates.length > MAX_CARDS) redirect("/dashboard/cards?tooMany=1");
 
+  /*
+   * The request's fingerprint: the campus, the target and the students it actually covers.
+   * A class run is therefore reusable — the same class with the same roster resolves to the
+   * run already queued, instead of rendering one PDF per officer who clicks Print.
+   */
+  const actionHash = createHash("sha256")
+    .update(
+      [
+        scope.campusId ?? "all",
+        target.kind,
+        targetKey(target),
+        ...candidates.map((candidate) => candidate.studentId).sort(),
+      ].join("|"),
+    )
+    .digest("hex");
+
+  const inFlight = await prisma.cardBatch.findFirst({
+    where: {
+      actionHash,
+      status: { not: "FAILED" },
+      createdAt: { gte: new Date(Date.now() - REQUEST_WINDOW_MS) },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  if (inFlight) redirect(`/dashboard/cards/batches/${inFlight.id}`);
+
   const batch = await prisma.cardBatch.create({
     data: {
       campusId: scope.campusId,
@@ -85,6 +126,7 @@ export async function generateCards(formData: FormData) {
       sheetCount: 0,
       fileUrl: null,
       status: "PENDING",
+      actionHash,
       actorId: scope.userId,
       actorEmail: scope.email,
     },

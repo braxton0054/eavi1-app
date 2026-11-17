@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { Job } from "bullmq";
 
 import { prisma } from "@/lib/prisma";
@@ -31,6 +33,57 @@ export async function processCardBatch(job: Job<CardBatchJobData>) {
   const { cards } = await buildPrintableCards(target, campusId);
   await job.updateProgress(15);
 
+  /*
+   * What the run will actually print: the serials and the merged faces. If a finished run
+   * already holds this exact content, its PDF is the right file — the same cards, already
+   * rendered and already stored. Reusing it saves the render and, more importantly, a second
+   * copy of an identical PDF in object storage.
+   */
+  const contentHash = createHash("sha256")
+    .update(cards.map((card) => `${card.serial}|${card.frontSvg}|${card.backSvg}`).join("\n"))
+    .digest("hex");
+
+  const sameContent =
+    cards.length > 0
+      ? await prisma.cardBatch.findFirst({
+          where: {
+            contentHash,
+            status: "COMPLETE",
+            fileUrl: { not: null },
+            campusId,
+            id: { not: batchId },
+          },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, fileUrl: true, sheetCount: true },
+        })
+      : null;
+
+  if (sameContent) {
+    await prisma.cardBatch.update({
+      where: { id: batchId },
+      data: {
+        cardCount: cards.length,
+        sheetCount: sameContent.sheetCount,
+        fileUrl: sameContent.fileUrl,
+        contentHash,
+        status: "COMPLETE",
+      },
+    });
+    await job.updateProgress(100);
+
+    await recordAudit({
+      campusId,
+      actorId,
+      actorEmail,
+      action: "card.reuse",
+      entityType: "card",
+      entityId: batchId,
+      detail: { cards: cards.length, reusedFrom: sameContent.id },
+    });
+
+    return { batchId, cards: cards.length, sheets: sameContent.sheetCount, reused: sameContent.id };
+  }
+
   const { sheets } = paginateSheets(cards);
 
   // Fronts and backs are separate pages, in sheet order, so a duplex print flips cleanly.
@@ -54,7 +107,7 @@ export async function processCardBatch(job: Job<CardBatchJobData>) {
 
   await prisma.cardBatch.update({
     where: { id: batchId },
-    data: { cardCount: cards.length, sheetCount: sheets.length, fileUrl, status: "COMPLETE" },
+    data: { cardCount: cards.length, sheetCount: sheets.length, fileUrl, contentHash, status: "COMPLETE" },
   });
 
   await job.updateProgress(100);

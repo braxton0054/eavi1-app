@@ -1187,11 +1187,22 @@ model CardBatch {
   /// Where the run stands. COMPLETE is the default so every run recorded before the
   /// queue existed reads exactly as it always did: done.
   status      CardBatchStatus @default(COMPLETE)
+  /// Fingerprint of the REQUEST: campus, target and the students it covered. A double
+  /// submit — or two officers printing the same class together — resolves to the run that
+  /// is already queued instead of queueing a second identical render.
+  actionHash  String?
+  /// Fingerprint of the RENDERED content. A re-run whose cards are unchanged reuses the
+  /// PDF already in object storage: no second render, and no second copy of the file.
+  contentHash String?
   actorId     String?
   actorEmail  String?
   createdAt   DateTime @default(now())
 
   @@index([campusId, createdAt])
+  /// Both lookups are "the newest run with this fingerprint", so the index carries the
+  /// sort column too rather than filtering a campus's whole history.
+  @@index([actionHash, createdAt])
+  @@index([contentHash, createdAt])
   @@map("card_batches")
 }
 
