@@ -488,6 +488,14 @@ const profilePhoto = {
   preview: "Your profile photo",
 };
 
+/**
+ * Custom periods are legacy only: an existing programme may still use them, but new
+ * programmes are planned around one of the three standard structures.
+ */
+export const programStructureChoices = Object.fromEntries(
+  Object.entries(labels.programStructure).filter(([structure]) => structure !== "CUSTOM"),
+) as Omit<typeof labels.programStructure, "CUSTOM">;
+
 export const pages = {
   chat: {
     title: "Chat",
@@ -1037,8 +1045,8 @@ export const pages = {
           label: "Delivery structure",
           type: "select",
           required: true,
-          options: toOptions(labels.programStructure),
-          hint: "Decides how units are grouped: by semester, by month, by module, or your own periods.",
+          options: toOptions(programStructureChoices),
+          hint: "Decides how units are grouped: by semester, by month, or by module.",
         },
         { name: "durationMonths", label: "Duration (months)", type: "number", required: true, step: "1", hint: "Whole months only. A two-year course is 24." },
         { name: "minKcseGrade", label: "Minimum KCSE grade", type: "select", required: true, options: toOptions(labels.entryGrade) },
@@ -1454,6 +1462,7 @@ export const pages = {
           type: "select",
           required: true,
           optionKey: "campuses",
+          placeholder: "Choose a campus…",
           hint: "The campus this tutor will teach at.",
         },
         { name: "fullName", label: "Full name", type: "text", required: true },

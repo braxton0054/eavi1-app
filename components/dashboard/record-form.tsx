@@ -53,7 +53,11 @@ function Control({
         defaultValue={value}
         className={cn(control, "appearance-none bg-eavi-card")}
       >
-        {field.required ? null : <option value="">{common.none}</option>}
+        {field.required
+          ? field.placeholder
+            ? <option value="" disabled>{field.placeholder}</option>
+            : null
+          : <option value="">{common.none}</option>}
         {choices.map((choice) => (
           <option key={choice.value} value={choice.value}>
             {choice.label}

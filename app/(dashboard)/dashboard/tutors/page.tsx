@@ -23,9 +23,9 @@ const accountTone: Record<string, ChipTone> = {
 export default async function TutorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; invalid?: string }>;
+  searchParams: Promise<{ q?: string; invalid?: string; reason?: string }>;
 }) {
-  const { q, invalid } = await searchParams;
+  const { q, invalid, reason } = await searchParams;
   const scope = await requireCollegeAdmin();
 
   const [tutors, programOptions, campusOptions] = await Promise.all([
@@ -87,7 +87,7 @@ export default async function TutorsPage({
     <div className="space-y-6">
       <PageHeader title={copy.title} />
 
-      {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
+      {invalid ? <Notice tone="warning" title={common.errorTitle} body={reason || common.invalidSubmit} /> : null}
 
       <DisclosureForm
         id="new-tutor"
@@ -95,6 +95,7 @@ export default async function TutorsPage({
         title={copy.create.title}
         fields={copy.create.fields}
         options={options}
+        values={{ campusId: scope.campusId === null ? undefined : String(scope.campusId) }}
         action={createTutor}
         submitLabel={common.create}
       />

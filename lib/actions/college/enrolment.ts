@@ -51,6 +51,11 @@ async function maybeUpload(
   return putFile(value, folder, keySeed);
 }
 
+/** "Other" is a prompt to type the town below, not a town to store. */
+function addressLine(county?: string, subCounty?: string, town?: string, detail?: string) {
+  return [county, subCounty, town && town !== "Other" ? town : null, detail].filter(Boolean).join(", ") || null;
+}
+
 function all(formData: FormData, name: string): string[] {
   return formData.getAll(name).map((v) => String(v ?? "").trim());
 }
@@ -268,7 +273,12 @@ export async function enrolStudent(formData: FormData) {
             gender,
             dateOfBirth,
             nationalId,
-            address: [text(formData, "addressCounty"), text(formData, "addressSubCounty"), text(formData, "addressDetail")].filter(Boolean).join(", ") || null,
+            address: addressLine(
+              text(formData, "addressCounty") ?? undefined,
+              text(formData, "addressSubCounty") ?? undefined,
+              text(formData, "addressTown") ?? undefined,
+              text(formData, "addressDetail") ?? undefined,
+            ),
             primarySchool,
             secondarySchool,
             primarySchoolDocUrl,
@@ -373,6 +383,7 @@ export async function enrolStudent(formData: FormData) {
       const gOccs = all(formData, "guardianOccupation");
       const gCounties = all(formData, "guardianCounty");
       const gSubs = all(formData, "guardianSubCounty");
+      const gTowns = all(formData, "guardianTown");
       const gDetails = all(formData, "guardianDetail");
       for (let i = 0; i < gNames.length; i++) {
         if (!gNames[i]) continue;
@@ -385,7 +396,7 @@ export async function enrolStudent(formData: FormData) {
             altPhone: gAltPhones[i] || null,
             email: gEmails[i] || null,
             occupation: gOccs[i] || null,
-            address: [gCounties[i], gSubs[i], gDetails[i]].filter(Boolean).join(", ") || null,
+            address: addressLine(gCounties[i], gSubs[i], gTowns[i], gDetails[i]),
           },
         });
       }
@@ -397,6 +408,7 @@ export async function enrolStudent(formData: FormData) {
       const eAltPhones = all(formData, "emergencyAltPhone");
       const eCounties = all(formData, "emergencyCounty");
       const eSubs = all(formData, "emergencySubCounty");
+      const eTowns = all(formData, "emergencyTown");
       const eDetails = all(formData, "emergencyDetail");
       for (let i = 0; i < eNames.length; i++) {
         if (!eNames[i] || !ePhones[i]) continue;
@@ -407,7 +419,7 @@ export async function enrolStudent(formData: FormData) {
             relationship: eRels[i] || "Emergency",
             phone: ePhones[i],
             altPhone: eAltPhones[i] || null,
-            address: [eCounties[i], eSubs[i], eDetails[i]].filter(Boolean).join(", ") || null,
+            address: addressLine(eCounties[i], eSubs[i], eTowns[i], eDetails[i]),
           },
         });
       }

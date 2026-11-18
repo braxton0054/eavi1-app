@@ -78,17 +78,20 @@ function EnrolSubmitButton() {
 function LocationPicker({ prefix, label = "Residential address" }: { prefix: string; label?: string }) {
   const [county, setCounty] = useState("");
   const [subCounty, setSubCounty] = useState("");
+  const [town, setTown] = useState("");
   const countyObj = KENYA_COUNTIES.find((c) => c.name === county);
+  const towns = countyObj?.townsBySubCounty?.[subCounty] ?? [];
   return (
     <div className="space-y-2 sm:col-span-2">
       <span className={labelCls}>{label}</span>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className={`grid gap-3 ${towns.length ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
         <select
           name={`${prefix}County`}
           value={county}
           onChange={(e) => {
             setCounty(e.target.value);
             setSubCounty("");
+            setTown("");
           }}
           className={inputCls}
         >
@@ -102,7 +105,10 @@ function LocationPicker({ prefix, label = "Residential address" }: { prefix: str
         <select
           name={`${prefix}SubCounty`}
           value={subCounty}
-          onChange={(e) => setSubCounty(e.target.value)}
+          onChange={(e) => {
+            setSubCounty(e.target.value);
+            setTown("");
+          }}
           className={inputCls}
           disabled={!countyObj}
         >
@@ -113,7 +119,27 @@ function LocationPicker({ prefix, label = "Residential address" }: { prefix: str
             </option>
           ))}
         </select>
-        <input name={`${prefix}Detail`} placeholder="Town / estate / street" className={inputCls} />
+        {towns.length ? (
+          <select
+            name={`${prefix}Town`}
+            value={town}
+            onChange={(e) => setTown(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">Town ({towns.length})…</option>
+            {towns.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+            <option value="Other">Other (specify below)</option>
+          </select>
+        ) : null}
+        <input
+          name={`${prefix}Detail`}
+          placeholder={towns.length ? "Estate / street / landmark" : "Town / estate / street"}
+          className={inputCls}
+        />
       </div>
     </div>
   );

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { EntryGrade, FeePeriodKind, ProgramStructure } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
-import { fieldErrors, pages } from "@/lib/content/dashboard";
+import { fieldErrors, pages, programStructureChoices } from "@/lib/content/dashboard";
 import {
   FieldError,
   assertStorageFor,
@@ -29,8 +29,12 @@ const GRADES = Object.keys(EntryGrade) as (keyof typeof EntryGrade)[];
 /** The billing periods a registered payment type can stand for. */
 const FEE_KINDS = Object.keys(FeePeriodKind) as (keyof typeof FeePeriodKind)[];
 
-/** Semesters, months, modules or a hand-built structure. */
+/** Existing programmes may still be custom; new ones only use the structures on the form. */
 const STRUCTURES = Object.keys(ProgramStructure) as (keyof typeof ProgramStructure)[];
+const NEW_STRUCTURES = Object.keys(programStructureChoices) as Exclude<
+  keyof typeof ProgramStructure,
+  "CUSTOM"
+>[];
 
 const copy = pages.programs;
 const settings = copy.settings;
@@ -86,7 +90,10 @@ async function allCampuses() {
 }
 
 /** Every answer the programme form collects, in the order a create and an edit both need it. */
-async function programmeAnswers(formData: FormData) {
+async function programmeAnswers(
+  formData: FormData,
+  allowedStructures: readonly (keyof typeof ProgramStructure)[] = STRUCTURES,
+) {
   const name = requiredText(formData, "name", fieldLabel("name"));
   const durationMonths = requiredNumber(formData, "durationMonths", fieldLabel("durationMonths"));
   if (durationMonths < 1) throw new FieldError(fieldErrors.number(fieldLabel("durationMonths")));
@@ -99,7 +106,7 @@ async function programmeAnswers(formData: FormData) {
   const type = await codedChoice("programType", requiredText(formData, "typeId", fieldLabel("typeId")), fieldLabel("typeId"));
   const cadenceId = await cadenceChoice(requiredText(formData, "cadenceId", fieldLabel("cadenceId")), fieldLabel("cadenceId"));
   const minKcseGrade = enumField(formData, "minKcseGrade", GRADES, fieldLabel("minKcseGrade"));
-  const structure = enumField(formData, "structure", STRUCTURES, fieldLabel("structure"));
+  const structure = enumField(formData, "structure", allowedStructures, fieldLabel("structure"));
 
   return {
     name,
@@ -148,7 +155,7 @@ export async function createProgram(formData: FormData) {
   await requireCollegeAdmin();
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
-    const answers = await programmeAnswers(formData);
+    const answers = await programmeAnswers(formData, NEW_STRUCTURES);
     const documents = await programmeDocuments(formData);
 
     // The catalogue is shared: a programme created on any campus belongs to every campus.
