@@ -2,7 +2,7 @@
 
 import { UnitStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
-import { requireCollegeAdmin } from "@/lib/session";
+import { requireCollegeAdmin, requireSuperAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -51,7 +51,7 @@ async function scopedProgram(programId: string, campusId: number | null) {
 }
 
 export async function createUnit(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.title);
 
   return onSave(`/dashboard/programs/${programId}/units`, affected(programId), async () => {
@@ -69,7 +69,7 @@ export async function createUnit(formData: FormData) {
  * structure rather than trusted from the form, so a placement can only name a real stage.
  */
 export async function assignProgramUnit(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  const scope = await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.title);
 
   return onSave(`/dashboard/programs/${programId}/units`, affected(programId), async () => {
@@ -139,7 +139,7 @@ export async function assignProgramUnit(formData: FormData) {
 
 /** A placement that a student has a result against is history and may not be removed. */
 export async function removeProgramUnit(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  const scope = await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.title);
 
   return onSave(`/dashboard/programs/${programId}/units`, affected(programId), async () => {
@@ -158,7 +158,7 @@ export async function removeProgramUnit(formData: FormData) {
 }
 
 export async function createProgramModule(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  const scope = await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.title);
 
   return onSave(`/dashboard/programs/${programId}/units`, affected(programId), async () => {
@@ -186,7 +186,7 @@ export async function createProgramModule(formData: FormData) {
 }
 
 export async function updateProgramModule(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  const scope = await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.title);
 
   return onSave(`/dashboard/programs/${programId}/units`, affected(programId), async () => {
@@ -213,7 +213,7 @@ export async function updateProgramModule(formData: FormData) {
 }
 
 export async function removeProgramModule(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  const scope = await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.title);
 
   return onSave(`/dashboard/programs/${programId}/units`, affected(programId), async () => {

@@ -5,6 +5,7 @@ import {
   updatePeriod,
 } from "@/lib/actions/college/calendar";
 import { getCalendar } from "@/lib/dal/college";
+import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { Label } from "@/components/ui/label";
@@ -80,6 +81,10 @@ export default async function CalendarPage({
   const { year, campus, invalid, reason } = await searchParams;
 
   const view = await getCalendar(year, campus);
+  const scope = await requireCollegeAdmin();
+  // The academic calendar is college-wide and kept by the super admin. A campus office
+  // reads it (including past years) but never creates or changes a period or an event.
+  const canManage = view.editable && scope.role === "SUPERADMIN";
   const collegeAdmin = view.campuses.length > 0;
 
   // Every link has to keep the campus a super admin chose, or the next read falls back to
@@ -125,7 +130,7 @@ export default async function CalendarPage({
             ? ("upcoming" as const)
             : ("current" as const),
       isCurrent: running,
-      canEdit: view.editable && slot.editable,
+      canEdit: canManage && slot.editable,
     };
   });
 
@@ -208,7 +213,7 @@ export default async function CalendarPage({
         />
       )}
 
-      {view.editable ? (
+      {canManage ? (
         <DisclosureForm
           id="new-period"
           button={copy.semesters.create.button}
@@ -448,6 +453,7 @@ export default async function CalendarPage({
                       <StatusChip tone={eventTone[event.type] ?? "neutral"}>
                         {labels.calendarEventType[event.type]}
                       </StatusChip>
+                      {canManage ? (
                       <RowForm
                         id={`remove-college-event-${event.id}`}
                         button={common.remove}
@@ -457,12 +463,14 @@ export default async function CalendarPage({
                         submitLabel={common.remove}
                         tone="danger"
                       />
+                      ) : null}
                     </span>
                   </li>
                 ))}
               </ul>
             )}
 
+            {canManage ? (
             <RowForm
               id="new-college-event"
               button={copy.events.college.button}
@@ -470,6 +478,7 @@ export default async function CalendarPage({
               action={createEvent}
               submitLabel={common.create}
             />
+            ) : null}
           </div>
         </Panel>
       ) : null}

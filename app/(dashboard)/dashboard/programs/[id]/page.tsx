@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 
 import { archiveProgram, deleteProgram, updateProgram } from "@/lib/actions/college/programs";
 import { getProgramDetail, getProgramRegistryOptions } from "@/lib/dal/college";
+import { requireCollegeAdmin } from "@/lib/session";
 import type { OptionSets } from "@/components/dashboard/record-form";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { RowForm } from "@/components/dashboard/record-form";
 import { DetailList, EmptyState, PageHeader, Panel, StatTile } from "@/components/dashboard/panel";
+import { PrintButton } from "@/components/dashboard/print-button";
 import { SectionTabs } from "@/components/dashboard/section-tabs";
 import { StatusChip } from "@/components/dashboard/status-chip";
 import { describeTrigger } from "@/lib/academics/structure";
@@ -26,6 +28,9 @@ export default async function ProgramDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const scope = await requireCollegeAdmin();
+  // Only the super admin changes the shared catalogue. A campus office reads and prints it.
+  const canManage = scope.role === "SUPERADMIN";
 
   let data: Awaited<ReturnType<typeof getProgramDetail>> | null = null;
   try {
@@ -142,6 +147,7 @@ export default async function ProgramDetailPage({
 
         <PageHeader
           title={program.name}
+          action={<PrintButton label={common.print} />}
           meta={
             <div className="mt-1.5 space-y-1.5 text-sm text-eavi-muted-text">
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -220,6 +226,7 @@ export default async function ProgramDetailPage({
             </div>
           </Panel>
 
+          {canManage ? (
           <Panel title={detail.actions}>
             <div className="flex flex-col gap-3 px-4 py-3">
               <div className="flex flex-wrap gap-2">
@@ -266,6 +273,7 @@ export default async function ProgramDetailPage({
               </div>
             </div>
           </Panel>
+          ) : null}
         </div>
       </div>
 

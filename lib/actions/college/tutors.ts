@@ -3,7 +3,7 @@
 import { Role, Status } from "@/generated/prisma/enums";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { requireCollegeAdmin } from "@/lib/session";
+import { requireSuperAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -28,7 +28,7 @@ const fieldLabel = (name: string) =>
 const AFFECTED = ["/dashboard/tutors", "/dashboard", "/dashboard/timetable"];
 
 export async function createTutor(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  const scope = await requireSuperAdmin();
 
   return onSave("/dashboard/tutors", AFFECTED, async () => {
     /*
@@ -104,7 +104,7 @@ export async function createTutor(formData: FormData) {
 }
 
 export async function approveTutor(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  const scope = await requireSuperAdmin();
 
   return onSave("/dashboard/tutors", AFFECTED, async () => {
     const tutorId = hiddenId(formData, "tutorId", copy.title);

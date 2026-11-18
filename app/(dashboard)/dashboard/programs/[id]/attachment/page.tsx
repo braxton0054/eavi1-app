@@ -35,7 +35,8 @@ export default async function ProgramAttachmentPage({
 
   if (!data) notFound();
 
-  const { program, periods, requirements, enrolled } = data;
+  const { program, periods, requirements, enrolled, scope } = data;
+  const canManage = scope.role === "SUPERADMIN";
   const archived = program.archivedAt !== null;
 
   // Only stages the programme actually has: each semester or month, or the whole course.
@@ -68,7 +69,7 @@ export default async function ProgramAttachmentPage({
           .filter(Boolean)
           .join(" · ") || common.notSet,
       tracked: String(requirement._count.studentAttachments),
-      actions:
+      actions: canManage ? (
         requirement._count.studentAttachments > 0 ? (
           <span className="text-xs text-eavi-muted-text">{attachmentCopy.removeBlocked}</span>
         ) : (
@@ -81,7 +82,8 @@ export default async function ProgramAttachmentPage({
             submitLabel={attachmentCopy.remove}
             tone="danger"
           />
-        ),
+        )
+      ) : null,
     },
   }));
 
@@ -118,7 +120,7 @@ export default async function ProgramAttachmentPage({
         <Notice tone="warning" title={attachmentCopy.title} body={attachmentCopy.archived} />
       ) : null}
 
-      {!archived ? (
+      {!archived && canManage ? (
         <DisclosureForm
           id="new-attachment-stage"
           button={attachmentCopy.add}
@@ -139,7 +141,7 @@ export default async function ProgramAttachmentPage({
           />
         ) : (
           <DataTable
-            columns={attachmentCopy.stageColumns as Column[]}
+            columns={(canManage ? attachmentCopy.stageColumns : attachmentCopy.stageColumns.slice(0, -1)) as Column[]}
             rows={rows}
             caption={attachmentCopy.stages}
           />

@@ -2,7 +2,7 @@
 
 import { AttachmentStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
-import { requireCollegeAdmin } from "@/lib/session";
+import { requireCollegeAdmin, requireSuperAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -48,7 +48,7 @@ async function scopedProgram(programId: string, campusId: number | null) {
  * it follows the programme's own structure. Students already enrolled get a record at once.
  */
 export async function saveAttachmentRequirement(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  const scope = await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.title);
 
   return onSave(`/dashboard/programs/${programId}/attachment`, affected(programId), async () => {
@@ -114,7 +114,7 @@ export async function saveAttachmentRequirement(formData: FormData) {
 }
 
 export async function removeAttachmentRequirement(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  const scope = await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.title);
 
   return onSave(`/dashboard/programs/${programId}/attachment`, affected(programId), async () => {

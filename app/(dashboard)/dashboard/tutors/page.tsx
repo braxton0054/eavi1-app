@@ -27,6 +27,9 @@ export default async function TutorsPage({
 }) {
   const { q, invalid, reason } = await searchParams;
   const scope = await requireCollegeAdmin();
+  // The tutor register is kept by the super admin. A campus office only reads it — it
+  // cannot create tutors or approve their accounts (the actions enforce this on the server).
+  const canManage = scope.role === "SUPERADMIN";
 
   const [tutors, programOptions, campusOptions] = await Promise.all([
     getTutors({ q }),
@@ -43,7 +46,9 @@ export default async function TutorsPage({
 
   const options: OptionSets = { programs: programOptions, campuses };
 
-  const columns: Column[] = [...copy.columns, { key: "actions", label: common.actions }];
+  const columns: Column[] = canManage
+    ? [...copy.columns, { key: "actions", label: common.actions }]
+    : [...copy.columns];
 
   const rows: Row[] = tutors.map((tutor) => ({
     id: tutor.id,
@@ -70,7 +75,7 @@ export default async function TutorsPage({
         </StatusChip>
       ),
       actions:
-        tutor.user.status === "PENDING" ? (
+        canManage && tutor.user.status === "PENDING" ? (
           <RowForm
             id={`tutor-${tutor.id}-approve`}
             button={copy.status.approve}
@@ -89,16 +94,18 @@ export default async function TutorsPage({
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={reason || common.invalidSubmit} /> : null}
 
-      <DisclosureForm
-        id="new-tutor"
-        button={copy.create.button}
-        title={copy.create.title}
-        fields={copy.create.fields}
-        options={options}
-        values={{ campusId: scope.campusId === null ? undefined : String(scope.campusId) }}
-        action={createTutor}
-        submitLabel={common.create}
-      />
+      {canManage ? (
+        <DisclosureForm
+          id="new-tutor"
+          button={copy.create.button}
+          title={copy.create.title}
+          fields={copy.create.fields}
+          options={options}
+          values={{ campusId: scope.campusId === null ? undefined : String(scope.campusId) }}
+          action={createTutor}
+          submitLabel={common.create}
+        />
+      ) : null}
 
       <Panel title={copy.title}>
         <div className="p-4">

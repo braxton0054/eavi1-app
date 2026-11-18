@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { EntryGrade, FeePeriodKind, ProgramStructure } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
-import { requireCollegeAdmin } from "@/lib/session";
+import { requireSuperAdmin } from "@/lib/session";
 import { fieldErrors, pages, programStructureChoices } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -152,7 +152,7 @@ async function saveProgrammeDocuments(
  * administrator never types one and two campuses cannot collide.
  */
 export async function createProgram(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
     const answers = await programmeAnswers(formData, NEW_STRUCTURES);
@@ -195,7 +195,7 @@ export async function createProgram(formData: FormData) {
  * that paper.
  */
 export async function updateProgram(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.edit.title);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
@@ -247,7 +247,7 @@ export async function updateProgram(formData: FormData) {
  * active for them; completed cohorts can be archived.
  */
 export async function archiveProgram(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.archive.button);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
@@ -274,7 +274,7 @@ export async function archiveProgram(formData: FormData) {
  * through a student's academic or financial history.
  */
 export async function deleteProgram(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.remove.button);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
@@ -303,7 +303,7 @@ function column(formData: FormData, name: string): string[] {
  * new version.
  */
 export async function saveProgramFeePlan(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
   const programId = hiddenId(formData, "programId", copy.feePlan.title);
   const feesPath = `/dashboard/programs/${programId}/fees`;
 
@@ -401,7 +401,7 @@ function registryCode(value: string, label: string) {
 }
 
 export async function createProgramBody(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
     const name = requiredText(formData, "name", registryFieldLabel("bodies", "name"));
@@ -415,7 +415,7 @@ export async function createProgramBody(formData: FormData) {
 }
 
 export async function updateProgramBody(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
   const bodyId = hiddenId(formData, "bodyId", settings.bodies.edit.title);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
@@ -433,7 +433,7 @@ export async function updateProgramBody(formData: FormData) {
 }
 
 export async function deleteProgramBody(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
   const bodyId = hiddenId(formData, "bodyId", settings.bodies.remove.button);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
@@ -452,7 +452,7 @@ export async function deleteProgramBody(formData: FormData) {
 }
 
 export async function createProgramType(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
     const name = requiredText(formData, "name", registryFieldLabel("types", "name"));
@@ -466,7 +466,7 @@ export async function createProgramType(formData: FormData) {
 }
 
 export async function updateProgramType(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
   const typeId = hiddenId(formData, "typeId", settings.types.edit.title);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
@@ -484,7 +484,7 @@ export async function updateProgramType(formData: FormData) {
 }
 
 export async function deleteProgramType(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
   const typeId = hiddenId(formData, "typeId", settings.types.remove.button);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
@@ -503,7 +503,7 @@ export async function deleteProgramType(formData: FormData) {
 }
 
 export async function createFeeCadence(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
     const name = requiredText(formData, "name", registryFieldLabel("cadences", "name"));
@@ -520,7 +520,7 @@ export async function createFeeCadence(formData: FormData) {
  * without touching the programmes themselves.
  */
 export async function updateFeeCadence(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
   const cadenceId = hiddenId(formData, "cadenceId", settings.cadences.edit.title);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
@@ -539,7 +539,7 @@ export async function updateFeeCadence(formData: FormData) {
 }
 
 export async function deleteFeeCadence(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
   const cadenceId = hiddenId(formData, "cadenceId", settings.cadences.remove.button);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
@@ -564,7 +564,7 @@ const departmentFieldLabel = (name: string) =>
   copy.departments.create.fields.find((field) => field.name === name)?.label ?? name;
 
 export async function createDepartment(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
     const name = requiredText(formData, "name", departmentFieldLabel("name"));

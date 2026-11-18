@@ -2,7 +2,7 @@
 
 import { AcademicPeriodStatus, CalendarEventType } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
-import { requireCollegeAdmin } from "@/lib/session";
+import { requireSuperAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -79,7 +79,7 @@ async function assertOnlyActive(exceptId?: string) {
  * any of them, so one cohort cannot appear in the list under three different spellings.
  */
 export async function createPeriod(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
     /*
@@ -158,7 +158,7 @@ async function ownPeriod(periodId: string) {
  * the right period and move the students.
  */
 export async function updatePeriod(formData: FormData) {
-  await requireCollegeAdmin();
+  await requireSuperAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
     const period = await ownPeriod(hiddenId(formData, "periodId", copy.semesters.heading));
@@ -201,7 +201,7 @@ export async function updatePeriod(formData: FormData) {
  * campus property for a campus admin and college-wide for an administrator with no campus scope.
  */
 export async function createEvent(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  const scope = await requireSuperAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
     const periodId = text(formData, "periodId");
@@ -231,7 +231,7 @@ export async function createEvent(formData: FormData) {
 }
 
 export async function deleteEvent(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  const scope = await requireSuperAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
     const eventId = hiddenId(formData, "eventId", copy.events.heading);

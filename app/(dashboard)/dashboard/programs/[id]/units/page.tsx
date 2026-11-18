@@ -10,6 +10,7 @@ import {
   updateProgramModule,
 } from "@/lib/actions/college/program-units";
 import { getProgramUnitsPlan } from "@/lib/dal/college";
+import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
@@ -27,6 +28,8 @@ export default async function ProgramUnitsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const scope = await requireCollegeAdmin();
+  const canManage = scope.role === "SUPERADMIN";
 
   let data: Awaited<ReturnType<typeof getProgramUnitsPlan>> | null = null;
   try {
@@ -83,7 +86,7 @@ export default async function ProgramUnitsPage({
       unit: `${placement.unit.code} · ${placement.unit.name}`,
       period: placement.periodLabel,
       order: String(placement.sequence),
-      actions:
+      actions: canManage ? (
         placement._count.studentUnits > 0 ? (
           <span className="text-xs text-eavi-muted-text">{unitCopy.removeBlocked}</span>
         ) : (
@@ -96,7 +99,8 @@ export default async function ProgramUnitsPage({
             submitLabel={unitCopy.removeUnit}
             tone="danger"
           />
-        ),
+        )
+      ) : null,
     },
   }));
 
@@ -122,7 +126,7 @@ export default async function ProgramUnitsPage({
       name: module.name,
       units: String(module._count.units),
       duration: module.durationMonths ? copy.duration(module.durationMonths) : common.notSet,
-      actions: (
+      actions: canManage ? (
         <div className="flex flex-wrap items-center gap-2">
           <RowForm
             id={`edit-module-${module.id}`}
@@ -156,7 +160,7 @@ export default async function ProgramUnitsPage({
             tone="danger"
           />
         </div>
-      ),
+      ) : null,
     },
   }));
 
@@ -192,7 +196,7 @@ export default async function ProgramUnitsPage({
 
       {archived ? <Notice tone="warning" title={unitCopy.title} body={unitCopy.archived} /> : null}
 
-      {!archived ? (
+      {!archived && canManage ? (
         <DisclosureForm
           id="assign-unit"
           button={unitCopy.assign}
@@ -208,13 +212,13 @@ export default async function ProgramUnitsPage({
         {placedRows.length === 0 ? (
           <EmptyState title={unitCopy.placed} body={unitCopy.noUnits} icon="programs" />
         ) : (
-          <DataTable columns={unitCopy.columns as Column[]} rows={placedRows} caption={unitCopy.placed} />
+          <DataTable columns={(canManage ? unitCopy.columns : unitCopy.columns.slice(0, -1)) as Column[]} rows={placedRows} caption={unitCopy.placed} />
         )}
       </Panel>
 
       {structure === "MODULE" ? (
         <Panel title={unitCopy.moduleName}>
-          {!archived ? (
+          {!archived && canManage ? (
             <div className="border-b border-eavi-border p-4">
               <DisclosureForm
                 id="new-module"
@@ -239,7 +243,7 @@ export default async function ProgramUnitsPage({
             <p className="p-4 text-sm text-eavi-muted-text">{unitCopy.moduleEmpty}</p>
           ) : (
             <DataTable
-              columns={unitCopy.moduleColumns as Column[]}
+              columns={(canManage ? unitCopy.moduleColumns : unitCopy.moduleColumns.slice(0, -1)) as Column[]}
               rows={moduleRows}
               caption={unitCopy.moduleName}
             />
@@ -248,7 +252,7 @@ export default async function ProgramUnitsPage({
       ) : null}
 
       <Panel title={unitCopy.catalogue}>
-        {!archived ? (
+        {!archived && canManage ? (
           <div className="border-b border-eavi-border p-4">
             <DisclosureForm
               id="new-unit"

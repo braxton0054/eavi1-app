@@ -40,7 +40,9 @@ export default async function ProgramFeesPage({
 
   if (!data) notFound();
 
-  const { program, plan, calendar, cadences, campusId } = data;
+  const { program, plan, calendar, cadences, campusId, scope } = data;
+  // The fee plan is part of the shared catalogue: only the super admin sets the amounts.
+  const canManage = scope.role === "SUPERADMIN";
 
   // The rows are handed to the client as plain strings: Prisma's Decimal cannot cross the
   // server/client boundary, and the editor only needs what fits in the form.
@@ -112,30 +114,67 @@ export default async function ProgramFeesPage({
 
       <Panel title={feeCopy.periodsHeading} description={feeCopy.amountsHint}>
         <div className="p-4 sm:p-6">
-          <ProgramFeeEditor
-            programId={program.id}
-            cadences={cadences}
-            initialCadenceId={initialCadenceId}
-            initialDuration={initialDuration}
-            initialPeriods={initialPeriods}
-            semestersPerYear={periodsPerYear}
-            copy={{
-              cadence: feeCopy.cadence,
-              duration: feeCopy.duration,
-              durationHint: feeCopy.durationHint,
-              note: feeCopy.note,
-              amount: feeCopy.amount,
-              periodHeader: feeCopy.periodHeader,
-              offsetHeader: feeCopy.offsetHeader,
-              total: feeCopy.total,
-              save: feeCopy.save,
-              customAdd: feeCopy.customAdd,
-              customRemove: feeCopy.customRemove,
-              customHint: feeCopy.customHint,
-              noPeriods: feeCopy.noPeriods,
-              current: plan ? feeCopy.current(plan.version) : feeCopy.none,
-            }}
-          />
+          {canManage ? (
+            <ProgramFeeEditor
+              programId={program.id}
+              cadences={cadences}
+              initialCadenceId={initialCadenceId}
+              initialDuration={initialDuration}
+              initialPeriods={initialPeriods}
+              semestersPerYear={periodsPerYear}
+              copy={{
+                cadence: feeCopy.cadence,
+                duration: feeCopy.duration,
+                durationHint: feeCopy.durationHint,
+                note: feeCopy.note,
+                amount: feeCopy.amount,
+                periodHeader: feeCopy.periodHeader,
+                offsetHeader: feeCopy.offsetHeader,
+                total: feeCopy.total,
+                save: feeCopy.save,
+                customAdd: feeCopy.customAdd,
+                customRemove: feeCopy.customRemove,
+                customHint: feeCopy.customHint,
+                noPeriods: feeCopy.noPeriods,
+                current: plan ? feeCopy.current(plan.version) : feeCopy.none,
+              }}
+            />
+          ) : (
+            <div className="space-y-4">
+              {initialPeriods.length === 0 ? (
+                <p className="rounded-lg border border-eavi-border p-4 text-sm text-eavi-muted-text">
+                  {feeCopy.noPeriods}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-eavi-border text-left text-xs uppercase tracking-wide text-eavi-muted-text">
+                        <th scope="col" className="py-2 pr-3 font-medium">{feeCopy.periodHeader}</th>
+                        <th scope="col" className="py-2 pr-3 text-right font-medium">{feeCopy.amount} (KES)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {initialPeriods.map((row, index) => (
+                        <tr key={`${row.label}-${index}`} className="border-b border-eavi-border/60">
+                          <td className="py-2 pr-3">{row.label}</td>
+                          <td className="py-2 pr-3 text-right tabular-nums">{money(row.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="text-sm">
+                {feeCopy.total}: <span className="font-semibold tabular-nums">
+                  {money(initialPeriods.reduce((sum, row) => sum + Number(row.amount || 0), 0))}
+                </span>
+                <span className="ml-2 text-xs text-eavi-muted-text">
+                  {plan ? feeCopy.current(plan.version) : feeCopy.none}
+                </span>
+              </p>
+            </div>
+          )}
         </div>
       </Panel>
 

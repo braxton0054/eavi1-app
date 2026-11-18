@@ -46,6 +46,9 @@ export default async function ProgramsPage({
 }) {
   const { invalid } = await searchParams;
   const scope = await requireCollegeAdmin();
+  // The catalogue is college-wide and kept by the super admin. Campus offices read and print
+  // it, but never add or change a programme (the actions enforce this on the server).
+  const canManage = scope.role === "SUPERADMIN";
 
   const [rows, departments, departmentOptions, registries, bodies, types, cadences, programOptions] =
     await Promise.all([
@@ -108,7 +111,7 @@ export default async function ProgramsPage({
           code: item.code,
           name: item.name,
           programs: String(item.programs.length),
-          actions: (
+          actions: canManage ? (
             <div className="flex flex-wrap items-center gap-2">
               <RowForm
                 id={`edit-${section}-${item.id}`}
@@ -129,7 +132,7 @@ export default async function ProgramsPage({
                 tone="danger"
               />
             </div>
-          ),
+          ) : null,
         },
       };
     });
@@ -140,7 +143,7 @@ export default async function ProgramsPage({
       name: cadence.name,
       kind: labels.feePeriodKind[cadence.kind],
       programs: String(cadence.programs.length),
-      actions: (
+      actions: canManage ? (
         <div className="flex flex-wrap items-center gap-2">
           <RowForm
             id={`edit-cadence-${cadence.id}`}
@@ -161,7 +164,7 @@ export default async function ProgramsPage({
             tone="danger"
           />
         </div>
-      ),
+      ) : null,
     },
   }));
 
@@ -176,6 +179,7 @@ export default async function ProgramsPage({
         title={copy.title}
         description={copy.description}
         action={
+          canManage ? (
           <SettingsDialog label={settings.button} title={settings.title} description={settings.description}>
             <Panel title={settings.bodies.heading} description={settings.bodies.description}>
               <div className="space-y-4 p-4">
@@ -261,20 +265,23 @@ export default async function ProgramsPage({
               )}
             </Panel>
           </SettingsDialog>
+          ) : null
         }
       />
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
-      <DisclosureForm
-        id="new-program"
-        button={copy.create.button}
-        title={copy.create.title}
-        fields={programFields}
-        options={options}
-        action={createProgram}
-        submitLabel={common.create}
-      />
+      {canManage ? (
+        <DisclosureForm
+          id="new-program"
+          button={copy.create.button}
+          title={copy.create.title}
+          fields={programFields}
+          options={options}
+          action={createProgram}
+          submitLabel={common.create}
+        />
+      ) : null}
 
       <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
         {programCards.length === 0 ? (
