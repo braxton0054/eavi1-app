@@ -81,7 +81,7 @@ export async function assignProgramUnit(formData: FormData) {
     if (!unit) throw new FieldError(fieldErrors.choice(copy.unit));
 
     const structure = program.structure as Structure;
-    const perYear = await planningSemesters(scope.campusId);
+    const perYear = await planningSemesters();
 
     let periodKey: string;
     let periodLabel: string;

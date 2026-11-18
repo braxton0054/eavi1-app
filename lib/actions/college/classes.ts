@@ -36,7 +36,7 @@ export async function createClass(formData: FormData) {
         select: { id: true, code: true },
       }),
       prisma.academicPeriod.findFirst({
-        where: { id: intakeId, campusId },
+        where: { id: intakeId },
         select: { id: true, month: true, year: true, name: true },
       }),
     ]);

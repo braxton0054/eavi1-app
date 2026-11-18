@@ -69,15 +69,20 @@ async function cadenceChoice(id: string, label: string) {
   return row.id;
 }
 
-/** A programme is only editable from the campuses that offer it; a super admin has no filter. */
-async function knownProgram(programId: string, campusId: number | null) {
-  const program = await prisma.program.findFirst({
-    where: { id: programId, campuses: campusId === null ? undefined : { some: { id: campusId } } },
+/** Programmes are one college-wide catalogue: every campus edits the same row. */
+async function knownProgram(programId: string) {
+  const program = await prisma.program.findUnique({
+    where: { id: programId },
     select: { id: true, code: true, archivedAt: true },
   });
-  if (!program) throw new FieldError(fieldErrors.notOnCampus);
+  if (!program) throw new FieldError(fieldErrors.notFound);
 
   return program;
+}
+
+/** Every campus gets every programme; nobody has to add the same course campus by campus. */
+async function allCampuses() {
+  return prisma.campus.findMany({ select: { id: true }, orderBy: { id: "asc" } });
 }
 
 /** Every answer the programme form collects, in the order a create and an edit both need it. */
@@ -140,15 +145,14 @@ async function saveProgrammeDocuments(
  * administrator never types one and two campuses cannot collide.
  */
 export async function createProgram(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  await requireCollegeAdmin();
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
     const answers = await programmeAnswers(formData);
     const documents = await programmeDocuments(formData);
 
-    // A super admin is not pinned to one campus, so what they add is college-wide.
-    const campuses =
-      scope.campusId === null ? await prisma.campus.findMany({ select: { id: true } }) : [{ id: scope.campusId }];
+    // The catalogue is shared: a programme created on any campus belongs to every campus.
+    const campuses = await allCampuses();
 
     const code = await nextProgramCode(answers.body.code, answers.type.code, answers.body.id, answers.type.id);
 
@@ -184,11 +188,11 @@ export async function createProgram(formData: FormData) {
  * that paper.
  */
 export async function updateProgram(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  await requireCollegeAdmin();
   const programId = hiddenId(formData, "programId", copy.edit.title);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
-    const program = await knownProgram(programId, scope.campusId);
+    const program = await knownProgram(programId);
     const answers = await programmeAnswers(formData);
     const documents = await programmeDocuments(formData);
 
@@ -218,6 +222,9 @@ export async function updateProgram(formData: FormData) {
         durationMonths: answers.durationMonths,
         structure: answers.structure,
         description: answers.description,
+        // A programme that predates the shared catalogue is attached to every campus on its
+        // first edit, so no office has to repeat the entry.
+        campuses: { set: await allCampuses() },
       },
     });
 
@@ -233,11 +240,11 @@ export async function updateProgram(formData: FormData) {
  * active for them; completed cohorts can be archived.
  */
 export async function archiveProgram(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  await requireCollegeAdmin();
   const programId = hiddenId(formData, "programId", copy.archive.button);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
-    const program = await knownProgram(programId, scope.campusId);
+    const program = await knownProgram(programId);
     if (program.archivedAt) return;
 
     const counts = await lifecycleCounts(prisma, program.id);
@@ -260,11 +267,11 @@ export async function archiveProgram(formData: FormData) {
  * through a student's academic or financial history.
  */
 export async function deleteProgram(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  await requireCollegeAdmin();
   const programId = hiddenId(formData, "programId", copy.remove.button);
 
   return onSave("/dashboard/programs", AFFECTED, async () => {
-    const program = await knownProgram(programId, scope.campusId);
+    const program = await knownProgram(programId);
 
     const counts = await lifecycleCounts(prisma, program.id);
     const refusal = deletionRefusal(counts);
@@ -289,12 +296,12 @@ function column(formData: FormData, name: string): string[] {
  * new version.
  */
 export async function saveProgramFeePlan(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  await requireCollegeAdmin();
   const programId = hiddenId(formData, "programId", copy.feePlan.title);
   const feesPath = `/dashboard/programs/${programId}/fees`;
 
   return onSave(feesPath, ["/dashboard/programs", feesPath, "/dashboard"], async () => {
-    const program = await knownProgram(programId, scope.campusId);
+    const program = await knownProgram(programId);
 
     const cadenceId = requiredText(formData, "cadenceId", copy.feePlan.cadence);
     const cadence = await prisma.feeCadence.findUnique({ where: { id: cadenceId }, select: { id: true } });

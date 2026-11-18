@@ -107,7 +107,6 @@ async function overviewFor(campusId: number | null) {
     where: {
       status: { in: ["PLANNED", "ACTIVE"] },
       startsAt: { gte: now },
-      ...campusWhere(campusId),
     },
     orderBy: { applicationDeadline: "asc" },
     take: 4,
@@ -677,7 +676,7 @@ export async function getProgramRegistryOptions() {
 
 /**
  * Everything the fee editor needs: the programme, the version currently live, the payment
- * methods, and the campus calendar the semester periods will be dated against.
+ * methods, and the shared college calendar the semester periods will be dated against.
  */
 export async function getProgramFees(programId: string) {
   const scope = await requireCollegeAdmin();
@@ -700,27 +699,23 @@ export async function getProgramFees(programId: string) {
   });
   if (!program) throw new Error("not_found");
 
-  // The preview calendar belongs to the campus being worked in; a college-wide admin sees
-  // the first campus that offers the programme.
+  // The preview uses the one college-wide calendar, whichever campus the administrator is on.
   const campusId = scope.campusId ?? program.campuses[0]?.id ?? null;
 
   const [calendar, cadences] = await Promise.all([
-    campusId === null
-      ? Promise.resolve([])
-      : prisma.academicPeriod.findMany({
-          where: { campusId },
-          orderBy: { startsAt: "asc" },
-          select: {
-            id: true,
-            year: true,
-            month: true,
-            sequence: true,
-            name: true,
-            startsAt: true,
-            endsAt: true,
-            status: true,
-          },
-        }),
+    prisma.academicPeriod.findMany({
+      orderBy: { startsAt: "asc" },
+      select: {
+        id: true,
+        year: true,
+        month: true,
+        sequence: true,
+        name: true,
+        startsAt: true,
+        endsAt: true,
+        status: true,
+      },
+    }),
     prisma.feeCadence.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, kind: true },
@@ -776,7 +771,7 @@ async function programForPlanning(programId: string) {
   if (!program) throw new Error("not_found");
 
   const campusId = scope.campusId ?? program.campuses[0]?.id ?? null;
-  const perYear = await planningSemesters(campusId);
+  const perYear = await planningSemesters();
   const periods = generatedPeriods(program.structure as Structure, program.durationMonths, perYear);
 
   return { scope, program, campusId, perYear, periods };
@@ -937,9 +932,9 @@ const clampYear = (value: number, current: number) =>
   Math.min(current + OPEN_YEARS, Math.max(current - HISTORY_YEARS, value));
 
 /**
- * A semester belongs to exactly one campus, so a calendar read always resolves to a single
- * campus: a campus admin is pinned to their own, and a super admin chooses one, because
- * "all campuses" has no meaning for a window only one campus runs.
+ * Periods are college-wide, but cards, exams and standalone events still belong to a campus.
+ * The campus context therefore decides those campus-owned strips while every campus reads the
+ * same intake windows.
  */
 async function campusContext(scope: AdminScope, requested?: string) {
   if (scope.campusId !== null) {
@@ -978,10 +973,11 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
 
   const [periods, collegeEvents, cards] = await Promise.all([
     prisma.academicPeriod.findMany({
-      where: { campusId: context.campusId, year },
+      where: { year },
       orderBy: { month: "asc" },
       include: {
         exams: {
+          where: campusWhere(context.campusId),
           orderBy: { date: "asc" },
           select: {
             id: true,
@@ -994,7 +990,7 @@ export async function getCalendar(yearParam?: string, campusParam?: string) {
           },
         },
         calendarEvents: {
-          where: { campusId: context.campusId },
+          where: { OR: [{ campusId: null }, { campusId: context.campusId }] },
           orderBy: { startsAt: "asc" },
         },
       },
@@ -1448,6 +1444,16 @@ export async function getStudentOptions(campusId: number | null) {
   return rows.map((row) => ({ value: row.id, label: `${row.admissionNo} · ${row.user.fullName}` }));
 }
 
+/** Every campus, for forms that must place a college-wide record on one campus. */
+export async function getCampusOptions() {
+  await requireCollegeAdmin();
+  const rows = await prisma.campus.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+  return rows.map((row) => ({ value: String(row.id), label: row.name }));
+}
+
 export async function getTutorOptions(campusId: number | null) {
   const rows = await prisma.tutorProfile.findMany({
     where: campusWhere(campusId),
@@ -1457,29 +1463,22 @@ export async function getTutorOptions(campusId: number | null) {
   return rows.map((row) => ({ value: row.id, label: `${row.user.fullName} (${row.staffNo})` }));
 }
 
-/**
- * A semester is one campus's, so this select never offers another campus's window. A super
- * admin is not pinned to a campus and sees every semester, labelled with the campus it runs on.
- */
+/** One shared list of periods for every campus. */
 export async function getSemesterOptions() {
-  const scope = await requireCollegeAdmin();
+  await requireCollegeAdmin();
   const rows = await prisma.academicPeriod.findMany({
-    where: campusWhere(scope.campusId),
     orderBy: [{ year: "desc" }, { sequence: "desc" }],
-    select: { id: true, name: true, campus: { select: { name: true } } },
+    select: { id: true, name: true },
   });
 
-  return rows.map((row) => ({
-    value: row.id,
-    label: scope.campusId === null ? `${row.name} · ${row.campus.name}` : row.name,
-  }));
+  return rows.map((row) => ({ value: row.id, label: row.name }));
 }
 
 export async function getIntakeOptions() {
-  const scope = await requireCollegeAdmin();
+  await requireCollegeAdmin();
 
   /*
-   * Every intake on the campus, including ones whose application deadline has passed.
+   * Every college-wide intake, including ones whose application deadline has passed.
    *
    * The deadline governs new applications, not whether an existing cohort can still be joined.
    * Filtering on it hid every earlier intake from the admission form, which broke the two kinds of
@@ -1491,7 +1490,6 @@ export async function getIntakeOptions() {
    * progression, fees and class all start in the wrong place.
    */
   const rows = await prisma.academicPeriod.findMany({
-    where: campusWhere(scope.campusId),
     orderBy: [{ year: "desc" }, { month: "desc" }],
     select: { id: true, name: true, year: true },
   });

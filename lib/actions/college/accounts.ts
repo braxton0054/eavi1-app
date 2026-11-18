@@ -19,7 +19,7 @@ import {
   requiredNumber,
   requiredText,
   text,
-  semesterOnCampus,
+  periodFromForm,
   unique,
 } from "@/lib/actions/college/_shared";
 import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
@@ -65,8 +65,8 @@ export async function createInvoice(formData: FormData) {
     if (campusId === null) throw new FieldError(fieldErrors.notOnCampus);
 
     const studentId = requiredText(formData, "studentId", fieldLabel("studentId"));
-    // The bill is raised against this campus's semester, so a foreign semester id is refused here.
-    const periodId = await semesterOnCampus(formData, "periodId", campusId);
+    // The bill is dated against the shared calendar; the invoice itself stays on this campus.
+    const periodId = await periodFromForm(formData, "periodId");
     const dueAt = dateField(formData, "dueAt");
     const note = text(formData, "note");
 

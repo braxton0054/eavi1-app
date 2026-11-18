@@ -10,6 +10,7 @@ import {
   emailField,
   hiddenId,
   nextStaffNo,
+  numberField,
   onSave,
   passwordField,
   phoneField,
@@ -30,10 +31,22 @@ export async function createTutor(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/tutors", AFFECTED, async () => {
-    // A tutor profile always belongs to one campus, so a campus-less administrator
-    // cannot create one from this form.
-    const campusId = scope.campusId;
-    if (campusId === null) throw new FieldError(fieldErrors.notOnCampus);
+    /*
+     * A tutor belongs to one campus even though the programme catalogue is shared. A campus
+     * admin is pinned to their own; a super admin names the campus on the form, so tutors can
+     * be added from anywhere instead of having to switch the global scope first.
+     */
+    let campusId = scope.campusId;
+    if (campusId === null) {
+      const posted = numberField(formData, "campusId", fieldLabel("campusId"));
+      if (posted === null) throw new FieldError(fieldErrors.required(fieldLabel("campusId")));
+      if (!Number.isInteger(posted) || posted <= 0) {
+        throw new FieldError(fieldErrors.choice(fieldLabel("campusId")));
+      }
+      const campus = await prisma.campus.findUnique({ where: { id: posted }, select: { id: true } });
+      if (!campus) throw new FieldError(fieldErrors.choice(fieldLabel("campusId")));
+      campusId = campus.id;
+    }
 
     const fullName = requiredText(formData, "fullName", fieldLabel("fullName"));
     // The helper throws when this required field is empty; the guard only narrows the type.

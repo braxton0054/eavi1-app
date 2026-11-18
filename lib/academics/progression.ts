@@ -54,7 +54,7 @@ export function periodEndsAt(openedAt: Date, monthsPerPeriod = DEFAULT_PERIOD_MO
 
 /**
  * The day a given period of an intake begins. Period 1 begins on the intake's first day;
- * every later one follows it, so the walk never depends on the campus calendar.
+ * every later one follows it, so the walk never depends on the shared college calendar.
  */
 export function periodStartsAt(
   intake: Pick<IntakeAnchor, "startsAt">,

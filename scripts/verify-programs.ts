@@ -21,6 +21,8 @@ import { generateFeeSchedule } from "@/lib/fees/schedule";
 
 const tag = `progflow-${Date.now()}`;
 let failures = 0;
+/** The intake is college-wide, so cleanup must target the exact period this run created. */
+let periodIdForCleanup: string | null = null;
 
 function check(label: string, condition: boolean, detail?: string | null) {
   if (condition) console.log(`  ok   ${label}`);
@@ -40,12 +42,16 @@ async function main() {
     select: { id: true },
   });
 
-  // The cohort the test student joins; their Semester 1 begins on this date. It is also the
-  // campus's January period, because an intake IS the period it opens.
-  const intake = await prisma.academicPeriod.create({
+  // The cohort the test student joins; their Semester 1 begins on this date. The intake is one
+  // college-wide period, so an existing row for the year and month is reused rather than copied
+  // for every campus. A period that already exists is college data and is left untouched.
+  const intakeForYear = await prisma.academicPeriod.findUnique({
+    where: { year_month: { year: 2027, month: 1 } },
+    select: { id: true },
+  });
+  const intake = intakeForYear ?? (await prisma.academicPeriod.create({
     data: {
-      name: `January intake 2027`,
-      campusId: campus.id,
+      name: "January intake 2027",
       year: 2027,
       month: 1,
       sequence: 1,
@@ -54,7 +60,8 @@ async function main() {
       applicationDeadline: day("2026-12-20"),
     },
     select: { id: true },
-  });
+  }));
+  if (!intakeForYear) periodIdForCleanup = intake.id;
 
   const department = await prisma.department.create({ data: { name: `${tag} dept` }, select: { id: true } });
   const body = await prisma.programBody.create({ data: { name: `${tag} body`, code: `PB${Date.now() % 10000}` }, select: { id: true } });
@@ -380,7 +387,12 @@ async function main() {
   await prisma.invoice.deleteMany({ where: { campusId: campus.id } });
   await prisma.studentUnit.deleteMany({ where: { enrollment: { campusId: campus.id } } });
   await prisma.enrollment.deleteMany({ where: { campusId: campus.id } });
-  await prisma.academicPeriod.deleteMany({ where: { campusId: campus.id } });
+  if (periodIdForCleanup) {
+    await prisma.exam.deleteMany({ where: { periodId: periodIdForCleanup } });
+    await prisma.timetableSlot.deleteMany({ where: { periodId: periodIdForCleanup } });
+    await prisma.calendarEvent.deleteMany({ where: { periodId: periodIdForCleanup } });
+    await prisma.academicPeriod.delete({ where: { id: periodIdForCleanup } }).catch(() => {});
+  }
   await prisma.campus.delete({ where: { id: campus.id } });
   await prisma.department.delete({ where: { id: department.id } });
   await prisma.programBody.delete({ where: { id: body.id } });

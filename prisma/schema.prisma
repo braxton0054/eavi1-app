@@ -504,16 +504,20 @@ model Application {
   @@map("applications")
 }
 
-/// One academic period a campus runs: an intake, and the teaching window that goes with it.
+/// One intake and the teaching window that goes with it, shared by the whole college.
 ///
 /// This replaces two separate tables — a `Semester` calendar and an `Intake` admission window —
 /// which described the same thing and drifted apart in practice, leaving campuses with one
 /// populated and the other empty. The college runs three intakes a year, and each one IS the
 /// start of a period, so they are one row here.
 ///
-/// A period is the INSTITUTIONAL CALENDAR: when the campus is open for teaching, where its
-/// exams and holidays fall, and when applications for that intake close. Classes, invoices,
-/// exams and timetable slots all point at it.
+/// A period is the INSTITUTIONAL CALENDAR: when the college is open for teaching and when
+/// applications for that intake close. Every campus sees the same window. Classes, invoices,
+/// exams and timetable slots still belong to a campus, but point at this shared row.
+///
+/// `campusId` is retained only as a nullable legacy column so existing references can be
+/// repointed. New periods are always written with it null; a non-null value is an old row that
+/// predates the shared calendar.
 ///
 /// It is NOT the student's own semester number. A student's position in their programme lives
 /// on `Enrollment.yearIndex` / `semesterNo`, derived from the period they joined and counted
@@ -521,8 +525,9 @@ model Application {
 /// campus calendar has moved on.
 model AcademicPeriod {
   id                  String               @id @default(uuid())
-  campusId            Int
-  campus              Campus               @relation(fields: [campusId], references: [id])
+  /// Legacy campus link. Null means college-wide; the application never sets it.
+  campusId            Int?
+  campus              Campus?              @relation(fields: [campusId], references: [id])
   /// The calendar year the period opens in.
   year                Int
   /// The month the period opens: 1, 5 or 9 only. Those three are the college's intakes, and the
@@ -555,8 +560,8 @@ model AcademicPeriod {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([campusId, year, month])
-  @@index([campusId, startsAt])
+  @@unique([year, month])
+  @@index([startsAt])
   @@map("academic_periods")
 }
 

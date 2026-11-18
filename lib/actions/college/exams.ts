@@ -17,7 +17,7 @@ import {
   requiredText,
   text,
   timeField,
-  semesterOnCampus,
+  periodFromForm,
 } from "@/lib/actions/college/_shared";
 
 const STATUSES = Object.keys(ExamStatus) as (keyof typeof ExamStatus)[];
@@ -54,8 +54,8 @@ export async function createExam(formData: FormData) {
     });
     if (!program) throw new FieldError(fieldErrors.notOnCampus);
 
-    // The paper sits inside this campus's semester, so a semester id from another campus is refused.
-    const periodId = await semesterOnCampus(formData, "periodId", campusId);
+    // The paper is dated against the college's shared calendar; the paper itself stays on this campus.
+    const periodId = await periodFromForm(formData, "periodId");
 
     const type = enumField(formData, "type", TYPES, fieldLabel("type"));
     const date = requiredDate(formData, "date", fieldLabel("date"));

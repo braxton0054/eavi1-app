@@ -6,17 +6,14 @@
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_SEMESTERS_PER_YEAR } from "@/lib/academics/structure";
 
-export async function planningSemesters(campusId: number | null): Promise<number> {
+export async function planningSemesters(): Promise<number> {
   const rows = await prisma.academicPeriod.findMany({
-    where: campusId === null ? {} : { campusId },
-    select: { campusId: true, sequence: true },
-    distinct: ["campusId", "sequence"],
+    select: { sequence: true },
+    distinct: ["sequence"],
   });
 
   if (rows.length === 0) return DEFAULT_SEMESTERS_PER_YEAR;
 
-  // The campus being worked in decides; college-wide falls back to the busiest calendar.
-  const chosen = campusId === null ? rows : rows.filter((row) => row.campusId === campusId);
-  const numbers = new Set(chosen.map((row) => row.sequence));
+  const numbers = new Set(rows.map((row) => row.sequence));
   return numbers.size >= 1 && numbers.size <= 4 ? numbers.size : DEFAULT_SEMESTERS_PER_YEAR;
 }

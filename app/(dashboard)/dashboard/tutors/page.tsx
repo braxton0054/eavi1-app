@@ -1,7 +1,7 @@
 import { createTutor, approveTutor } from "@/lib/actions/college/tutors";
-import { getProgramOptions, getTutors } from "@/lib/dal/college";
+import { getCampusOptions, getProgramOptions, getTutors } from "@/lib/dal/college";
 import { requireCollegeAdmin } from "@/lib/session";
-import { common, labels, pages, shell } from "@/lib/content/dashboard";
+import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
 import { ListFilters } from "@/components/dashboard/list-tools";
@@ -28,12 +28,20 @@ export default async function TutorsPage({
   const { q, invalid } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  const [tutors, programOptions] = await Promise.all([
+  const [tutors, programOptions, campusOptions] = await Promise.all([
     getTutors({ q }),
     getProgramOptions(scope.campusId),
+    getCampusOptions(),
   ]);
 
-  const options: OptionSets = { programs: programOptions };
+  // A campus admin is pinned to their own campus; the field stays visible so the form reads
+  // the same for everyone, but only the campus they may write to is offered.
+  const campuses =
+    scope.campusId === null
+      ? campusOptions
+      : campusOptions.filter((option) => Number(option.value) === scope.campusId);
+
+  const options: OptionSets = { programs: programOptions, campuses };
 
   const columns: Column[] = [...copy.columns, { key: "actions", label: common.actions }];
 
@@ -81,19 +89,15 @@ export default async function TutorsPage({
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
 
-      {scope.campusId !== null ? (
-        <DisclosureForm
-          id="new-tutor"
-          button={copy.create.button}
-          title={copy.create.title}
-          fields={copy.create.fields}
-          options={options}
-          action={createTutor}
-          submitLabel={common.create}
-        />
-      ) : (
-        <Notice tone="neutral" title={copy.create.button} body={shell.chooseCampus} />
-      )}
+      <DisclosureForm
+        id="new-tutor"
+        button={copy.create.button}
+        title={copy.create.title}
+        fields={copy.create.fields}
+        options={options}
+        action={createTutor}
+        submitLabel={common.create}
+      />
 
       <Panel title={copy.title}>
         <div className="p-4">

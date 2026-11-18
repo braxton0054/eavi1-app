@@ -183,9 +183,9 @@ function semesterHolding(calendar: readonly CalendarPeriod[], date: Date): Calen
 /**
  * Puts each period of a fee plan on a real date.
  *
- * Semester plans are dated from the STUDENT'S INTAKE, not from the campus calendar. A student
- * who joins in May is billed Semester 1 fees from May, and their Semester 2 follows four
- * months later — even though the campus calendar is running its own second semester then.
+ * Semester plans are dated from the STUDENT'S INTAKE, not from the shared college calendar. A
+ * student who joins in May is billed Semester 1 fees from May, and their Semester 2 follows four
+ * months later — even though the college calendar is running its own second semester then.
  * The calendar row is still recorded so a bill can be looked up against the term it falls
  * in, but it never decides where in their studies the student is.
  *

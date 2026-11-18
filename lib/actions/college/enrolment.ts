@@ -168,14 +168,13 @@ export async function enrolStudent(formData: FormData) {
     const intake = intakeId
       ? await prisma.academicPeriod.findUnique({
           where: { id: intakeId },
-          select: { id: true, campusId: true, startsAt: true, month: true, year: true },
+          select: { id: true, startsAt: true, month: true, year: true },
         })
       : null;
     // The intake decides which semester the student is in and when their fees begin, so it
     // is required rather than guessed at: silently picking a cohort would put a student on
     // the wrong schedule.
     if (!intake) throw new FieldError(fieldErrors.required("Intake"));
-    if (intake.campusId !== campusId) throw new FieldError(fieldErrors.notOnCampus);
 
     const startDate = intake.startsAt;
 

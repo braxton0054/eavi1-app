@@ -50,10 +50,9 @@ export async function activePlanFor(programId: string, reader: Reader = prisma):
   };
 }
 
-/** The campus calendar rows a plan is dated against. */
-async function calendarFor(reader: Reader, campusId: number): Promise<CalendarPeriod[]> {
+/** The college calendar rows a plan is dated against. */
+async function calendarFor(reader: Reader): Promise<CalendarPeriod[]> {
   return reader.academicPeriod.findMany({
-    where: { campusId },
     orderBy: { startsAt: "asc" },
     select: { id: true, year: true, month: true, sequence: true, name: true, startsAt: true, endsAt: true },
   });
@@ -107,7 +106,7 @@ export async function generateFeeSchedule(
     return { planId: null, version: null, created: 0, total: 0, skipped: 0 };
   }
 
-  const calendar = await calendarFor(tx, input.campusId);
+  const calendar = await calendarFor(tx);
   const semestersPerYear = new Set(calendar.map((row) => row.sequence)).size || undefined;
 
   const drafts: PeriodDraft[] = plan.periods.map((period) => ({

@@ -55,7 +55,7 @@ export async function saveAttachmentRequirement(formData: FormData) {
     const program = await scopedProgram(programId, scope.campusId);
     if (program.archivedAt) throw new FieldError(copy.archived);
 
-    const perYear = await planningSemesters(scope.campusId);
+    const perYear = await planningSemesters();
     const periods = generatedPeriods(program.structure as Structure, program.durationMonths, perYear);
     const trigger = parseTrigger(text(formData, "trigger"), periods);
     if (!trigger) throw new FieldError(copy.triggerRequired);

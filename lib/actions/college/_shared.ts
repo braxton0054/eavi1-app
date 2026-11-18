@@ -266,24 +266,17 @@ export async function refuseWhenUsed(
 }
 
 /**
- * A semester runs on one campus only, so a form-supplied semester id is honoured only when that semester
- * is the caller's. Blank stays blank; a foreign semester is refused rather than quietly dropped.
+ * Periods are college-wide. Blank stays blank; an id must still name a real period.
  */
-export async function semesterOnCampus(
-  formData: FormData,
-  name: string,
-  campusId: number | null,
-): Promise<string | null> {
+export async function periodFromForm(formData: FormData, name: string): Promise<string | null> {
   const value = text(formData, name);
   if (!value) return null;
 
   const period = await prisma.academicPeriod.findUnique({
     where: { id: value },
-    select: { id: true, campusId: true },
+    select: { id: true },
   });
-  if (!period || (campusId !== null && period.campusId !== campusId)) {
-    throw new FieldError(fieldErrors.notOnCampus);
-  }
+  if (!period) throw new FieldError(fieldErrors.notFound);
 
   return period.id;
 }

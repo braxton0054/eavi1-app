@@ -287,6 +287,7 @@ export const fieldErrors = {
   phone: (label: string) => `${label} is not a Kenyan phone number.`,
   duplicate: (label: string) => `That ${label} is already on file.`,
   notOnCampus: "That record is not available on your account, so nothing was changed.",
+  notFound: "That record no longer exists, so nothing was changed.",
   exhausted: "A new reference number could not be issued. Contact the college office.",
   yearClosed: "That academic year is closed for changes.",
   semesterEnded: "That semester has ended, so it can no longer be changed.",
@@ -1079,9 +1080,9 @@ export const pages = {
       customHint: "Custom schedules are entered by hand: label each period and its amount.",
       calendarTitle: "Academic calendar",
       calendarNote:
-        "Semester periods are dated from the campus calendar when a student enrols. Two intakes starting in different months therefore follow the same schedule shifted to their own start.",
+        "Semester periods are dated from the shared college calendar when a student enrols. Two intakes starting in different months therefore follow the same schedule shifted to their own start.",
       calendarEmpty:
-        "This campus has no semesters on its calendar yet, so semester periods fall back to the offsets below.",
+        "The college has no semesters on its calendar yet, so semester periods fall back to the offsets below.",
       calendarColumns: [
         { key: "name", label: "Semester" },
         { key: "starts", label: "Starts" },
@@ -1447,6 +1448,14 @@ export const pages = {
       button: "Add tutor",
       title: "New tutor",
       fields: [
+        {
+          name: "campusId",
+          label: "Campus",
+          type: "select",
+          required: true,
+          optionKey: "campuses",
+          hint: "The campus this tutor will teach at.",
+        },
         { name: "fullName", label: "Full name", type: "text", required: true },
         { name: "email", label: "Email (sign-in)", type: "email", required: true },
         { name: "phone", label: "Phone", type: "tel" },
@@ -1493,7 +1502,7 @@ export const pages = {
      * not a statement of what semester any student is in; that depends on their intake.
      */
     description:
-      "The campus calendar: teaching windows, exams and events. What semester a student is in comes from their intake, not from this page.",
+      "The college-wide academic calendar: teaching windows, intakes and shared events. Every campus sees the same periods; exams, cards and campus-only events stay with their own campus.",
     year: {
       select: "Year",
       show: "Show",
@@ -1552,8 +1561,6 @@ export const pages = {
         button: "Add a period",
         title: "New intake period",
         fields: [
-          // Only a super admin sees this; a campus admin is pinned to their own campus.
-          { name: "campusId", label: "Campus", type: "select", required: true, optionKey: "campuses" },
           {
             name: "startsAt",
             label: "Intake begins",
@@ -1575,7 +1582,7 @@ export const pages = {
             type: "date",
             required: true,
             hint:
-              "The last day to apply. Must be on or before the intake ends.",
+              "The last day to apply. Must be on or before teaching starts.",
           },
         ] satisfies Field[],
         created: "Period saved.",
@@ -1617,8 +1624,7 @@ export const pages = {
         notAnOfficialMonth:
           "Intakes start in January, May or September only. Pick a start date in one of those months.",
         deadlineAfterStart:
-          "Applications close must be on or before the intake ends. Move the closing date earlier, or extend the intake.",
-        chooseCampus: "Choose a campus before adding an intake — an intake belongs to one campus.",
+          "Applications close must be on or before teaching starts. Move the closing date earlier.",
         monthIsFixed:
           "An intake's start date decides which intake it is, so it cannot move to another month. Create the correct intake and move the students across.",
       },

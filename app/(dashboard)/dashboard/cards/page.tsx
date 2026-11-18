@@ -45,7 +45,7 @@ export default async function CardsPage({
     getStudentOptions(scope.campusId),
     getProgramOptions(scope.campusId),
     getClassOptions(scope.campusId),
-    getIntakeChoices(scope.campusId),
+    getIntakeChoices(),
   ]);
 
   // The picker shows who each choice would print before anything is generated. Every

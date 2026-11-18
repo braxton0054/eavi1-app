@@ -57,13 +57,9 @@ export async function createEnrollment(formData: FormData) {
     if (intakeId) {
       const period = await prisma.academicPeriod.findUnique({
         where: { id: intakeId },
-        select: { id: true, campusId: true },
+        select: { id: true },
       });
       if (!period) throw new FieldError(fieldErrors.choice(fieldLabel("intakeId")));
-      // A period belongs to one campus; a student cannot join another campus's intake.
-      if (period.campusId !== (scope.campusId ?? student.campusId)) {
-        throw new FieldError(fieldErrors.notOnCampus);
-      }
     }
 
     // One student cannot sit on the same programme twice.
@@ -174,7 +170,6 @@ export async function promoteEnrollment(formData: FormData) {
       },
       select: {
         id: true,
-        campusId: true,
         programId: true,
         yearIndex: true,
         semesterNo: true,
@@ -182,10 +177,9 @@ export async function promoteEnrollment(formData: FormData) {
     });
     if (!enrollment) throw new FieldError(fieldErrors.notOnCampus);
 
-    // The campus calendar decides how many periods a year has, so the promotion uses the
-    // same shape the student's own plan was built with.
+    // The shared college calendar decides how many periods a year has, so the promotion uses
+    // the same shape the student's own plan was built with.
     const calendar = await prisma.academicPeriod.findMany({
-      where: { campusId: enrollment.campusId },
       select: { sequence: true },
     });
     const semestersPerYear = new Set(calendar.map((row) => row.sequence)).size || undefined;

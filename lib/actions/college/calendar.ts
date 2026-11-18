@@ -2,7 +2,7 @@
 
 import { AcademicPeriodStatus, CalendarEventType } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
-import { requireCollegeAdmin, type AdminScope } from "@/lib/session";
+import { requireCollegeAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
@@ -10,10 +10,8 @@ import {
   dateField,
   enumField,
   hiddenId,
-  numberField,
   onSave,
   requiredDate,
-  requiredNumber,
   requiredText,
   startOfToday,
   text,
@@ -53,40 +51,14 @@ function assertNotEnded(endDate: Date) {
 }
 
 /**
- * The campus a period is written to. A campus admin is pinned to their own and the form value
- * is ignored; a super admin has no campus of their own, so they name the one being configured.
- */
-async function periodCampusId(scope: AdminScope, formData: FormData): Promise<number> {
-  /*
-   * A campus admin is pinned to their own campus and never shown the field, so scope is the
-   * whole answer for them. A super admin has no scope campus and is shown a picker; reading the
-   * posted value first is what makes that picker mean anything.
-   */
-  const posted = numberField(formData, "campusId", fieldLabel("campusId"));
-  if (posted !== null) {
-    const campus = await prisma.campus.findUnique({ where: { id: posted }, select: { id: true } });
-    if (!campus) throw new FieldError(fieldErrors.choice(fieldLabel("campusId")));
-    // A campus admin may only ever file against their own campus, whatever was posted.
-    if (scope.campusId !== null && campus.id !== scope.campusId) {
-      throw new FieldError(fieldErrors.choice(fieldLabel("campusId")));
-    }
-    return campus.id;
-  }
-
-  if (scope.campusId !== null) return scope.campusId;
-
-  throw new FieldError(fieldErrors.required(fieldLabel("campusId")));
-}
-
-/**
- * Only one period per campus may be active. Windows need not overlap for this to go wrong:
+ * Only one period in the college may be active. Windows need not overlap for this to go wrong:
  * a period that ran and finished keeps its ACTIVE status until somebody closes it, and the
  * calendar then has two current periods. The window that has already closed is the one to
  * ask about, so the message names it.
  */
-async function assertOnlyActive(campusId: number, exceptId?: string) {
+async function assertOnlyActive(exceptId?: string) {
   const other = await prisma.academicPeriod.findFirst({
-    where: { campusId, status: "ACTIVE", ...(exceptId ? { id: { not: exceptId } } : {}) },
+    where: { status: "ACTIVE", ...(exceptId ? { id: { not: exceptId } } : {}) },
     orderBy: { endsAt: "asc" },
     select: { name: true },
   });
@@ -94,7 +66,8 @@ async function assertOnlyActive(campusId: number, exceptId?: string) {
 }
 
 /**
- * Creates an academic period — an intake and the teaching window that goes with it.
+ * Creates the college's next academic period — an intake and the teaching window that goes with
+ * it. There is one row per year and month for the whole college; every campus reads the same one.
  *
  * The month comes from the START date, because that is what the cohort is: a January intake is
  * January however long it runs. Only January, May and September are accepted; the database holds
@@ -106,7 +79,7 @@ async function assertOnlyActive(campusId: number, exceptId?: string) {
  * any of them, so one cohort cannot appear in the list under three different spellings.
  */
 export async function createPeriod(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  await requireCollegeAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
     /*
@@ -133,23 +106,17 @@ export async function createPeriod(formData: FormData) {
       "applicationDeadline",
       fieldLabel("applicationDeadline"),
     );
-    if (applicationDeadline.getTime() > endsAt.getTime()) {
+    // The database requires applications to close before teaching starts. Match it here so the
+    // office gets a field error rather than a raw constraint failure.
+    if (applicationDeadline.getTime() > startsAt.getTime()) {
       throw new FieldError(intakeCopy.deadlineAfterStart);
     }
-
-    /*
-     * The campus this period belongs to, in the order that always resolves: an explicit choice on
-     * the form, then the campus already in scope. A campus admin has no campus field, so nothing
-     * is posted and their scope decides. A super admin is shown a picker, and preferring the scope
-     * cookie would make picking a campus in this form do nothing.
-     */
-    const campusId = (await periodCampusId(scope, formData)) ?? scope.campusId;
 
     const year = startsAt.getUTCFullYear();
     assertOpenYear(year);
 
     const taken = await prisma.academicPeriod.findUnique({
-      where: { campusId_year_month: { campusId, year, month } },
+      where: { year_month: { year, month } },
       select: { name: true },
     });
     if (taken) throw new FieldError(fieldErrors.windowOverlap(taken.name));
@@ -157,7 +124,6 @@ export async function createPeriod(formData: FormData) {
     await unique(fieldLabel("name"), () =>
       prisma.academicPeriod.create({
         data: {
-          campusId,
           year,
           month,
           sequence: intakeSequenceForMonth(month),
@@ -172,15 +138,13 @@ export async function createPeriod(formData: FormData) {
   });
 }
 
-/** A period is campus property, so its id is only honoured when it is the caller's own. */
-async function ownPeriod(periodId: string, campusId: number | null) {
+/** Every admin edits the one shared period; only its id needs checking. */
+async function ownPeriod(periodId: string) {
   const period = await prisma.academicPeriod.findUnique({
     where: { id: periodId },
-    select: { id: true, campusId: true, year: true, startsAt: true, endsAt: true },
+    select: { id: true, year: true, startsAt: true, endsAt: true },
   });
-  if (!period || (campusId !== null && period.campusId !== campusId)) {
-    throw new FieldError(fieldErrors.notOnCampus);
-  }
+  if (!period) throw new FieldError(fieldErrors.notFound);
   assertOpenYear(period.year);
   return period;
 }
@@ -194,10 +158,10 @@ async function ownPeriod(periodId: string, campusId: number | null) {
  * the right period and move the students.
  */
 export async function updatePeriod(formData: FormData) {
-  const scope = await requireCollegeAdmin();
+  await requireCollegeAdmin();
 
   return onSave("/dashboard/calendar", AFFECTED, async () => {
-    const period = await ownPeriod(hiddenId(formData, "periodId", copy.semesters.heading), scope.campusId);
+    const period = await ownPeriod(hiddenId(formData, "periodId", copy.semesters.heading));
 
     const startsAt = requiredDate(formData, "startsAt", fieldLabel("startsAt"));
     const endsAt = requiredDate(formData, "endsAt", fieldLabel("endsAt"));
@@ -218,7 +182,7 @@ export async function updatePeriod(formData: FormData) {
       throw new FieldError(intakeCopy.deadlineAfterStart);
     }
 
-    if (status === "ACTIVE") await assertOnlyActive(period.campusId, period.id);
+    if (status === "ACTIVE") await assertOnlyActive(period.id);
 
     // An ended period keeps its dates; the office can still record how it finished.
     const sameWindow =
@@ -233,8 +197,8 @@ export async function updatePeriod(formData: FormData) {
 }
 
 /**
- * With a semester on the form the entry belongs to that semester's campus. Without one it is a
- * college-wide entry, which only an administrator with no campus of their own may post.
+ * An entry on a shared period is college-wide, so every campus sees it. A standalone entry is
+ * campus property for a campus admin and college-wide for an administrator with no campus scope.
  */
 export async function createEvent(formData: FormData) {
   const scope = await requireCollegeAdmin();
@@ -249,16 +213,15 @@ export async function createEvent(formData: FormData) {
 
     if (endsAt && endsAt < startsAt) throw new FieldError(fieldErrors.dateOrder);
 
-    let campusId: number | null = null;
+    let campusId: number | null = scope.campusId;
     let linkedPeriodId: string | null = null;
 
     if (periodId) {
-      const period = await ownPeriod(periodId, scope.campusId);
+      const period = await ownPeriod(periodId);
       assertNotEnded(period.endsAt);
-      campusId = period.campusId;
+      // The period is shared, so an entry filed against it belongs to the whole college.
+      campusId = null;
       linkedPeriodId = period.id;
-    } else if (scope.campusId !== null) {
-      throw new FieldError(fieldErrors.notOnCampus);
     }
 
     await prisma.calendarEvent.create({
@@ -278,13 +241,18 @@ export async function deleteEvent(formData: FormData) {
       select: {
         id: true,
         campusId: true,
-        period: { select: { campusId: true, year: true, endsAt: true } },
+        periodId: true,
+        period: { select: { year: true, endsAt: true } },
       },
     });
-    const owner = event?.campusId ?? event?.period?.campusId ?? null;
 
-    // A college-wide entry is the super admin's to remove; anything else goes to its campus.
-    if (!event || (scope.campusId !== null && owner !== scope.campusId)) {
+    if (!event) throw new FieldError(fieldErrors.notFound);
+
+    /*
+     * Period-linked entries are college-wide, so every campus admin may remove them. A standalone
+     * entry belongs to the campus that filed it; a college-wide one belongs only to a super admin.
+     */
+    if (scope.campusId !== null && event.periodId === null && event.campusId !== scope.campusId) {
       throw new FieldError(fieldErrors.notOnCampus);
     }
     if (event.period) {

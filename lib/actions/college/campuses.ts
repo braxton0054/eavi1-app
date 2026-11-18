@@ -21,7 +21,7 @@ const fieldLabel = (name: string) =>
   name;
 
 /** The campus register, every campus picker and the college overview all read this. */
-const AFFECTED = ["/dashboard/campuses", "/dashboard", "/dashboard/scope"];
+const AFFECTED = ["/dashboard/campuses", "/dashboard", "/dashboard/scope", "/dashboard/programs"];
 
 export async function createCampus(formData: FormData) {
   await requireSuperAdmin();
@@ -33,9 +33,23 @@ export async function createCampus(formData: FormData) {
     const phone = phoneField(formData, "phone", fieldLabel("phone"));
 
     await unique(fieldLabel("code"), () =>
-      prisma.campus.create({
-        data: { code, name, place, phone, takesApplicants: checked(formData, "takesApplicants") },
-        select: { id: true },
+      prisma.$transaction(async (tx) => {
+        const created = await tx.campus.create({
+          data: { code, name, place, phone, takesApplicants: checked(formData, "takesApplicants") },
+          select: { id: true },
+        });
+
+        // A new campus inherits the shared catalogue in the same write. It still owns its own
+        // students, classes and invoices; only the programme list and calendar are college-wide.
+        const programs = await tx.program.findMany({ select: { id: true } });
+        for (const program of programs) {
+          await tx.program.update({
+            where: { id: program.id },
+            data: { campuses: { connect: { id: created.id } } },
+          });
+        }
+
+        return created;
       }),
     );
   });

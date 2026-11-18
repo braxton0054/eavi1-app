@@ -221,7 +221,7 @@ async function main() {
   }
   console.log(`  programmes: ${programRows.length}`);
 
-  // --- intakes per campus ------------------------------------------------
+  // --- college-wide intakes ----------------------------------------------
   const year = new Date().getFullYear();
   const intakePlan = [
     { month: 1, start: [1, 1], end: [4, 30] },
@@ -229,41 +229,34 @@ async function main() {
     { month: 9, start: [9, 1], end: [12, 20] },
   ];
 
-  const intakesByCampus = new Map<number, { id: string; month: number; year: number }[]>();
-  for (const campus of campusRows) {
-    const list = [];
-    for (const plan of intakePlan) {
-      const name = `${["January", "May", "September"][[1, 5, 9].indexOf(plan.month)]} intake ${year}`;
-      const startsAt = day(new Date(year, plan.start[0] - 1, plan.start[1]));
-      const endsAt = day(new Date(year, plan.end[0] - 1, plan.end[1]));
-      const deadline = addDays(startsAt, -21);
+  const sharedIntakes: { id: string; month: number; year: number }[] = [];
+  for (const plan of intakePlan) {
+    const name = `${["January", "May", "September"][[1, 5, 9].indexOf(plan.month)]} intake ${year}`;
+    const startsAt = day(new Date(year, plan.start[0] - 1, plan.start[1]));
+    const endsAt = day(new Date(year, plan.end[0] - 1, plan.end[1]));
+    const deadline = addDays(startsAt, -21);
+    const sequence = [1, 5, 9].indexOf(plan.month) + 1;
 
-      const sequence = [1, 5, 9].indexOf(plan.month) + 1;
-      const existing = await prisma.academicPeriod.findFirst({
-        where: { campusId: campus.id, year, month: plan.month },
-      });
-      const row = existing
-        ? await prisma.academicPeriod.update({
-            where: { id: existing.id },
-            data: { startsAt, endsAt, applicationDeadline: deadline, name },
-          })
-        : await prisma.academicPeriod.create({
-            data: {
-              campusId: campus.id,
-              year,
-              month: plan.month,
-              sequence,
-              name,
-              startsAt,
-              endsAt,
-              applicationDeadline: deadline,
-            },
-          });
-      list.push({ id: row.id, month: plan.month, year });
-    }
-    intakesByCampus.set(campus.id, list);
+    const row = await prisma.academicPeriod.upsert({
+      where: { year_month: { year, month: plan.month } },
+      update: { campusId: null, startsAt, endsAt, applicationDeadline: deadline, name, sequence },
+      create: {
+        year,
+        month: plan.month,
+        sequence,
+        name,
+        startsAt,
+        endsAt,
+        applicationDeadline: deadline,
+      },
+    });
+    sharedIntakes.push({ id: row.id, month: plan.month, year });
   }
-  console.log(`  intakes: ${campusRows.length * intakePlan.length}`);
+
+  // Every campus books its own classes against the same shared intake rows.
+  const intakesByCampus = new Map<number, { id: string; month: number; year: number }[]>();
+  for (const campus of campusRows) intakesByCampus.set(campus.id, sharedIntakes);
+  console.log(`  intakes: ${sharedIntakes.length} (shared by ${campusRows.length} campuses)`);
 
   // --- classes per campus/intake/programme --------------------------------
   const classesByCampus = new Map<number, { id: string; programId: string; intakeId: string }[]>();

@@ -15,7 +15,7 @@ export default async function NewClassPage() {
 
   const [programs, intakes] = await Promise.all([
     getProgramOptions(scope.campusId),
-    getIntakeChoices(scope.campusId),
+    getIntakeChoices(),
   ]);
 
   return (

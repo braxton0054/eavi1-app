@@ -16,19 +16,36 @@ import "dotenv/config";
 
 let failures = 0;
 
-/** Removes the fixture campus and everything hanging off it, whatever happened above. */
-async function cleanup(campusId: number) {
+/** Removes the fixture campus and the shared periods this run created, whatever happened above. */
+async function cleanup(campusId: number, periodIds: string[] = []) {
   const { prisma } = await import("@/lib/prisma");
   const enrollmentCampus = { enrollment: { campusId } };
+  const byPeriod = periodIds.length ? { periodId: { in: periodIds } } : null;
+
   await prisma.classMembership.deleteMany({ where: { campusId } });
   await prisma.classMembership.deleteMany({ where: enrollmentCampus });
+  if (byPeriod) {
+    await prisma.classMembership.deleteMany({ where: { enrollment: { periodId: { in: periodIds } } } });
+  }
   await prisma.invoice.deleteMany({ where: { campusId } });
+  if (byPeriod) await prisma.invoice.deleteMany({ where: byPeriod });
   await prisma.studentUnit.deleteMany({ where: enrollmentCampus });
+  if (byPeriod) {
+    await prisma.studentUnit.deleteMany({ where: { enrollment: { periodId: { in: periodIds } } } });
+  }
   await prisma.enrollment.deleteMany({ where: { campusId } });
+  if (byPeriod) await prisma.enrollment.deleteMany({ where: byPeriod });
   await prisma.studentProfile.deleteMany({ where: { campusId } });
   await prisma.user.deleteMany({ where: { campusId } });
+  if (byPeriod) {
+    await prisma.feeItem.deleteMany({ where: byPeriod });
+    await prisma.exam.deleteMany({ where: byPeriod });
+    await prisma.timetableSlot.deleteMany({ where: byPeriod });
+    await prisma.calendarEvent.deleteMany({ where: byPeriod });
+  }
   await prisma.academicClass.deleteMany({ where: { campusId } });
-  await prisma.academicPeriod.deleteMany({ where: { campusId } });
+  if (byPeriod) await prisma.academicClass.deleteMany({ where: byPeriod });
+  if (byPeriod) await prisma.academicPeriod.deleteMany({ where: { id: { in: periodIds } } });
   await prisma.$executeRawUnsafe(`DELETE FROM "_ProgramCampuses" WHERE "A" = ${campusId}`).catch(() => {});
   await prisma.campus.delete({ where: { id: campusId } }).catch(() => {});
 }
@@ -43,6 +60,34 @@ function check(name: string, ok: boolean, detail = "") {
 }
 
 let campusIdForCleanup: number | null = null;
+/** Periods are college-wide, so cleanup must target the rows this script actually created. */
+const periodIdsForCleanup: string[] = [];
+
+/**
+ * Gets the one college-wide period for a year and month, creating it only when it is missing.
+ * A period that is already there belongs to the database, so this script never edits or removes it.
+ */
+async function sharedPeriod(
+  year: number,
+  month: number,
+  sequence: number,
+  name: string,
+  startsAt: Date,
+  endsAt: Date,
+  applicationDeadline: Date,
+) {
+  const { prisma } = await import("@/lib/prisma");
+  const existing = await prisma.academicPeriod.findUnique({
+    where: { year_month: { year, month } },
+  });
+  if (existing) return existing;
+
+  const created = await prisma.academicPeriod.create({
+    data: { name, year, month, sequence, startsAt, endsAt, applicationDeadline },
+  });
+  periodIdsForCleanup.push(created.id);
+  return created;
+}
 
 async function main() {
   const { prisma } = await import("@/lib/prisma");
@@ -94,30 +139,27 @@ async function main() {
     `INSERT INTO "_ProgramCampuses" ("A", "B") VALUES (${campus.id}, '${program.id}') ON CONFLICT DO NOTHING`,
   );
 
-  const januaryIntake = await prisma.academicPeriod.create({
-    data: {
-      name: "January intake 2027",
-      campusId: campus.id,
-      year: 2027,
-      month: 1,
-      sequence: 1,
-      startsAt: new Date(Date.UTC(2027, 0, 5)),
-      endsAt: new Date(Date.UTC(2027, 3, 30)),
-      applicationDeadline: new Date(Date.UTC(2026, 11, 20)),
-    },
-  });
-  const mayIntake = await prisma.academicPeriod.create({
-    data: {
-      name: "May intake 2027",
-      campusId: campus.id,
-      year: 2027,
-      month: 5,
-      sequence: 2,
-      startsAt: new Date(Date.UTC(2027, 4, 4)),
-      endsAt: new Date(Date.UTC(2027, 7, 31)),
-      applicationDeadline: new Date(Date.UTC(2027, 3, 20)),
-    },
-  });
+  // One row per year and month for the whole college. If a period already exists it is shared
+  // data owned by the college, so the script reads it but never changes or deletes it.
+  const januaryIntake = await sharedPeriod(
+    2027,
+    1,
+    1,
+    "January intake 2027",
+    new Date(Date.UTC(2027, 0, 5)),
+    new Date(Date.UTC(2027, 3, 30)),
+    new Date(Date.UTC(2026, 11, 20)),
+  );
+
+  const mayIntake = await sharedPeriod(
+    2027,
+    5,
+    2,
+    "May intake 2027",
+    new Date(Date.UTC(2027, 4, 4)),
+    new Date(Date.UTC(2027, 7, 31)),
+    new Date(Date.UTC(2027, 3, 20)),
+  );
 
   const janClass = await prisma.academicClass.create({
     data: {
@@ -402,19 +444,17 @@ async function main() {
    * is already running or over: a transfer placed into the intake matching what they have already
    * studied, and a returning student resuming with the group they began in.
    */
-  const closedIntake = await prisma.academicPeriod.create({
-    data: {
-      name: "January intake 2025",
-      campusId: campus.id,
-      year: 2025,
-      month: 1,
-      sequence: 1,
-      startsAt: new Date(Date.UTC(2025, 0, 6)),
-      endsAt: new Date(Date.UTC(2025, 3, 30)),
-      // Deliberately in the past: this cohort has already started and its applications closed.
-      applicationDeadline: new Date(Date.UTC(2024, 11, 20)),
-    },
-  });
+  // A deliberately ancient year avoids colliding with the college's real planning periods.
+  const closedIntake = await sharedPeriod(
+    1970,
+    1,
+    1,
+    "January intake 1970",
+    new Date(Date.UTC(1970, 0, 6)),
+    new Date(Date.UTC(1970, 3, 30)),
+    // Deliberately in the past: this cohort has already started and its applications closed.
+    new Date(Date.UTC(1969, 11, 20)),
+  );
   check(
     "a past-deadline intake still exists to be joined",
     closedIntake.applicationDeadline < new Date(),
@@ -422,7 +462,6 @@ async function main() {
 
   // The picker must now return it. Mirrors getIntakeOptions without needing a request scope.
   const listed = await prisma.academicPeriod.findMany({
-    where: { campusId: campus.id },
     orderBy: [{ year: "desc" }, { month: "desc" }],
     select: { id: true, month: true, year: true, applicationDeadline: true },
   });
@@ -440,7 +479,7 @@ async function main() {
   const { currentPeriod } = await import("@/lib/academics/progression");
   const early = currentPeriod(
     { startsAt: closedIntake.startsAt },
-    new Date(Date.UTC(2025, 0, 6)),
+    closedIntake.startsAt,
     { totalPeriods: 6, semestersPerYear: 3 },
   );
   check(
@@ -634,6 +673,6 @@ main()
   // rows behind for the next one to trip over.
   .finally(async () => {
     const { prisma } = await import("@/lib/prisma");
-    if (campusIdForCleanup !== null) await cleanup(campusIdForCleanup);
+    if (campusIdForCleanup !== null) await cleanup(campusIdForCleanup, periodIdsForCleanup);
     await prisma.$disconnect();
   });

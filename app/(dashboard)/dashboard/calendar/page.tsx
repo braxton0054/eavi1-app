@@ -95,16 +95,8 @@ export default async function CalendarPage({
   const choiceClass =
     "h-11 rounded-lg border border-input bg-eavi-card eavi-carved px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-  /*
-   * No campus field on either form, for anyone.
-   *
-   * Both forms file their record against the campus the page is already showing, which the
-   * header picker and the campus links above have already chosen. Offering the campus a third
-   * time inside the form invited a record to be filed somewhere other than the page you were
-   * looking at — and when the field went in twice the wrong one won, which is how intakes
-   * silently stopped being created. One place decides the campus: the page.
-   */
-  const periodFields = copy.semesters.create.fields.filter((field) => field.name !== "campusId");
+  // Periods are college-wide, so the form has no campus field and files against no campus.
+  const periodFields = copy.semesters.create.fields;
 
   /**
    * The three intake months, ordered as a timeline. Every slot is shown whether or not a period
@@ -224,8 +216,6 @@ export default async function CalendarPage({
           fields={periodFields}
           options={options}
           values={{ year: String(view.year) }}
-          // The campus is the page's, not a third question.
-          hidden={{ campusId: String(view.campusId) }}
           action={createPeriod}
           submitLabel={common.create}
         />

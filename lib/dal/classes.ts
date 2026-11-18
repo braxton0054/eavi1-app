@@ -307,10 +307,9 @@ export function mergeSummary(preview: MergePreview): string {
   return describeMerge(preview);
 }
 
-/** Periods that a new class may be attached to, newest first. */
-export async function getIntakeChoices(campusId: number | null) {
+/** The shared periods a new class may be attached to, newest first. */
+export async function getIntakeChoices() {
   const rows = await prisma.academicPeriod.findMany({
-    where: campusWhere(campusId),
     orderBy: [{ year: "desc" }, { startsAt: "desc" }],
     select: { id: true, name: true, year: true, month: true, startsAt: true },
   });
