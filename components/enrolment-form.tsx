@@ -120,8 +120,8 @@ function LocationPicker({ prefix, label = "Residential address" }: { prefix: str
         >
           <option value="">{countyObj ? `Sub-county (${countyObj.subCounties.length})…` : "Pick county first…"}</option>
           {countyObj?.subCounties.map((s) => (
-            <option key={s.name} value={s.name}>
-              {s.name}
+            <option key={s} value={s}>
+              {s}
             </option>
           ))}
         </select>
@@ -133,7 +133,7 @@ function LocationPicker({ prefix, label = "Residential address" }: { prefix: str
             className={inputCls}
             disabled={!countyObj}
           >
-            <option value="">{countyObj ? `Town / ward (${towns.length})…` : "Pick county first…"}</option>
+            <option value="">{countyObj ? `Town (${towns.length})…` : "Pick county first…"}</option>
             {towns.map((t) => (
               <option key={t} value={t}>
                 {t}
