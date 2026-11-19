@@ -55,3 +55,6 @@ worker.mjs
 
 # Full-resolution photo originals; the site serves the optimized copies in web/.
 public/eavi-assets/originals/
+
+# Design source drop; the runtime copies live in lib/statements/templates/ and public/
+/incoice templete/
