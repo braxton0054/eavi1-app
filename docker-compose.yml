@@ -56,6 +56,9 @@ services:
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
         # The push public key, inlined into the client bundle at build time.
         NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+        # Build-time CSP: the object store's origin must be allowed in img-src or the
+        # browser refuses every profile and student photo.
+        S3_ENDPOINT: ${S3_ENDPOINT:-}
     image: ${APP_IMAGE:-eavi-portal:latest}
     restart: unless-stopped
     environment:
@@ -111,6 +114,7 @@ services:
       target: runner
       args:
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+        S3_ENDPOINT: ${S3_ENDPOINT:-}
     image: ${APP_IMAGE:-eavi-portal:latest}
     restart: unless-stopped
     command: ["node", "worker.mjs"]

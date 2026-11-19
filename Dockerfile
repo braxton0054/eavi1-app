@@ -33,6 +33,12 @@ ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 # The push public key rides into the bundle the same way; the private key is runtime-only.
 ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
+# `next.config.ts` reads S3_ENDPOINT while building the CSP: profile and student photos
+# are served straight from the object store, so its origin must be in img-src or the
+# browser blocks every picture. It is a build-time ARG, not a runner ENV, like the other
+# values the config folds into the compiled headers.
+ARG S3_ENDPOINT=
+ENV S3_ENDPOINT=$S3_ENDPOINT
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
