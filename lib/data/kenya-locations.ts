@@ -1,3 +1,5 @@
+import { TOWNS_BY_COUNTY } from "@/lib/data/kenya-towns";
+
 export type KenyaCounty = {
   name: string;
   capital: string;
@@ -201,3 +203,22 @@ export const KENYA_COUNTIES: KenyaCounty[] = [
   { name: "Wajir", capital: "Wajir", code: 8, subCounties: ["Eldas", "Tarbaj", "Wajir East", "Wajir North", "Wajir South", "Wajir West"] },
   { name: "West Pokot", capital: "Kapenguria", code: 24, subCounties: ["Central Pokot", "North Pokot", "Pokot South", "West Pokot"] },
 ];
+
+/** Towns offered as soon as a county is picked, before a sub-county is chosen. */
+export function townsInCounty(county: KenyaCounty): string[] {
+  return [
+    ...new Set([
+      ...Object.values(county.townsBySubCounty ?? {}).flat(),
+      ...(TOWNS_BY_COUNTY[county.name] ?? []),
+    ]),
+  ];
+}
+
+/**
+ * Towns of the chosen sub-county. Counties with a captured sub-county breakdown use that
+ * narrower list; everywhere else the whole county's towns stay selectable.
+ */
+export function townsInSubCounty(county: KenyaCounty, subCounty: string): string[] {
+  const local = county.townsBySubCounty?.[subCounty];
+  return local?.length ? local : townsInCounty(county);
+}

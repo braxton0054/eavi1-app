@@ -7,7 +7,7 @@ import { enrolStudent } from "@/lib/actions/college/enrolment";
 import type { ClassOption } from "@/lib/dal/classes";
 import { nextClassLetter } from "@/lib/academics/classes";
 import { genderChoices } from "@/lib/content/apply";
-import { KENYA_COUNTIES } from "@/lib/data/kenya-locations";
+import { KENYA_COUNTIES, townsInCounty, townsInSubCounty } from "@/lib/data/kenya-locations";
 
 type Option = { value: string; label: string };
 
@@ -80,7 +80,13 @@ function LocationPicker({ prefix, label = "Residential address" }: { prefix: str
   const [subCounty, setSubCounty] = useState("");
   const [town, setTown] = useState("");
   const countyObj = KENYA_COUNTIES.find((c) => c.name === county);
-  const towns = countyObj?.townsBySubCounty?.[subCounty] ?? [];
+  // With no sub-county yet, offer every town in the county. Choosing one narrows the list
+  // to that sub-county's towns where we have that breakdown.
+  const towns = countyObj
+    ? subCounty
+      ? townsInSubCounty(countyObj, subCounty)
+      : townsInCounty(countyObj)
+    : [];
   return (
     <div className="space-y-2 sm:col-span-2">
       <span className={labelCls}>{label}</span>
@@ -125,8 +131,9 @@ function LocationPicker({ prefix, label = "Residential address" }: { prefix: str
             value={town}
             onChange={(e) => setTown(e.target.value)}
             className={inputCls}
+            disabled={!countyObj}
           >
-            <option value="">Town ({towns.length})…</option>
+            <option value="">{countyObj ? `Town (${towns.length})…` : "Pick county first…"}</option>
             {towns.map((t) => (
               <option key={t} value={t}>
                 {t}
