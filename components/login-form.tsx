@@ -192,7 +192,20 @@ export function LoginForm({
         </CardHeader>
 
         <CardContent>
-          <form id="login-form" onSubmit={handleSubmit} noValidate className={styles.form}>
+          {/*
+            The action is a real server endpoint: if the browser bundle is slow (a distant
+            VPS, a weak connection) the native POST still signs the person in instead of
+            the button just reloading the page. handleSubmit prevents it when JS is ready.
+          */}
+          <form
+            id="login-form"
+            action="/api/auth/login/form"
+            method="post"
+            onSubmit={handleSubmit}
+            noValidate
+            className={styles.form}
+          >
+            <input type="hidden" name="next" value={nextPath ?? ""} />
             <Field data-invalid={errors.email ? "true" : undefined}>
               <FieldLabel htmlFor="email">Email address</FieldLabel>
               <Input
