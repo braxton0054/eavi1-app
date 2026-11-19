@@ -480,7 +480,7 @@ const profilePhoto = {
   heading: "Profile photo",
   description: "Shown next to your name at the top right of the portal.",
   file: "Photo (JPG or PNG)",
-  hint: "A square picture reads best.",
+  hint: "Use a passport-size portrait; it is shown in a 3:4 frame.",
   button: "Save photo",
   remove: "Remove photo",
   removed: "Photo removed.",

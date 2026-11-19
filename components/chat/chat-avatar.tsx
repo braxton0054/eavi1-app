@@ -51,8 +51,13 @@ export function ChatAvatar({
   const [failed, setFailed] = useState(false);
   const showPhoto = Boolean(photoThumbUrl) && !failed;
 
+  // Passport-format 3:4 frame for the picture, never a circle. The presence dot stays
+  // round — it is a status marker, not a photograph.
   return (
-    <span className={cn("relative inline-flex shrink-0", className)} style={{ width: size, height: size }}>
+    <span
+      className={cn("relative inline-flex shrink-0", className)}
+      style={{ width: Math.round(size * 0.75), height: size }}
+    >
       {showPhoto ? (
         /* eslint-disable-next-line @next/next/no-img-element -- authenticated route, already
            a small cropped thumbnail; next/image would need the route allow-listed and would
@@ -65,13 +70,13 @@ export function ChatAvatar({
           loading="lazy"
           decoding="async"
           onError={() => setFailed(true)}
-          className="h-full w-full rounded-full border border-[var(--eavi-border)] object-cover"
+          className="h-full w-full rounded-md border border-[var(--eavi-border)] object-cover"
         />
       ) : (
         <span
           aria-hidden="true"
           className={cn(
-            "flex h-full w-full items-center justify-center rounded-full border border-[var(--eavi-border)] font-semibold text-[var(--eavi-on-bg)]",
+            "flex h-full w-full items-center justify-center rounded-md border border-[var(--eavi-border)] font-semibold text-[var(--eavi-on-bg)]",
             colourFor(name),
           )}
           style={{ fontSize: Math.max(11, size * 0.36) }}

@@ -40,7 +40,8 @@ export default async function ProfilePage({
 
       <Panel title={copy.photo.heading} description={copy.photo.description}>
         <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start">
-          <span className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-eavi-plate ring-1 ring-eavi-border">
+          {/* A passport-format 3:4 frame, never a circle — the same crop everywhere. */}
+          <span className="flex h-32 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-eavi-plate ring-1 ring-eavi-border">
             {scope.photoUrl ? (
               // The object host only comes from the environment at runtime, so the picture
               // cannot be declared in next.config.ts's image allow-list.

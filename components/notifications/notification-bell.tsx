@@ -44,7 +44,7 @@ const TYPES = [
   ["chat", "Messages"],
 ] as const;
 
-const POLL_MS = 45_000;
+const POLL_MS = 15_000;
 
 function ago(iso: string) {
   const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -67,8 +67,10 @@ export function NotificationBell() {
   });
   const [muted, setMuted] = useState<string[]>([]);
 
-  // The newest id seen: toasts fire only for rows that arrive after this.
-  const newestSeen = useRef<string | null>(null);
+  // Ids already shown: a toast fires for a row the moment it first appears, whether the
+  // person is on this tab or on another one. Keeping the set (rather than just the newest
+  // id) means a burst of notifications is never silently swallowed between two polls.
+  const seenIds = useRef<Set<string>>(new Set());
   const firstLoad = useRef(true);
 
   const refresh = useCallback(async () => {
@@ -80,16 +82,13 @@ export function NotificationBell() {
       setItems(data.items);
       setUnread(data.unread);
 
-      const newest = data.items[0]?.id ?? null;
-      if (newest && newest !== newestSeen.current) {
-        const incoming = data.items.find((item) => item.id === newest && !item.isRead);
-        if (!firstLoad.current && incoming && document.hidden) {
-          // Real-time in-app toast: the person is on another tab, so the portal
-          // surfaces what arrived instead of waiting for the bell to be opened.
-          toast({ title: incoming.title, description: incoming.body, variant: "info" });
-        }
-        newestSeen.current = newest;
+      const incoming = data.items.find((item) => !item.isRead && !seenIds.current.has(item.id));
+      if (!firstLoad.current && incoming) {
+        // A live popup like a notice arriving: show it as soon as the poll sees it,
+        // regardless of whether the tab is in focus. The first load only seeds the set.
+        toast({ title: incoming.title, description: incoming.body, variant: "info" });
       }
+      for (const item of data.items) seenIds.current.add(item.id);
       firstLoad.current = false;
     } catch {
       // A poll that fails stays silent — the next one is 45 seconds away.

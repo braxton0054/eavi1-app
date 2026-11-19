@@ -94,14 +94,15 @@
     outline-offset: 2px;
   }
 
+  /* Passport format, not a circle: a 3:4 portrait frame with a small corner radius. */
   .avatar {
     display: grid;
     place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2rem;
+    height: 2.67rem;
     flex-shrink: 0;
     overflow: hidden;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-xs);
     background: var(--surface-2);
     box-shadow: inset 0 0 0 1px var(--border);
     color: var(--text-muted);
