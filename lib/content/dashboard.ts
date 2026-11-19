@@ -33,6 +33,7 @@ export type FieldType =
   | "time"
   | "number"
   | "select"
+  | "multiselect"
   | "textarea"
   | "checkbox"
   | "file";
@@ -303,6 +304,8 @@ export const fieldErrors = {
   image: (label: string) =>
     `${label} must be a JPG or PNG picture. Photos from some phones are HEIC — re-save it as JPG first.`,
   fileSize: (label: string, maxMb: number) => `${label} must be smaller than ${maxMb} MB.`,
+  photoTooSmall: (label: string, width: number, height: number) =>
+    `${label} must be at least ${width} × ${height} pixels so it stays clear on a card.`,
   storageOff: "File storage is not configured, so the college office must enable it first.",
   currentPassword: "That is not your current password.",
   passwordMismatch: "The two new passwords do not match.",
@@ -1445,6 +1448,7 @@ export const pages = {
       { key: "contact", label: "Contact" },
       { key: "department", label: "Department" },
       { key: "programs", label: "Programmes" },
+      { key: "campuses", label: "Campuses" },
       { key: "load", label: "Weekly hours", align: "end" },
       { key: "status", label: "Account" },
     ] satisfies Column[],
@@ -1457,13 +1461,12 @@ export const pages = {
       title: "New tutor",
       fields: [
         {
-          name: "campusId",
-          label: "Campus",
-          type: "select",
+          name: "campusIds",
+          label: "Campuses",
+          type: "multiselect",
           required: true,
           optionKey: "campuses",
-          placeholder: "Choose a campus…",
-          hint: "The campus this tutor will teach at.",
+          hint: "Select one campus or both — Ctrl/Cmd-click or use the arrow keys.",
         },
         { name: "fullName", label: "Full name", type: "text", required: true },
         { name: "email", label: "Email (sign-in)", type: "email", required: true },

@@ -10,7 +10,6 @@ import {
   emailField,
   hiddenId,
   nextStaffNo,
-  numberField,
   onSave,
   passwordField,
   phoneField,
@@ -32,21 +31,21 @@ export async function createTutor(formData: FormData) {
 
   return onSave("/dashboard/tutors", AFFECTED, async () => {
     /*
-     * A tutor belongs to one campus even though the programme catalogue is shared. A campus
-     * admin is pinned to their own; a super admin names the campus on the form, so tutors can
-     * be added from anywhere instead of having to switch the global scope first.
+     * The super admin picks one or both teaching campuses on the form. The sign-in account
+     * keeps a primary campus (the first one picked), while the tutor profile is connected
+     * to every selected campus so both offices see and can timetable the same tutor.
      */
-    let campusId = scope.campusId;
-    if (campusId === null) {
-      const posted = numberField(formData, "campusId", fieldLabel("campusId"));
-      if (posted === null) throw new FieldError(fieldErrors.required(fieldLabel("campusId")));
-      if (!Number.isInteger(posted) || posted <= 0) {
-        throw new FieldError(fieldErrors.choice(fieldLabel("campusId")));
-      }
-      const campus = await prisma.campus.findUnique({ where: { id: posted }, select: { id: true } });
-      if (!campus) throw new FieldError(fieldErrors.choice(fieldLabel("campusId")));
-      campusId = campus.id;
-    }
+    const postedIds = formData
+      .getAll("campusIds")
+      .map((value) => Number(String(value)))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    const campuses = await prisma.campus.findMany({
+      where: { id: { in: [...new Set(postedIds)] }, takesApplicants: true },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    if (campuses.length === 0) throw new FieldError(fieldErrors.required(fieldLabel("campusIds")));
+    const campusId = campuses[0].id;
 
     const fullName = requiredText(formData, "fullName", fieldLabel("fullName"));
     // The helper throws when this required field is empty; the guard only narrows the type.
@@ -96,6 +95,7 @@ export async function createTutor(formData: FormData) {
             title: text(formData, "title"),
             department: text(formData, "department"),
             programs: { connect: programId ? [{ id: programId }] : [] },
+            campuses: { connect: campuses.map((campus) => ({ id: campus.id })) },
           },
         }),
       );
@@ -110,13 +110,14 @@ export async function approveTutor(formData: FormData) {
     const tutorId = hiddenId(formData, "tutorId", copy.title);
 
     const tutor = await prisma.tutorProfile.findFirst({
-      where: { id: tutorId, ...(scope.campusId === null ? {} : { campusId: scope.campusId }) },
-      include: { user: { select: { id: true, campusId: true } } },
+      where: {
+        id: tutorId,
+        ...(scope.campusId === null ? {} : { campuses: { some: { id: scope.campusId } } }),
+      },
+      include: { user: { select: { id: true } } },
     });
-    // The profile and the sign-in account behind it both have to sit on this campus.
-    if (!tutor || (scope.campusId !== null && tutor.user.campusId !== scope.campusId)) {
-      throw new FieldError(fieldErrors.notOnCampus);
-    }
+    // A tutor connected to the scoped campus is theirs to approve, whichever campus is primary.
+    if (!tutor) throw new FieldError(fieldErrors.notOnCampus);
 
     await prisma.user.update({
       where: { id: tutor.user.id },

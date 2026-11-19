@@ -70,7 +70,7 @@ export function ChatAvatar({
           loading="lazy"
           decoding="async"
           onError={() => setFailed(true)}
-          className="h-full w-full rounded-md border border-[var(--eavi-border)] object-cover"
+          className="h-full w-full rounded-md border border-[var(--eavi-border)] object-contain"
         />
       ) : (
         <span

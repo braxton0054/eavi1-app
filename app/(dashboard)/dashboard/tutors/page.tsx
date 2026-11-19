@@ -68,6 +68,10 @@ export default async function TutorsPage({
         tutor.programs.length > 0
           ? tutor.programs.map((program) => program.code).join(", ")
           : common.none,
+      campuses:
+        tutor.campuses.length > 0
+          ? tutor.campuses.map((campus) => campus.name).join(", ")
+          : common.none,
       load: String(tutor.weeklyHours),
       status: (
         <StatusChip tone={accountTone[tutor.user.status] ?? "neutral"}>
@@ -101,7 +105,7 @@ export default async function TutorsPage({
           title={copy.create.title}
           fields={copy.create.fields}
           options={options}
-          values={{ campusId: scope.campusId === null ? undefined : String(scope.campusId) }}
+          values={{ campusIds: scope.campusId === null ? undefined : String(scope.campusId) }}
           action={createTutor}
           submitLabel={common.create}
         />

@@ -12,6 +12,7 @@ import { genderValues } from "@/lib/content/apply";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
+  assertPhotoDimensions,
   assertStorageFor,
   dateField,
   enumField,
@@ -48,6 +49,7 @@ async function maybeUpload(
   keySeed: string,
 ): Promise<string | null> {
   if (!(value instanceof File) || value.size === 0) return null;
+  await assertPhotoDimensions(value, "photo");
   return putFile(value, folder, keySeed);
 }
 

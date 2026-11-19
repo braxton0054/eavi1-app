@@ -67,6 +67,28 @@ function Control({
     );
   }
 
+  if (field.type === "multiselect") {
+    // Several values travel under the same field name; the action reads getAll().
+    const chosen = new Set((value ?? "").split(",").filter(Boolean));
+    return (
+      <select
+        id={htmlId}
+        name={field.name}
+        multiple
+        size={Math.min(Math.max(choices.length, 2), 5)}
+        required={field.required}
+        defaultValue={[...chosen]}
+        className={cn(control, "h-auto min-h-11 py-1")}
+      >
+        {choices.map((choice) => (
+          <option key={choice.value} value={choice.value}>
+            {choice.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
   if (field.type === "textarea") {
     return (
       <Textarea id={htmlId} name={field.name} required={field.required} defaultValue={value} placeholder={field.placeholder} rows={4} className={control} />

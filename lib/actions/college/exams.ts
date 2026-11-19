@@ -72,7 +72,7 @@ export async function createExam(formData: FormData) {
     const invigilatorId = text(formData, "invigilatorId");
     if (invigilatorId) {
       const invigilator = await prisma.tutorProfile.findFirst({
-        where: { id: invigilatorId, campusId },
+        where: { id: invigilatorId, ...(campusId === null ? {} : { campuses: { some: { id: campusId } } }) },
         select: { id: true },
       });
       if (!invigilator) throw new FieldError(fieldErrors.notOnCampus);

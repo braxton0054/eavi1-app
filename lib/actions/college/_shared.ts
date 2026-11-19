@@ -163,6 +163,10 @@ export function passwordField(formData: FormData, name: string, label: string): 
 export const MAX_UPLOAD_MB = 10;
 const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
+/** Minimum pixels for a photograph (a passport-style portrait). */
+export const MIN_PHOTO_WIDTH = 300;
+export const MIN_PHOTO_HEIGHT = 400;
+
 /**
  * A file the administrator attached. A file picker that was opened and cancelled arrives as
  * an empty file, which counts as "nothing attached" instead of a missing answer.
@@ -208,6 +212,42 @@ export async function fileField(
   if (kind === "image" && !isImage) throw new FieldError(fieldErrors.image(label));
 
   return file;
+}
+
+/**
+ * Read a JPEG/PNG's dimensions from its header — no image library, no decode. Only the
+ * first 64 KB is read, enough for SOF/IHDR, so a large photo costs almost nothing here.
+ */
+function imageSize(bytes: Buffer): { width: number; height: number } | null {
+  // PNG: IHDR width/height are big-endian at offsets 16 and 20.
+  if (bytes.length >= 24 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  }
+  // JPEG: walk markers until a Start-of-Frame segment gives the dimensions.
+  if (bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    let at = 2;
+    while (at + 9 < bytes.length) {
+      if (bytes[at] !== 0xff) { at += 1; continue; }
+      const marker = bytes[at + 1];
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) { at += 2; continue; }
+      const length = bytes.readUInt16BE(at + 2);
+      const sof = (marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) ||
+        (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf);
+      if (sof) return { height: bytes.readUInt16BE(at + 5), width: bytes.readUInt16BE(at + 7) };
+      at += 2 + length;
+    }
+  }
+  return null;
+}
+
+/** Reject pictures too small to read as a passport photo before anything is written. */
+export async function assertPhotoDimensions(file: File, label: string): Promise<void> {
+  const header = Buffer.from(await file.slice(0, 64 * 1024).arrayBuffer());
+  const size = imageSize(header);
+  if (!size) throw new FieldError(fieldErrors.image(label));
+  if (size.width < MIN_PHOTO_WIDTH || size.height < MIN_PHOTO_HEIGHT) {
+    throw new FieldError(fieldErrors.photoTooSmall(label, MIN_PHOTO_WIDTH, MIN_PHOTO_HEIGHT));
+  }
 }
 
 /**

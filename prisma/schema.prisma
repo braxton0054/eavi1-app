@@ -210,6 +210,7 @@ model Campus {
   classes         AcademicClass[]
   cardBatches     CardBatch[]
   offerLetters    OfferLetter[]
+  tutorAssignments TutorProfile[] @relation("TutorCampuses")
 
   @@map("campuses")
 }
@@ -460,6 +461,8 @@ model TutorProfile {
   classes        ClassTutor[]
   campusId       Int
   campus         Campus          @relation(fields: [campusId], references: [id])
+  /// A tutor may teach at more than one campus; a super admin picks them on the form.
+  campuses       Campus[]        @relation("TutorCampuses")
   title          String?
   department     String?
   programs       Program[]       @relation("ProgramTutors")

@@ -43,7 +43,7 @@ export async function createSlot(formData: FormData) {
     const tutorId = text(formData, "tutorId");
     if (tutorId) {
       const tutor = await prisma.tutorProfile.findFirst({
-        where: { id: tutorId, campusId },
+        where: { id: tutorId, ...(campusId === null ? {} : { campuses: { some: { id: campusId } } }) },
         select: { id: true },
       });
       if (!tutor) throw new FieldError(fieldErrors.notOnCampus);

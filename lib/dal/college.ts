@@ -867,9 +867,14 @@ export async function getProgramDetail(programId: string) {
 
 /* -------------------------------------------------------------------- tutors */
 
+/** A tutor scope covers every campus they teach at, not just their sign-in campus. */
+function tutorScopeWhere(campusId: number | null) {
+  return campusId === null ? {} : { campuses: { some: { id: campusId } } };
+}
+
 export async function getTutors(query: ListQuery) {
   const scope = await requireCollegeAdmin();
-  const where = { AND: [campusWhere(scope.campusId), tutorSearch(query.q)] };
+  const where = { AND: [tutorScopeWhere(scope.campusId), tutorSearch(query.q)] };
 
   const rows = await prisma.tutorProfile.findMany({
     where,
@@ -877,6 +882,7 @@ export async function getTutors(query: ListQuery) {
     include: {
       user: { select: { id: true, fullName: true, email: true, phone: true, status: true } },
       programs: { select: { name: true, code: true } },
+      campuses: { select: { name: true } },
       timetableSlots: { select: { startAt: true, endAt: true } },
     },
   });
@@ -1321,7 +1327,7 @@ export async function getReports() {
     select: { id: true, name: true, code: true, type: { select: { name: true } } },
   });
   const tutors = await prisma.tutorProfile.findMany({
-    where,
+    where: tutorScopeWhere(scope.campusId),
     include: { user: { select: { fullName: true } }, timetableSlots: { select: { startAt: true, endAt: true } } },
   });
 
@@ -1448,6 +1454,8 @@ export async function getStudentOptions(campusId: number | null) {
 export async function getCampusOptions() {
   await requireCollegeAdmin();
   const rows = await prisma.campus.findMany({
+    // Town Office is paperwork, not a teaching campus: never assign a tutor to it.
+    where: { takesApplicants: true },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
@@ -1456,7 +1464,7 @@ export async function getCampusOptions() {
 
 export async function getTutorOptions(campusId: number | null) {
   const rows = await prisma.tutorProfile.findMany({
-    where: campusWhere(campusId),
+    where: tutorScopeWhere(campusId),
     orderBy: { staffNo: "asc" },
     select: { id: true, staffNo: true, user: { select: { fullName: true } } },
   });

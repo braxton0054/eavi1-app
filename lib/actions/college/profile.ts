@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
+  assertPhotoDimensions,
   assertStorageFor,
   emailField,
   fileField,
@@ -33,6 +34,7 @@ export async function saveProfilePhoto(formData: FormData) {
 
   return onSave("/dashboard/profile", AFFECTED, async () => {
     assertStorageFor([file]);
+    await assertPhotoDimensions(file, photoLabel);
     const url = await putFile(file, "staff-photos", scope.userId);
     await prisma.user.update({ where: { id: scope.userId }, data: { photoUrl: url } });
   });

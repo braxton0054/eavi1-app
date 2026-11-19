@@ -46,7 +46,7 @@ export default async function ProfilePage({
               // The object host only comes from the environment at runtime, so the picture
               // cannot be declared in next.config.ts's image allow-list.
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={scope.photoUrl} alt={copy.photo.preview} className="size-full object-cover" />
+              <img src={scope.photoUrl} alt={copy.photo.preview} className="size-full object-contain" />
             ) : (
               <span className="px-2 text-center text-xs text-eavi-muted-text">{copy.photo.none}</span>
             )}
