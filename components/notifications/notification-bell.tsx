@@ -240,6 +240,9 @@ export function NotificationBell() {
         </div>
 
         <div className={styles.push}>
+          <p className={styles.pushStatus}>
+            Turn this on to get pop-ups even when the browser is closed.
+          </p>
           <div className={styles.toggleRow}>
             <span className={styles.pushStatus}>{statusLine}</span>
             <button type="button" onClick={() => void togglePush()} disabled={busy} style={{ cursor: "pointer" }}>

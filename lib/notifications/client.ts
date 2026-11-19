@@ -18,8 +18,23 @@ export function pushSupported(): boolean {
   return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
 }
 
-function applicationServerKey(): Uint8Array | null {
-  const raw = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+/**
+ * The public VAPID key comes from a tiny runtime route, not from a NEXT_PUBLIC_ build
+ * variable: that value was repeatedly missing from the compiled browser bundle in Docker
+ * (build args are easy to lose), and push silently refused to switch on. The key is
+ * public by design, so serving it to a signed-in browser loses nothing.
+ */
+async function applicationServerKey(): Promise<Uint8Array | null> {
+  let raw: string | null = null;
+  try {
+    const response = await fetch("/api/push/config", { cache: "no-store" });
+    if (response.ok) {
+      const data = (await response.json()) as { publicKey?: string };
+      raw = typeof data.publicKey === "string" && data.publicKey ? data.publicKey : null;
+    }
+  } catch {
+    return null;
+  }
   if (!raw) return null;
   // The key arrives URL-safe base64; the subscription call wants the raw bytes.
   const padding = "=".repeat((4 - (raw.length % 4)) % 4);
@@ -70,10 +85,6 @@ export async function enablePush(): Promise<PushSetupResult> {
   if (!pushSupported()) {
     return { ok: false, reason: "This browser does not support push notifications." };
   }
-  if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
-    return { ok: false, reason: "Notifications are not configured on the server yet." };
-  }
-
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
     return {
@@ -87,7 +98,7 @@ export async function enablePush(): Promise<PushSetupResult> {
 
   try {
     const swReg = await ensureRegistration();
-    const key = applicationServerKey();
+    const key = await applicationServerKey();
     if (!key) return { ok: false, reason: "Notifications are not configured on the server yet." };
 
     const existing = await swReg.pushManager.getSubscription();
