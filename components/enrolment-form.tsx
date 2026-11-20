@@ -144,7 +144,7 @@ function LocationPicker({ prefix, label = "Residential address" }: { prefix: str
         ) : null}
         <input
           name={`${prefix}Detail`}
-          placeholder={towns.length ? "Estate / street / landmark" : "Town / estate / street"}
+          placeholder={towns.length ? "Street / landmark" : "Town / street"}
           className={inputCls}
         />
       </div>
