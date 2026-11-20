@@ -90,7 +90,7 @@ function LocationPicker({ prefix, label = "Residential address" }: { prefix: str
   return (
     <div className="space-y-2 sm:col-span-2">
       <span className={labelCls}>{label}</span>
-      <div className={`grid gap-3 ${towns.length ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+      <div className="grid gap-3 sm:grid-cols-3">
         <select
           name={`${prefix}County`}
           value={county}
@@ -139,13 +139,8 @@ function LocationPicker({ prefix, label = "Residential address" }: { prefix: str
                 {t}
               </option>
             ))}
-            <option value="Other">Other (specify below)</option>
           </select>
         ) : null}
-        <input
-          name={`${prefix}Detail`}
-          className={inputCls}
-        />
       </div>
     </div>
   );

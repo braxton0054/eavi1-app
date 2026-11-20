@@ -7,7 +7,7 @@
  *   https://github.com/open-admin-data/kenya-administrative-divisions
  * Each county offers its single main town (the county headquarters).
  *   https://en.wikipedia.org/wiki/Counties_of_Kenya
- * "Other (specify below)" covers a different town if needed.
+ * The picker offers exactly three selects: county, sub-county and main town.
  */
 
 export type KenyaCounty = {
