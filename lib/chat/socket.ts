@@ -153,12 +153,14 @@ export function attachChat(io: Server) {
       }
     });
 
-    socket.on("chat:typing", async (payload: { conversationId?: string; typing?: boolean }) => {
+    socket.on("chat:typing", (payload: { conversationId?: string; typing?: boolean }) => {
       const conversationId = String(payload?.conversationId ?? "");
       if (!conversationId) return;
 
-      const member = await membershipFor(conversationId, user.id);
-      if (!member) return;
+      // The set is filled only after chat:join confirmed membership in the database, and
+      // pruned on leave. Checking it keeps every keystroke from costing a DB round trip;
+      // a socket that never joined simply receives no broadcast.
+      if (!socket.data.rooms.has(conversationId)) return;
 
       socket.to(`conv:${conversationId}`).emit("chat:typing", {
         conversationId,
@@ -189,29 +191,42 @@ export function attachChat(io: Server) {
         ack?: CallableFunction,
       ) => {
         const rooms = Array.isArray(payload?.rooms) ? payload.rooms.slice(0, 50) : [];
+
+        // Rooms are independent, so a reconnect with many open threads no longer waits
+        // for 50 sequential round trips. A failed room is skipped rather than losing
+        // the catch-up for every other thread.
+        const recovered = await Promise.all(
+          rooms.map(async (room) => {
+            try {
+              const conversationId = String(room?.conversationId ?? "");
+              const member = await membershipFor(conversationId, user.id);
+              if (!member) return null;
+
+              const after = room.afterId
+                ? await prisma.message.findUnique({
+                    where: { id: String(room.afterId) },
+                    select: { createdAt: true },
+                  })
+                : null;
+
+              const rows = await prisma.message.findMany({
+                where: {
+                  conversationId,
+                  ...(after ? { createdAt: { gt: after.createdAt } } : {}),
+                },
+                orderBy: { createdAt: "asc" },
+                take: 200,
+              });
+              return [conversationId, rows.map((row) => row.id)] as const;
+            } catch {
+              return null;
+            }
+          }),
+        );
+
         const result: Record<string, unknown[]> = {};
-
-        for (const room of rooms) {
-          const conversationId = String(room?.conversationId ?? "");
-          const member = await membershipFor(conversationId, user.id);
-          if (!member) continue;
-
-          const after = room.afterId
-            ? await prisma.message.findUnique({
-                where: { id: String(room.afterId) },
-                select: { createdAt: true },
-              })
-            : null;
-
-          const rows = await prisma.message.findMany({
-            where: {
-              conversationId,
-              ...(after ? { createdAt: { gt: after.createdAt } } : {}),
-            },
-            orderBy: { createdAt: "asc" },
-            take: 200,
-          });
-          result[conversationId] = rows.map((row) => row.id);
+        for (const entry of recovered) {
+          if (entry) result[entry[0]] = entry[1];
         }
 
         ack?.({ ok: true, rooms: result });

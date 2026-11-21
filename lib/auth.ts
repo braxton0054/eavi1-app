@@ -27,6 +27,12 @@ const SCRYPT_P = 1;
 const SCRYPT_MAX_MEMORY = 64 * 1024 * 1024;
 export const SESSION_COOKIE = "eavi_session";
 export const SESSION_TTL_DAYS = 30;
+/**
+ * Presence only needs an activity timestamp inside a 90-second window, so one write a
+ * minute per active session is plenty. Without this, every page view and RSC request
+ * wrote to the sessions table, making it the hottest table in the database.
+ */
+const LAST_SEEN_WRITE_INTERVAL_MS = 60_000;
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
@@ -92,10 +98,15 @@ export async function resolveSession(token: string) {
 
   if (!session || session.expiresAt.getTime() < Date.now()) return null;
 
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { lastSeenAt: new Date() },
-  });
+  // The guarded update means concurrent requests cannot push the timestamp backwards,
+  // and a session active for an hour now costs one write a minute instead of one per click.
+  const cutoff = new Date(Date.now() - LAST_SEEN_WRITE_INTERVAL_MS);
+  if (session.lastSeenAt < cutoff) {
+    await prisma.session.updateMany({
+      where: { id: session.id, lastSeenAt: { lt: cutoff } },
+      data: { lastSeenAt: new Date() },
+    });
+  }
 
   return session.user;
 }

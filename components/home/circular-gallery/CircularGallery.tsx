@@ -1194,6 +1194,10 @@ const CircularGallery = ({
               <img
                 src={item.image}
                 alt={item.alt ?? item.text ?? 'Gallery image'}
+                // Without WebGL this fallback used to fetch all 226 full-size photos at
+                // once on an older phone. Keep the strip scrollable but fetch on approach.
+                loading="lazy"
+                decoding="async"
                 style={{ width: '100%', aspectRatio: '3 / 4', objectFit: 'cover', borderRadius: 12, display: 'block' }}
               />
               {item.text && (
