@@ -34,6 +34,9 @@ jobs:
   deploy:
     name: Build and restart on the VPS
     runs-on: [self-hosted, eavi-vps]
+    # A wedged buildkit session can leave `docker compose up -d --build` idle for
+    # ages. Fail loudly at 20 min instead of hanging until someone cancels by hand.
+    timeout-minutes: 20
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Resolve target commit
