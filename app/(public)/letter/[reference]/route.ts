@@ -2,28 +2,35 @@ import { NextResponse } from "next/server";
 
 import { assembleOfferLetter } from "@/lib/admissions/letter";
 import { letterForDownload } from "@/lib/admissions/issue";
+import {
+  renderAdmissionLetterSvg,
+  renderAdmissionLetterPdf,
+} from "@/lib/admissions/letter-svg";
 import type { LetterView } from "@/components/admissions/offer-letter";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Downloads an applicant's letter.
+ * Downloads an applicant's admission letter in SVG or PDF format.
  *
- * Public on purpose: the applicant has just filled in a form and has no account. Authority comes
- * from the token instead of a session — the reference alone is sequential (`APP/2026/0001`), so
- * honouring it by itself would let anyone walk the range and download other people's letters.
+ * Public on purpose: the applicant has just submitted the application form and has no account.
+ * Authority comes from the unguessable verification token instead of a session — the reference
+ * alone is sequential (`APP/2026/0001`), so honouring it by itself would let anyone walk the range
+ * and download other applicants' letters.
  *
- * The letter is stamped, because it is the document the student brings to enrolment and an
- * unstamped letter would not be accepted at the counter. That is safe only because the token makes
- * it unforgeable in the other direction: the stamp is ours, the reference is ours, and anyone can
- * check the pair at `/verify`.
+ * Supports:
+ *   - `?format=svg` (default): Returns the standalone vector A4 SVG letter template styled with the
+ *     official ID card colors, ID card logo, registrar signature, and live verification QR code.
+ *   - `?format=pdf`: Returns the high-resolution A4 PDF document.
  */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ reference: string }> },
 ) {
   const { reference } = await params;
-  const token = new URL(_request.url).searchParams.get("t") ?? "";
+  const url = new URL(_request.url);
+  const token = url.searchParams.get("t") ?? "";
+  const format = url.searchParams.get("format")?.toLowerCase();
 
   if (!reference || !token) {
     return NextResponse.json({ error: "This letter link is incomplete." }, { status: 400 });
@@ -31,8 +38,6 @@ export async function GET(
 
   const letter = await letterForDownload(decodeURIComponent(reference), token);
   if (!letter) {
-    // One message for a wrong reference and a wrong token: saying which was wrong would confirm
-    // that a reference exists, which is the first step to guessing a token.
     return NextResponse.json({ error: "This letter could not be found." }, { status: 404 });
   }
 
@@ -42,9 +47,7 @@ export async function GET(
     programName: letter.program.name,
     programCode: letter.program.code,
     campusName: letter.application.campus.name,
-    intakeLabel: "the intake stated on your application",
-    // The letter is dated when it was issued; the intake start is not something we know per
-    // applicant at this point, so the letter avoids promising a day it cannot stand behind.
+    intakeLabel: "the next available intake",
     startDate: letter.issuedAt,
     expiresAt: letter.expiresAt,
     issuedOn: letter.issuedAt,
@@ -53,19 +56,44 @@ export async function GET(
     stamped: true,
   };
 
-  const pdf = await assembleOfferLetter(view, {
-    feeStructureUrl: letter.feeStructureUrl,
-    bursaryFormUrl: letter.bursaryFormUrl,
-  });
+  const sanitizedRef = letter.reference.replace(/[^A-Za-z0-9]+/g, "-");
 
-  const filename = `Admission-Letter-${letter.reference.replace(/[^A-Za-z0-9]+/g, "-")}.pdf`;
+  // If format is explicitly 'pdf', assemble and return the PDF document
+  if (format === "pdf") {
+    let pdfBytes: Uint8Array;
+    try {
+      const assembled = await assembleOfferLetter(view, {
+        feeStructureUrl: letter.feeStructureUrl,
+        bursaryFormUrl: letter.bursaryFormUrl,
+      });
+      pdfBytes = new Uint8Array(assembled.bytes);
+    } catch {
+      // Fallback: render A4 PDF directly from the SVG letter template if Chromium is unavailable
+      const svg = await renderAdmissionLetterSvg(view, { websiteUrl: publicOrigin() });
+      pdfBytes = await renderAdmissionLetterPdf(svg);
+    }
 
-  return new NextResponse(new Uint8Array(pdf.bytes), {
+    const filename = `Admission-Letter-${sanitizedRef}.pdf`;
+    return new NextResponse(Buffer.from(pdfBytes), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Length": String(pdfBytes.byteLength),
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  }
+
+  // Default / format=svg: Return the vector A4 SVG letter with inlined assets and QR code
+  const svg = await renderAdmissionLetterSvg(view, { websiteUrl: publicOrigin() });
+  const filename = `Admission-Letter-${sanitizedRef}.svg`;
+
+  return new NextResponse(svg, {
     headers: {
-      "Content-Type": "application/pdf",
+      "Content-Type": "image/svg+xml; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
-      "Content-Length": String(pdf.bytes.byteLength),
-      // Never cached: the letter carries a live verification token.
+      "Content-Length": String(Buffer.byteLength(svg, "utf-8")),
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },

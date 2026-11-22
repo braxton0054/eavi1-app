@@ -136,9 +136,10 @@ export const applyPage = {
     reference: "Your reference",
     campus: "You report to",
     letter: {
-      button: "Download your admission letter",
+      buttonSvg: "Download admission letter (SVG)",
+      buttonPdf: "Download admission letter (PDF)",
       downloading: "Preparing your letter…",
-      note: "The letter holds your fees, your programme requirements and a bursary form. Keep the file, or print it and bring it with you.",
+      note: "Your A4 acknowledgement letter shows your course details, campus reporting instructions, and a QR code the admissions office can verify.",
       failed: "Your letter could not be prepared just now. Try again, or show the office your reference above.",
       missing: "Your letter is being prepared. Show the office your reference above and ask them to print it.",
     },

@@ -393,14 +393,14 @@ export function ApplicationForm({ programs }: { programs: Choice[] }) {
 }
 
 /**
- * Downloads the admission letter.
+ * Downloads the admission letter in SVG or PDF format.
  *
- * Fetched rather than linked so the wait is visible. The letter is a four-page PDF built on
- * demand, which takes a few seconds; a plain anchor would look like nothing happened and invite a
- * second click that starts a second build.
+ * Built dynamically: applicants can download the vector SVG admission letter template
+ * (styled with ID card colors, logo, and verification QR code) or the PDF document.
  */
 function LetterDownload({ letterUrl }: { letterUrl: string | null }) {
-  const [state, setState] = useState<"idle" | "working" | "failed">("idle");
+  const [activeFormat, setActiveFormat] = useState<"svg" | "pdf" | null>(null);
+  const [failed, setFailed] = useState(false);
   const copy = applyPage.applied.letter;
 
   if (!letterUrl) {
@@ -411,42 +411,64 @@ function LetterDownload({ letterUrl }: { letterUrl: string | null }) {
     );
   }
 
-  const download = async () => {
-    setState("working");
+  const download = async (format: "svg" | "pdf") => {
+    setActiveFormat(format);
+    setFailed(false);
     try {
-      const response = await fetch(letterUrl);
+      const urlWithFormat = `${letterUrl}${letterUrl.includes("?") ? "&" : "?"}format=${format}`;
+      const response = await fetch(urlWithFormat);
       if (!response.ok) throw new Error("failed");
 
       const blob = await response.blob();
-      // The filename comes from the server's Content-Disposition, so the saved file is named
-      // after the reference rather than something generic like "download.pdf".
+      // The filename comes from the server's Content-Disposition header.
       const disposition = response.headers.get("content-disposition") ?? "";
       const named = /filename="([^"]+)"/.exec(disposition)?.[1];
 
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = named ?? "Admission-Letter.pdf";
+      anchor.download = named ?? `Admission-Letter.${format}`;
       document.body.append(anchor);
       anchor.click();
       anchor.remove();
       // Released on the next tick: revoking synchronously can cancel the download in some browsers.
       setTimeout(() => URL.revokeObjectURL(url), 4000);
 
-      setState("idle");
+      setActiveFormat(null);
     } catch {
-      setState("failed");
+      setActiveFormat(null);
+      setFailed(true);
     }
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-eavi-border bg-eavi-bg p-4">
-      <ShimmerButton type="button" onClick={download} disabled={state === "working"} className="min-h-11">
-        {state === "working" ? copy.downloading : copy.button}
-      </ShimmerButton>
-      <p className="text-sm leading-6 text-muted-foreground">{copy.note}</p>
-      {state === "failed" ? (
-        <p role="alert" className="text-sm leading-6 font-medium">
+    <div className="flex flex-col gap-3 rounded-xl border border-eavi-border bg-eavi-bg p-4">
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-semibold text-eavi-plate-ink">Official Admission Letter (A4)</p>
+        <p className="text-xs leading-5 text-muted-foreground">{copy.note}</p>
+      </div>
+      <div className="flex flex-wrap gap-2.5">
+        <ShimmerButton
+          type="button"
+          onClick={() => download("svg")}
+          disabled={activeFormat !== null}
+          className="min-h-11 flex-1 sm:flex-initial"
+        >
+          {activeFormat === "svg" && <Spinner data-icon="inline-start" />}
+          {activeFormat === "svg" ? copy.downloading : copy.buttonSvg}
+        </ShimmerButton>
+        <ShimmerButton
+          type="button"
+          onClick={() => download("pdf")}
+          disabled={activeFormat !== null}
+          className="min-h-11 flex-1 sm:flex-initial"
+        >
+          {activeFormat === "pdf" && <Spinner data-icon="inline-start" />}
+          {activeFormat === "pdf" ? copy.downloading : copy.buttonPdf}
+        </ShimmerButton>
+      </div>
+      {failed ? (
+        <p role="alert" className="text-sm leading-6 font-medium text-destructive">
           {copy.failed}
         </p>
       ) : null}
