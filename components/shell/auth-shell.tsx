@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { ThemeToggle } from "@/components/theme-toggle";
+
 import styles from "./auth-shell.module.css";
 
 /**
@@ -30,9 +32,12 @@ export function AuthShell({ children }: { children: ReactNode }) {
           </span>
         </Link>
 
-        <Link href="/" className={styles.back}>
-          Back to home
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link href="/" className={styles.back}>
+            Back to home
+          </Link>
+        </div>
       </header>
 
       <main className={styles.main}>

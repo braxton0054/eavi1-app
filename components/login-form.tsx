@@ -187,11 +187,36 @@ export function LoginForm({
         <CardHeader>
           <CardTitle>Sign in</CardTitle>
           <CardDescription>
-            Use the email address and password for your EAVI account.
+            Use your Google account, or the email and password for your EAVI account.
           </CardDescription>
         </CardHeader>
 
         <CardContent>
+          {/*
+           * A plain link, not a popup: the browser leaves the page, sets the CSRF cookie on
+           * the way out, and comes back to the same session cookie the password form sets.
+           * `next` is carried so a deep link survives the round trip through Google.
+           */}
+          <div className={styles.actions}>
+            <Button asChild variant="outline" size="lg" className={styles.submit}>
+              <a
+                href={`/api/auth/google${
+                  nextPath ? `?next=${encodeURIComponent(nextPath)}` : ""
+                }`}
+              >
+                <GoogleMark />
+                Sign in with Google
+              </a>
+            </Button>
+            <div
+              className="flex items-center gap-3 text-xs uppercase tracking-wide text-eavi-muted-text"
+              aria-hidden="true"
+            >
+              <span className="h-px flex-1 bg-eavi-border" />
+              <span>or with your EAVI password</span>
+              <span className="h-px flex-1 bg-eavi-border" />
+            </div>
+          </div>
           {/*
             The action is a real server endpoint: if the browser bundle is slow (a distant
             VPS, a weak connection) the native POST still signs the person in instead of
@@ -271,32 +296,6 @@ export function LoginForm({
             </div>
           </form>
 
-          {/*
-           * A plain link, not a popup: the browser leaves the page, sets the CSRF cookie on
-           * the way out, and comes back to the same session cookie the password form sets.
-           * `next` is carried so a deep link survives the round trip through Google.
-           */}
-          <div className={styles.actions}>
-            <div
-              className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide opacity-60"
-              aria-hidden="true"
-            >
-              <span className="h-px flex-1 bg-current" />
-              <span>or</span>
-              <span className="h-px flex-1 bg-current" />
-            </div>
-
-            <Button asChild variant="outline" size="lg" className={styles.submit}>
-              <a
-                href={`/api/auth/google${
-                  nextPath ? `?next=${encodeURIComponent(nextPath)}` : ""
-                }`}
-              >
-                <GoogleMark />
-                Sign in with Google
-              </a>
-            </Button>
-          </div>
         </CardContent>
 
         <CardFooter>

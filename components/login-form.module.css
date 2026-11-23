@@ -6,6 +6,8 @@
   .form {
     display: grid;
     gap: var(--field-gap);
+    /* Space the first field away from the social/divider block above it. */
+    margin-block-start: var(--space-5);
   }
 
   .alert {
