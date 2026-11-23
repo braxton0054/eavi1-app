@@ -107,7 +107,7 @@ export function StatTile({
 
   if (compact) {
     return (
-      <div className={cn(styles.tile, styles.tileCompact)}>
+      <div className={cn(styles.tile, styles.tileCompact)} data-tone={tone}>
         <Icon aria-hidden className={cn(styles.tileIcon)} data-tone={tone} />
         <p className={cn(styles.tileValue)} data-tone={tone === "neutral" ? undefined : tone}>
           {value}
@@ -121,7 +121,7 @@ export function StatTile({
   }
 
   return (
-    <div className={styles.tile}>
+    <div className={styles.tile} data-tone={tone}>
       <div className={styles.tileHead}>
         <span className={styles.tileLabel}>{label}</span>
         <Icon aria-hidden className={styles.tileIcon} data-tone={tone === "neutral" ? undefined : tone} />

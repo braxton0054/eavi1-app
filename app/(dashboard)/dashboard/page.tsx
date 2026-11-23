@@ -32,7 +32,11 @@ export default async function OverviewPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={pages.overview.title} />
+      {/* A plain-English verdict line (GitHub Pulse): what changed today, in one read. */}
+      <PageHeader
+        title={pages.overview.title}
+        description={`${stats.students} students, ${stats.applicationsOpen} applications to review and ${stats.activeEnrollments} active enrolments across ${scope.campusName}.`}
+      />
 
       {/* LAY-08: one focal figure, the rest compact — not eight identical tiles. */}
       <section aria-label={pages.overview.title} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -43,16 +47,18 @@ export default async function OverviewPage() {
             icon={kpis[0].icon}
           />
         </div>
-        {kpis.slice(1).map((kpi) => (
-          <StatTile
-            key={kpi.key}
-            label={kpi.label}
-            value={values[kpi.key]}
-            icon={kpi.icon}
-            compact
-            tone={kpi.key === "applicationsOpen" || kpi.key === "cardsPending" ? "attention" : kpi.key === "collected" ? "money" : "neutral"}
-          />
-        ))}
+        <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2 xl:grid-cols-4">
+          {kpis.slice(1).map((kpi) => (
+            <StatTile
+              key={kpi.key}
+              label={kpi.label}
+              value={values[kpi.key]}
+              icon={kpi.icon}
+              compact
+              tone={kpi.key === "applicationsOpen" || kpi.key === "cardsPending" ? "attention" : kpi.key === "collected" ? "money" : "neutral"}
+            />
+          ))}
+        </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">

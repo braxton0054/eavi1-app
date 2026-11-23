@@ -157,3 +157,24 @@ Implementation: `components/home/eavi-home.tsx`, `eavi-home.module.css`, and the
 client-only `program-catalogue.tsx`; `app/(public)/page.tsx` composes them.
 
 Rules: PASS
+
+---
+
+## Dashboard design language (2026-11-23)
+
+Researched real dashboard patterns (AdminLTE roundup: Odoo tinted KPI tiles, Mercury
+one-dominant-number, Plausible restraint, Grafana stat-row-then-detail, GitHub Pulse
+plain-English summary, Home Assistant status = icon + colour + text) and combined them
+with both skills. Applied through the shared components so every role's screens change:
+
+- **Panel** — quiet hairline surface, one radius, no shadow (restraint).
+- **StatTile / MetricCard** — Odoo-style softly tinted tiles by state, larger dominant
+  figure (Mercury), tabular numerals; colour only for状态, never decoration.
+- **PageHeader** — a plain-English verdict line on both overviews, e.g. "1048 students,
+  14 applications to review, Ksh 24m collected of Ksh 87m billed" (GitHub Pulse).
+- **LAY-08** — one focal metric, compact remainder; fixed grid overflow at 1366px.
+- Status chips keep text + dot, never colour alone (Home Assistant rule).
+
+Affects admin, superadmin, student and tutor portals because they share these components.
+
+Rules: PASS

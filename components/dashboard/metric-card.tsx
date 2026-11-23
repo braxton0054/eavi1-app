@@ -30,7 +30,10 @@ export function MetricCard({
   const body = (
     <div
       className={cn(
-        "flex h-full flex-col gap-3 rounded-2xl border border-eavi-border bg-eavi-card p-4 shadow-eavi-card sm:p-5",
+        /* Quiet tile: hairline border, one radius, no shadow — colour only for state. */
+        "flex h-full flex-col gap-3 rounded-lg border border-eavi-border p-5",
+        tone === "attention" && "bg-eavi-warn-soft",
+        tone === "money" && "bg-eavi-success-soft",
         href && "transition-shadow hover:shadow-eavi-lift",
       )}
     >
@@ -54,7 +57,7 @@ export function MetricCard({
       </div>
       <p
         className={cn(
-          "text-3xl font-semibold tabular-nums tracking-tight",
+          "text-4xl font-semibold tabular-nums tracking-tight",
           tone === "money" && "text-eavi-secondary-text",
           tone === "attention" && "text-eavi-warn-text",
         )}

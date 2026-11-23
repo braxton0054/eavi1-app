@@ -62,7 +62,7 @@ export async function CollegeOverview() {
     <div className="space-y-6">
       <PageHeader
         title={copy.title}
-        description={copy.description}
+        description={`${totals.students} students, ${totals.applicationsOpen} applications to review, ${money(totals.collected)} collected of ${money(totals.billed)} billed.`}
         meta={
           <p className="mt-2 text-xs uppercase tracking-wider text-eavi-muted-text">
             {byCampus.length === 1 ? copy.campusesOne : copy.campusesMany} · {byCampus.length}
