@@ -78,14 +78,12 @@ export const hero = {
   photoLabel: "Campus photo",
   photoPending: "Add a campus photo in public/campus-life/",
   trustHeading: "EAVI at a glance",
+  // Three figures, all real: campuses come from the campus register, programmes and
+  // students are counted live on the page. No invented "years leading" statistic (AIT-03).
   trust: [
     { label: "Campuses in Eldoret", value: campuses.length },
-    /** TODO: real programme count. */
     { label: "Programmes", value: null },
-    /** TODO: real enrolled-student count. */
     { label: "Students", value: null },
-    /** TODO: year the institute was founded. */
-    { label: "Years leading", value: null },
   ] satisfies TrustItem[],
   pendingValue: "TODO",
 } as const;

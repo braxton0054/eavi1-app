@@ -3,7 +3,6 @@ import { ArrowRightIcon, DownloadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { ContentPlaceholder } from "@/components/home/content-placeholder";
-import { Reveal } from "@/components/home/reveal";
 import { Section, SectionHeader } from "@/components/home/section";
 import { admissionsSection } from "@/lib/content/home";
 
@@ -32,7 +31,7 @@ export function AdmissionsSection() {
       <ol className="mt-6 grid items-stretch gap-4 sm:mt-8 lg:grid-cols-3">
         {admissionsSection.steps.map((step, index) => (
           <li key={step.title} className="flex">
-            <Reveal delay={index * 0.06} className="flex">
+            <div className="flex">
               <div className="eavi-lift flex h-full w-full flex-col gap-3 rounded-2xl border border-border bg-card p-5">
                 <div className="flex items-center gap-3">
                   <span className="cn-font-heading flex size-9 items-center justify-center rounded-full bg-eavi-fill text-sm font-semibold text-eavi-on-fill">
@@ -55,7 +54,7 @@ export function AdmissionsSection() {
                   </Button>
                 )}
               </div>
-            </Reveal>
+            </div>
           </li>
         ))}
       </ol>

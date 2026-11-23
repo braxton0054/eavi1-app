@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { ArrowRightIcon } from "lucide-react";
-import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import {
   Card,
   CardContent,
@@ -8,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Reveal } from "@/components/home/reveal";
 import { Section, SectionHeader } from "@/components/home/section";
 import { iconMap } from "@/components/home/icon-map";
 import { portalSection } from "@/lib/content/home";
@@ -24,10 +23,10 @@ export function PortalSection() {
       />
 
       <div className="mt-6 grid items-stretch gap-4 sm:mt-8 sm:grid-cols-2 lg:grid-cols-4">
-        {portalSection.roles.map((role, index) => {
+        {portalSection.roles.map((role) => {
           const Icon = iconMap[role.icon];
           return (
-            <Reveal key={role.role} delay={index * 0.05} className="flex">
+            <div key={role.role} className="flex">
               <Card size="sm" className="eavi-lift h-full w-full">
                 <CardHeader>
                   <span className="mb-1 flex size-10 items-center justify-center rounded-xl bg-eavi-primary-soft">
@@ -37,15 +36,19 @@ export function PortalSection() {
                   <CardDescription>{role.line}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ShimmerButton asChild className="w-full font-semibold">
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="w-full border-eavi-border/70 bg-transparent text-eavi-on-bg hover:bg-eavi-primary-soft hover:text-eavi-on-bg"
+                  >
                     <Link href={portalSection.loginHref(role.role)}>
                       {portalSection.openPortal}
                       <ArrowRightIcon data-icon="inline-end" />
                     </Link>
-                  </ShimmerButton>
+                  </Button>
                 </CardContent>
               </Card>
-            </Reveal>
+            </div>
           );
         })}
       </div>

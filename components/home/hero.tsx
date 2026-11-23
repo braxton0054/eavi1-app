@@ -94,7 +94,7 @@ export function Hero({
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-eavi-on-bg">
           {hero.trustHeading}
         </h2>
-        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-4">
+        <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-3">
           {hero.trust.map((item) => (
             <div
               key={item.label}
