@@ -211,11 +211,13 @@ export const mobileNav: Record<"admin" | "tutor" | "portal" | "student", NavItem
   portal: [
     { href: "/portal/chat", label: "Chat", icon: "chat" },
   ],
+  // Five section tabs plus the Menu utility. Labels stay short so none truncate at
+  // 375px (NAV-01/04); the full names remain in the sidebar and page headings.
   admin: [
     { href: "/dashboard", label: "Overview", icon: "overview" },
-    { href: "/dashboard/applications", label: "Applications", icon: "applications" },
+    { href: "/dashboard/applications", label: "Apply", icon: "applications" },
     { href: "/dashboard/students", label: "Students", icon: "students" },
-    { href: "/dashboard/enrollments", label: "Enrollments", icon: "enrollments" },
+    { href: "/dashboard/enrollments", label: "Enrol", icon: "enrollments" },
     { href: "/dashboard/classes", label: "Classes", icon: "students" },
   ],
   student: [

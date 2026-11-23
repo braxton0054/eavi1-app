@@ -126,7 +126,10 @@ const nextConfig: NextConfig = {
  * where photographs live. Empty when unset, which leaves the policy at `'self' data: blob:`.
  */
 function storageOrigin(): string {
-  const endpoint = process.env.S3_ENDPOINT?.replace(/\/$/, "");
+  // The image is built in CI where S3_ENDPOINT may not be passed as a build arg.
+  // This is a public bucket host in a public CSP allow-list, not a secret — keep a
+  // default so a published image never silently blocks every profile photo.
+  const endpoint = (process.env.S3_ENDPOINT || "https://usc1.contabostorage.com").replace(/\/$/, "");
   if (!endpoint) return "";
   try {
     return ` ${new URL(endpoint).origin}`;

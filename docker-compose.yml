@@ -51,6 +51,7 @@ services:
     build:
       context: .
       target: migrate
+    image: ${MIGRATE_IMAGE:-eavi-portal-migrate:latest}
     restart: "no"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public

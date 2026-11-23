@@ -35,6 +35,9 @@ jobs:
           tags: |
             type=ref,event=tag
             type=sha
+            # Deploy resolves the exact commit and pulls this full-SHA tag, so the
+            # running image always matches the commit the workflow validated.
+            type=raw,value=${{ github.sha }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Publish app image
@@ -49,6 +52,9 @@ jobs:
           # carry the real origin or its metadata/sitemap point at localhost.
           build-args: |
             NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000' }}
+            # The CSP is compiled from this: without it the browser blocks every
+            # profile and student photo served from the object store.
+            S3_ENDPOINT=${{ vars.S3_ENDPOINT || 'https://usc1.contabostorage.com' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

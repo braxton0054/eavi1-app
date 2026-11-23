@@ -2,11 +2,10 @@ name: Deploy
 
 # Runs only after CI has passed on main, so a red build never reaches the box.
 # The deployment lives at /root/eavi1-app and keeps its own .env; this workflow
-# moves that working copy to the exact commit CI validated, rebuilds the images
-# on the box and restarts the stack.
-#
-# Builds happen here rather than pulling the published GHCR image on purpose:
-# the package is private, so pulling would need a token with read:packages.
+# moves that working copy to the exact commit CI validated, pulls the images CI
+# already built and published, and restarts the stack. No images are built on the
+# VPS: that step was slow and could hang, leaving the site down on cancellation.
+# The GHCR package must be public so the box can pull without an expiring token.
 
 on:
   workflow_run:
@@ -32,11 +31,11 @@ env:
 
 jobs:
   deploy:
-    name: Build and restart on the VPS
+    name: Pull published images and restart on the VPS
     runs-on: [self-hosted, eavi-vps]
-    # A wedged buildkit session can leave `docker compose up -d --build` idle for
-    # ages. Fail loudly at 20 min instead of hanging until someone cancels by hand.
-    timeout-minutes: 20
+    # A pull should finish in well under a minute; the short timeout still fails
+    # loudly if the registry hangs instead of leaving the site half-restarted.
+    timeout-minutes: 10
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Resolve target commit
@@ -65,13 +64,25 @@ jobs:
           git reset --hard "${{ steps.target.outputs.sha }}"
           echo "deploying $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
 
-      - name: Build and restart
+      - name: Pull the images CI published for this commit
         run: |
           set -eu
           cd "$DEPLOY_PATH"
-          # --build completes before any container is recreated, so a failed
-          # build leaves the previous release serving traffic.
-          docker compose up -d --build
+          SHA="${{ steps.target.outputs.sha }}"
+          # Both images are tagged by release.yml with the full commit SHA. Export
+          # them so compose references the exact migration and app images for this
+          # release instead of an older 'latest'.
+          echo "APP_IMAGE=ghcr.io/${{ github.repository }}:${SHA}" >> "$GITHUB_ENV"
+          echo "MIGRATE_IMAGE=ghcr.io/${{ github.repository }}:migrate-${SHA}" >> "$GITHUB_ENV"
+          docker compose pull
+
+      - name: Restart on the published images
+        run: |
+          set -eu
+          cd "$DEPLOY_PATH"
+          # No build here: --no-build guarantees a registry failure can never turn
+          # into a half-built local image or a wedged buildkit session.
+          docker compose up -d --no-build
 
       - name: Wait for health
         run: |
