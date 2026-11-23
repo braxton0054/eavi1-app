@@ -153,3 +153,10 @@ jobs:
           cd "$DEPLOY_PATH"
           echo "commit: $(git rev-parse HEAD)"
           docker compose ps --format '{{.Service}} {{.Status}}'
+
+      # Runs only after a healthy deploy, so cleanup can never race a pull or
+      # remove the image the stack is currently running.
+      - name: Prune stale images
+        run: |
+          cd "$DEPLOY_PATH"
+          bash scripts/prune-old-images.sh
