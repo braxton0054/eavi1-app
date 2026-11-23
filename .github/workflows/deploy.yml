@@ -5,7 +5,8 @@ name: Deploy
 # moves that working copy to the exact commit CI validated, pulls the images CI
 # already built and published, and restarts the stack. No images are built on the
 # VPS: that step was slow and could hang, leaving the site down on cancellation.
-# The GHCR package must be public so the box can pull without an expiring token.
+# GHCR stays private: this job logs in with its own short-lived GITHUB_TOKEN,
+# which has packages:read for this repo. No public package and no stored PAT.
 
 on:
   workflow_run:
@@ -20,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: deploy-production
@@ -68,6 +70,13 @@ jobs:
           git reset --hard "${{ steps.target.outputs.sha }}"
           echo "deploying $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
 
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Pull the images CI published for this commit
         run: |
           set -eu
@@ -82,6 +91,21 @@ jobs:
           export MIGRATE_IMAGE="ghcr.io/${{ github.repository }}:migrate-${SHA}"
           echo "APP_IMAGE=${APP_IMAGE}" >> "$GITHUB_ENV"
           echo "MIGRATE_IMAGE=${MIGRATE_IMAGE}" >> "$GITHUB_ENV"
+
+          # Release runs in parallel with CI, so its tags may not exist yet when
+          # this job starts. Wait for them instead of racing the publisher.
+          for i in $(seq 1 30); do
+            if docker manifest inspect "$APP_IMAGE" >/dev/null 2>&1 &&
+               docker manifest inspect "$MIGRATE_IMAGE" >/dev/null 2>&1; then
+              echo "images available after ${i} attempt(s)"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::error::tags for ${SHA} never appeared — check/re-run the Release image workflow"
+              exit 1
+            fi
+            sleep 10
+          done
           docker compose pull
 
       - name: Restart on the published images
