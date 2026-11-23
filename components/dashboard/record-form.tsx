@@ -45,6 +45,38 @@ function Control({
         />
       );
     }
+    // 2–4 choices are shown as radios, not buried in a dropdown (FRM-11).
+    if (choices.length >= 2 && choices.length <= 4) {
+      return (
+        <fieldset id={htmlId} className="flex flex-wrap gap-x-5 gap-y-2 pt-1">
+          <legend className="sr-only">{field.label}</legend>
+          {!field.required ? (
+            <label className="inline-flex min-h-11 items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={field.name}
+                value=""
+                defaultChecked={!value}
+                className="size-5 accent-eavi-fill"
+              />
+              <span>{common.none}</span>
+            </label>
+          ) : null}
+          {choices.map((choice) => (
+            <label key={choice.value} className="inline-flex min-h-11 items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={field.name}
+                value={choice.value}
+                defaultChecked={value === choice.value}
+                className="size-5 accent-eavi-fill"
+              />
+              <span>{choice.label}</span>
+            </label>
+          ))}
+        </fieldset>
+      );
+    }
     return (
       <select
         id={htmlId}
@@ -148,7 +180,7 @@ export function RecordForm({
   submitLabel,
   aside,
   hidden,
-  compact = false,
+  compact,
 }: {
   id: string;
   fields: readonly Field[];
@@ -159,9 +191,10 @@ export function RecordForm({
   aside?: ReactNode;
   /** Ids the form must carry but the administrator should not edit. */
   hidden?: Record<string, string>;
-  /** One column instead of two, for the small form attached to a table row. */
+  /** @deprecated All forms are single-column now; kept so existing callers compile. */
   compact?: boolean;
 }) {
+  void compact; // accepted for compatibility; layout is always single-column
   return (
     <form
       action={action}
@@ -169,7 +202,7 @@ export function RecordForm({
       // A file input is only carried in a multipart body, which the browser decides from
       // this attribute rather than from the field list.
       encType={fields.some((field) => field.type === "file") ? "multipart/form-data" : undefined}
-      className={cn("grid gap-4", compact ? "grid-cols-1" : "sm:grid-cols-2")}
+      className="grid grid-cols-1 gap-4"
     >
       {Object.entries(hidden ?? {}).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
@@ -178,10 +211,10 @@ export function RecordForm({
       {fields.map((field) => {
         const htmlId = `${id}-${field.name}`;
         return (
-          <div key={field.name} className={cn("flex flex-col gap-1.5", field.wide && !compact && "sm:col-span-2")}>
+          <div key={field.name} className="flex flex-col gap-1.5">
             <Label htmlFor={htmlId}>
               {field.label}
-              {field.required ? <span className="text-eavi-destructive"> *</span> : null}
+              {!field.required ? <span className="font-normal text-eavi-muted-text"> (optional)</span> : null}
             </Label>
             <Control field={field} htmlId={htmlId} options={options ?? {}} value={values?.[field.name]} />
             {field.hint ? <p className="text-xs text-eavi-muted-text">{field.hint}</p> : null}
@@ -189,7 +222,7 @@ export function RecordForm({
         );
       })}
 
-      <div className={cn("flex flex-wrap items-center gap-3", !compact && "sm:col-span-2")}>
+      <div className="flex flex-wrap items-center gap-3">
         <SubmitButton label={submitLabel} />
         {aside}
       </div>
