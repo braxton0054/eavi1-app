@@ -111,7 +111,9 @@ export const ShimmerButton = React.forwardRef<
           {SPARK}
           <Slot.Root
             className={cn(
-              "relative z-10 inline-flex min-h-full min-w-full items-center justify-center gap-1.5 whitespace-nowrap",
+              /* The child is often an <a>; without this, the base link colour wins
+                 over the button colour and the label becomes nearly invisible. */
+              "relative z-10 inline-flex min-h-full min-w-full items-center justify-center gap-1.5 whitespace-nowrap text-inherit",
               pad,
             )}
             {...(props as ComponentPropsWithoutRef<"a">)}

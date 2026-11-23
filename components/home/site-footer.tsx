@@ -12,7 +12,7 @@ const linkClass =
 
 /** The footer's own baseline links: same colour as the copyright, underline on hover. */
 const legalLinkClass =
-  "inline-flex min-h-11 items-center underline-offset-4 transition-colors hover:text-eavi-band-foreground hover:underline";
+  "inline-flex min-h-11 items-center text-eavi-band-muted underline-offset-4 transition-colors hover:text-eavi-band-foreground hover:underline";
 
 export function SiteFooter() {
   return (

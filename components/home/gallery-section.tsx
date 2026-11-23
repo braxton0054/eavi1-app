@@ -38,7 +38,12 @@ export function GallerySection() {
         onBackground
       />
 
-      <div className="mt-6 sm:mt-8" style={{ height: "min(68vh, 540px)", minHeight: 340 }}>
+      {/* The gallery renders its captions through WebGL with a fixed dark ink, so it
+          keeps a light plate in the dark theme rather than inverting the text colour. */}
+      <div
+        className="mt-6 overflow-hidden rounded-2xl sm:mt-8"
+        style={{ height: "min(68vh, 540px)", minHeight: 340, background: "var(--eavi-plate)" }}
+      >
         <CircularGallery
           items={items}
           bend={2.4}
