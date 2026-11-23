@@ -103,3 +103,26 @@ Acceptance: each screen has a clear first/second/third read; one primary button;
 - No backend/business-logic changes: data, payments, campuses, permissions and migrations stay untouched.
 - No new libraries: reuse the existing Radix/shadcn-style primitives, Tailwind v4 and CSS modules.
 - Work in small, reviewable branches per phase; main stays deployable after each phase.
+
+---
+
+## Completion status (2026-11-23)
+
+All phases are implemented and verified.
+
+| Phase | Status | Key change |
+|---|---|---|
+| 0 — Foundation | done | Token layer + AA-verified dark palette, pre-paint theme script, toggle in header/topbar/auth; all audit FAILs cleared |
+| 1 — Homepage | done | One loud CTA, three real stats, no placeholder sections, uniform cards, sans headings |
+| 2 — Auth | done | Google sign-in first, form spacing, theme toggle, inline errors |
+| 3 — Dashboard shell | done | Active nav + aria-current, short mobile labels that fit 375px, 44/56px targets |
+| 4 — Shared components | done | Single-column forms, radios for 2–4 choices, "(optional)" labels |
+| 5 — Guided flows | done | Accessible progress bars on enrolment and payment wizards |
+| 6 — Role dashboards | done | One focal metric + compact remainder on both overviews (LAY-08) |
+| 7 — Verification | done | audit 0 FAIL, tsc clean, lint 0 errors, build green, 375/1366 light+dark checks |
+
+Final audit: 0 FAIL, 14 WARN (13 fixed-geometry ID-card print rules, 1 comment false-positive).
+Contrast scan: 0 controls below 4.5:1 across homepage, login, dashboard overview, students,
+tutors, class form and accounts in both themes (after transitions settle).
+
+Rules: PASS

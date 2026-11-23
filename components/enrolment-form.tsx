@@ -257,8 +257,21 @@ export function EnrolmentForm({
         </div>
       ) : null}
 
-      {/* Stepper */}
-      <ol className="flex items-start gap-2 rounded-2xl border border-eavi-border bg-eavi-card p-3 shadow-eavi-card" aria-label="Enrolment progress">
+      {/* Stepper (FRM-16): the visible steps plus a progress bar for assistive tech. */}
+      <div
+        role="progressbar"
+        aria-valuemin={1}
+        aria-valuemax={STEPS.length}
+        aria-valuenow={step}
+        aria-label="Enrolment progress"
+        className="mb-2 h-1.5 overflow-hidden rounded-full bg-eavi-muted"
+      >
+        <div
+          className="h-full rounded-full bg-eavi-fill transition-[width] duration-300"
+          style={{ width: `${(step / STEPS.length) * 100}%` }}
+        />
+      </div>
+      <ol className="flex items-start gap-2 rounded-2xl border border-eavi-border bg-eavi-card p-3 shadow-eavi-card" aria-label="Enrolment steps">
         {STEPS.map((s, i) => (
           <li key={s.n} className="flex min-w-0 flex-1 items-center gap-2">
             <button

@@ -70,32 +70,38 @@ export async function CollegeOverview() {
         }
       />
 
+      {/* One focal figure, the rest compact (LAY-08). */}
       <section aria-label={copy.title} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label={copy.figures.students}
-          value={String(totals.students)}
-          icon="students"
-          hint={`${byCampus.length} ${byCampus.length === 1 ? copy.campusesOne : copy.campusesMany}`}
-        />
-        <MetricCard
-          label={copy.figures.applicationsOpen}
-          value={String(totals.applicationsOpen)}
-          icon="applications"
-          tone="attention"
-          href="/dashboard/applications"
-        />
-        <MetricCard
-          label={copy.figures.activeEnrollments}
-          value={String(totals.activeEnrollments)}
-          icon="enrollments"
-          href="/dashboard/enrollments"
-        />
-        <MetricCard
-          label={copy.figures.tutors}
-          value={String(totals.tutors)}
-          icon="tutors"
-          href="/dashboard/tutors"
-        />
+        <div className="sm:col-span-2">
+          <MetricCard
+            label={copy.figures.students}
+            value={String(totals.students)}
+            icon="students"
+            href="/dashboard/students"
+            hint={`Across ${byCampus.length} ${byCampus.length === 1 ? copy.campusesOne : copy.campusesMany}`}
+          />
+        </div>
+        <div className="grid gap-4 sm:col-span-2 sm:grid-cols-3">
+          <MetricCard
+            label={copy.figures.applicationsOpen}
+            value={String(totals.applicationsOpen)}
+            icon="applications"
+            tone="attention"
+            href="/dashboard/applications"
+          />
+          <MetricCard
+            label={copy.figures.activeEnrollments}
+            value={String(totals.activeEnrollments)}
+            icon="enrollments"
+            href="/dashboard/enrollments"
+          />
+          <MetricCard
+            label={copy.figures.tutors}
+            value={String(totals.tutors)}
+            icon="tutors"
+            href="/dashboard/tutors"
+          />
+        </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-12">

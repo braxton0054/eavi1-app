@@ -140,9 +140,25 @@ export function PaymentWizard({ students, campusLocked }: Props) {
     setError(null);
   };
 
-  // The wizard's step rail, rendered for every step.
+  // The wizard's step rail, rendered for every step (FRM-16).
   const rail = (
-    <ol className={styles.rail}>
+    <>
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={STEPS.length - 1}
+        aria-valuenow={receiptNo ? STEPS.length - 1 : step}
+        aria-label="Payment progress"
+        className="mb-2 h-1.5 overflow-hidden rounded-full bg-eavi-muted"
+      >
+        <div
+          className="h-full rounded-full bg-eavi-fill transition-[width] duration-300"
+          style={{
+            width: `${((receiptNo ? STEPS.length - 1 : Math.max(0, step)) / (STEPS.length - 1)) * 100}%`,
+          }}
+        />
+      </div>
+      <ol className={styles.rail}>
       {STEPS.map((label, index) => (
         <li
           key={label}
@@ -153,7 +169,8 @@ export function PaymentWizard({ students, campusLocked }: Props) {
           {label}
         </li>
       ))}
-    </ol>
+      </ol>
+    </>
   );
 
   // The entry state: one clear button — the flow starts when the office asks for it.

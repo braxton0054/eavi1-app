@@ -34,13 +34,22 @@ export default async function OverviewPage() {
     <div className="space-y-6">
       <PageHeader title={pages.overview.title} />
 
+      {/* LAY-08: one focal figure, the rest compact — not eight identical tiles. */}
       <section aria-label={pages.overview.title} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map((kpi) => (
+        <div className="sm:col-span-2">
+          <StatTile
+            label={kpis[0].label}
+            value={values[kpis[0].key]}
+            icon={kpis[0].icon}
+          />
+        </div>
+        {kpis.slice(1).map((kpi) => (
           <StatTile
             key={kpi.key}
             label={kpi.label}
             value={values[kpi.key]}
             icon={kpi.icon}
+            compact
             tone={kpi.key === "applicationsOpen" || kpi.key === "cardsPending" ? "attention" : kpi.key === "collected" ? "money" : "neutral"}
           />
         ))}
