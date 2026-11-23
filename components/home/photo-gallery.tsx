@@ -5,27 +5,21 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./eavi-home.module.css";
 
 /**
- * A small selection of the college's own photographs. Every image is a real link, so
- * the gallery still works if JavaScript never loads; with JS it opens a lightbox.
+ * Every photograph the college supplied, in file order. The office has not captioned
+ * them, so the captions name the collection, not a specific claimed moment.
  */
-const PHOTOS = [
-  { file: "001", caption: "Main Campus" },
-  { file: "018", caption: "A college event" },
-  { file: "035", caption: "Students together" },
-  { file: "052", caption: "Practical training" },
-  { file: "071", caption: "Learning by doing" },
-  { file: "089", caption: "In the skills lab" },
-  { file: "104", caption: "At work" },
-  { file: "153", caption: "Students on campus" },
-  { file: "171", caption: "Outside the classroom" },
-  { file: "189", caption: "In class" },
-  { file: "201", caption: "A lecture" },
-  { file: "226", caption: "The college gate" },
-] as const;
+const PHOTO_COUNT = 226;
+const pad = (n: number) => String(n).padStart(3, "0");
+const src = (index: number) => `/eavi-assets/web/${pad(index + 1)}.jpg`;
 
-const src = (file: string) => `/eavi-assets/web/${file}.jpg`;
+const TITLES = ["Campus life", "Around EAVI", "On campus", "Student life", "The college", "Campus scenes"];
+const caption = (index: number) => TITLES[index % TITLES.length];
+
+/** Show a manageable first batch; the rest arrive on demand. */
+const BATCH = 24;
 
 export function PhotoGallery() {
+  const [shown, setShown] = useState(BATCH);
   const [open, setOpen] = useState<number | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
 
@@ -39,8 +33,8 @@ export function PhotoGallery() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (open === null) return;
-      if (event.key === "ArrowRight") setOpen((value) => (value === null ? null : (value + 1) % PHOTOS.length));
-      if (event.key === "ArrowLeft") setOpen((value) => (value === null ? null : (value - 1 + PHOTOS.length) % PHOTOS.length));
+      if (event.key === "ArrowRight") setOpen((v) => (v === null ? null : (v + 1) % PHOTO_COUNT));
+      if (event.key === "ArrowLeft") setOpen((v) => (v === null ? null : (v - 1 + PHOTO_COUNT) % PHOTO_COUNT));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -49,10 +43,10 @@ export function PhotoGallery() {
   return (
     <>
       <ul className={styles.galleryGrid}>
-        {PHOTOS.map((photo, index) => (
-          <li key={photo.file} className={index === 0 ? styles.galleryFeature : undefined}>
+        {Array.from({ length: shown }, (_, index) => (
+          <li key={index} className={index % 7 === 0 ? styles.galleryFeature : undefined}>
             <a
-              href={src(photo.file)}
+              href={src(index)}
               target="_blank"
               rel="noopener noreferrer"
               className={styles.galleryItem}
@@ -62,13 +56,35 @@ export function PhotoGallery() {
                 setOpen(index);
               }}
             >
-              {/* The web copies are resized to 960px; the originals are multi-megabyte. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src(photo.file)} alt={photo.caption} loading="lazy" className={styles.galleryImage} />
+              <img
+                src={src(index)}
+                alt={caption(index)}
+                loading="lazy"
+                decoding="async"
+                className={styles.galleryImage}
+              />
             </a>
           </li>
         ))}
       </ul>
+
+      {shown < PHOTO_COUNT ? (
+        <div className={styles.galleryMore}>
+          <button
+            type="button"
+            className={styles.galleryMoreButton}
+            onClick={() => setShown((value) => Math.min(value + BATCH, PHOTO_COUNT))}
+          >
+            Show more photographs
+          </button>
+          <span className={styles.galleryCount}>
+            {shown} of {PHOTO_COUNT}
+          </span>
+        </div>
+      ) : (
+        <p className={styles.galleryCount}>All {PHOTO_COUNT} photographs shown.</p>
+      )}
 
       <dialog
         ref={dialog}
@@ -81,11 +97,11 @@ export function PhotoGallery() {
         {open !== null ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src(PHOTOS[open].file)} alt={PHOTOS[open].caption} className={styles.lightboxImage} />
+            <img src={src(open)} alt={caption(open)} className={styles.lightboxImage} />
             <p className={styles.lightboxCaption}>
-              {PHOTOS[open].caption}
+              {caption(open)}
               <span className={styles.lightboxCount}>
-                {open + 1} of {PHOTOS.length}
+                {open + 1} of {PHOTO_COUNT}
               </span>
             </p>
             <button type="button" className={styles.lightboxClose} onClick={() => setOpen(null)}>

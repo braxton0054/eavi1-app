@@ -616,3 +616,36 @@
     outline-offset: 2px;
   }
 }
+
+@layer components {
+  .galleryMore {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4);
+    margin-top: var(--space-6);
+  }
+
+  .galleryMoreButton {
+    min-height: var(--touch-target);
+    padding-inline: var(--space-6);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--space-2);
+    background: transparent;
+    color: var(--eavi-text);
+    font: inherit;
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+  }
+
+  .galleryMoreButton:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .galleryCount {
+    color: var(--eavi-muted-text);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+}
