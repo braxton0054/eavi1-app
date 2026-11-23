@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { PhotoGallery } from "@/components/home/photo-gallery";
 import { ProgramCatalogue } from "@/components/home/program-catalogue";
 import {
   admissionsSection,
@@ -187,6 +188,21 @@ export function EaviHome({
               </li>
             ))}
           </ul>
+        </div>
+      </section>
+
+      <section id="gallery" className={styles.section} aria-labelledby="gallery-title">
+        <div className={styles.wrap}>
+          <div className={styles.sectionHead}>
+            <p className={styles.sectionLabel}>Campus life</p>
+            <h2 id="gallery-title" className={styles.sectionTitle}>
+              Around EAVI
+            </h2>
+            <p className={styles.sectionIntro}>
+              A look at the campus, the classrooms and the practical work students do here.
+            </p>
+          </div>
+          <PhotoGallery />
         </div>
       </section>
 

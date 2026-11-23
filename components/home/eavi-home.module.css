@@ -507,3 +507,112 @@
     line-height: var(--leading-body);
   }
 }
+
+@layer components {
+  /* --------------------------------------------------------------- gallery */
+  /*
+   * Static CSS grid + plain images + a native <dialog>. No WebGL, no scroll observers,
+   * no JS animation loop — the things that made the old gallery stutter. The only motion
+   * is a GPU-composited transform on hover and a short opacity fade on the lightbox.
+   */
+  .galleryGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (min-width: 48rem) {
+    .galleryGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+  }
+
+  .galleryFeature {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+
+  .galleryItem {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: var(--space-2);
+    background: var(--surface-2);
+  }
+
+  .galleryImage {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 8rem;
+    object-fit: cover;
+    /* Transform-only hover stays on the compositor: no layout, no repaint. */
+    transition: transform 240ms var(--ease-out);
+    will-change: transform;
+  }
+
+  .galleryFeature .galleryImage { min-height: 16rem; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .galleryItem:hover .galleryImage { transform: scale(1.03); }
+  }
+
+  .lightbox {
+    width: min(92vw, 60rem);
+    max-height: 90vh;
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--space-3);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .lightbox::backdrop {
+    background: var(--scrim);
+  }
+
+  .lightboxImage {
+    display: block;
+    width: 100%;
+    max-height: 72vh;
+    object-fit: contain;
+    border-radius: var(--space-2);
+  }
+
+  .lightboxCaption {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin: var(--space-3) 0 0;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+  }
+
+  .lightboxCount {
+    color: var(--eavi-muted-text);
+    font-weight: var(--weight-regular);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lightboxClose {
+    min-height: var(--touch-target);
+    margin-top: var(--space-2);
+    padding-inline: var(--space-5);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--space-2);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+  }
+
+  .lightboxClose:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
