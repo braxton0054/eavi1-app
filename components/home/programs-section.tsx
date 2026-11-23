@@ -88,48 +88,35 @@ export function ProgramsSection({ programs }: { programs?: Program[] }) {
             ))}
           </div>
 
-          <ul className="mt-6 grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {visible.map((program, index) => {
-              // One card leads, the rest are compact (LAY-08): a wall of identical
-              // cards has no reading order. The accent stays with the hero CTA.
-              const featured = index === 0 && visible.length > 1;
-              return (
-                <li key={program.id} className={cn("flex", featured && "lg:col-span-2")}>
-                  <Card size="sm" className="eavi-lift h-full w-full">
-                    <CardHeader>
-                      <CardTitle className={featured ? "text-xl" : "text-base"}>
-                        {program.title}
-                      </CardTitle>
-                      <CardDescription>
-                        {program.level} · {program.duration}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-1 flex-col gap-3">
-                      <p
-                        className={cn(
-                          "text-sm leading-6 text-muted-foreground",
-                          !featured && "line-clamp-3",
-                        )}
+          <ul className="mt-6 grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {visible.map((program) => (
+              <li key={program.id} className="flex">
+                <Card size="sm" className="eavi-lift h-full w-full">
+                  <CardHeader>
+                    <CardTitle className="text-base">{program.title}</CardTitle>
+                    <CardDescription>
+                      {program.level} · {program.duration}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-1 flex-col gap-3">
+                    <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
+                      {program.description}
+                    </p>
+                    <div className="mt-auto pt-1">
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="w-full border-eavi-border/70 bg-transparent text-eavi-on-bg hover:bg-eavi-primary-soft hover:text-eavi-on-bg"
                       >
-                        {program.description}
-                      </p>
-                      {/* One quiet link per card — never a second shimmering CTA. */}
-                      <div className="mt-auto">
-                        <Button
-                          asChild
-                          variant="outline"
-                          className="border-eavi-border/70 bg-transparent text-eavi-on-bg hover:bg-eavi-primary-soft hover:text-eavi-on-bg"
-                        >
-                          <Link href={programsSection.learnMoreHref}>
-                            {programsSection.learnMore}
-                          </Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </li>
-              );
-            })}
+                        <Link href={programsSection.learnMoreHref}>
+                          {programsSection.learnMore}
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </li>
+            ))}
           </ul>
         </>
       )}

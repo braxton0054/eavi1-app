@@ -16,7 +16,7 @@ export function CtaBand() {
         <Reveal className="flex flex-col items-start gap-2">
           <h2
             id="cta-heading"
-            className="cn-font-heading text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+            className="font-[var(--font-ui)] text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
             {ctaSection.heading}
           </h2>
           <p className="max-w-lg text-pretty text-sm leading-6 text-eavi-band-muted sm:text-base sm:leading-7">

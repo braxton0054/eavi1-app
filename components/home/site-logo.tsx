@@ -45,7 +45,7 @@ export function SiteLogo({
       </span>
       <span
         className={cn(
-          "cn-font-heading min-w-0 truncate text-[15px] leading-tight font-semibold tracking-tight sm:text-base",
+          "font-[var(--font-ui)] min-w-0 truncate text-[15px] leading-tight font-semibold tracking-tight sm:text-base",
           tone === "band" ? "text-eavi-band-foreground" : "text-eavi-on-bg",
         )}
       >

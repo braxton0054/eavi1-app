@@ -63,7 +63,7 @@ export function SectionHeader({
         <h2
           id={id}
           className={cn(
-            "cn-font-heading text-balance text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-3xl",
+            "font-[var(--font-ui)] text-balance text-[1.75rem] leading-tight font-semibold tracking-tight sm:text-3xl",
             onBackground && "text-eavi-on-bg",
           )}
         >

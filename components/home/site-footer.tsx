@@ -21,7 +21,7 @@ export function SiteFooter() {
         <div className="flex flex-col gap-3 lg:col-span-4">
           {/* The badge stays in the sticky header so the page never shows two logos at
               once; the footer carries the name in type only. */}
-          <Link href="/" className="cn-font-heading min-h-11 inline-flex items-center text-base font-semibold tracking-tight text-eavi-band-foreground">
+          <Link href="/" className="font-[var(--font-ui)] min-h-11 inline-flex items-center text-base font-semibold tracking-tight text-eavi-band-foreground">
             {footer.name}
           </Link>
           <p className="max-w-xs text-pretty text-xs leading-5 text-eavi-band-muted">

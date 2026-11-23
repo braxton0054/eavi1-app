@@ -81,7 +81,7 @@ export function Hero({
               <span className="rounded-2xl border border-border bg-eavi-plate p-3">
                 <ImagesIcon className="size-7 text-eavi-primary-text" aria-hidden />
               </span>
-              <p className="cn-font-heading text-sm font-semibold">{hero.photoLabel}</p>
+              <p className="font-[var(--font-ui)] text-sm font-semibold">{hero.photoLabel}</p>
               <p className="text-xs leading-5 text-eavi-muted-text">
                 {pending.label} — {hero.photoPending}
               </p>
@@ -103,7 +103,7 @@ export function Hero({
               <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 {item.label}
               </dt>
-              <dd className="cn-font-heading text-2xl font-semibold text-eavi-primary-text sm:text-3xl">
+              <dd className="font-[var(--font-ui)] text-2xl font-semibold text-eavi-primary-text sm:text-3xl">
                 {liveValue(item) === null ? (
                   <span className="rounded-md border border-dashed border-border px-2 py-0.5 text-sm font-medium text-eavi-muted-text">
                     {hero.pendingValue}

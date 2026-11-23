@@ -12,17 +12,17 @@ export function WhySection() {
         subheading={whySection.subheading}
       />
 
-      <ul className="mt-6 grid items-stretch gap-3 sm:mt-8 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+      <ul className="mt-6 grid items-start gap-3 sm:mt-8 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
         {whySection.reasons.map((reason) => {
           const Icon = iconMap[reason.icon];
           return (
             <li key={reason.title} className="flex">
-              <div className="flex">
-                <div className="eavi-lift flex h-full w-full flex-col gap-3 rounded-2xl border border-border bg-card p-5">
+              <div className="flex w-full">
+                <div className="eavi-lift flex w-full flex-col gap-3 rounded-2xl border border-border bg-card p-5">
                   <span className="flex size-10 items-center justify-center rounded-xl bg-eavi-primary-soft">
                     <Icon className="size-5 text-eavi-primary-text" aria-hidden />
                   </span>
-                  <p className="cn-font-heading text-base leading-snug font-semibold tracking-tight">
+                  <p className="font-[var(--font-ui)] text-base leading-snug font-semibold tracking-tight">
                     {reason.title}
                   </p>
                   {reason.detail && (
