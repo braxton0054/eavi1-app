@@ -41,7 +41,7 @@ jobs:
     runs-on: [self-hosted, eavi-vps]
     # A pull should finish in well under a minute; the short timeout still fails
     # loudly if the registry hangs instead of leaving the site half-restarted.
-    timeout-minutes: 10
+    timeout-minutes: 15
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Resolve target commit
@@ -106,7 +106,20 @@ jobs:
             fi
             sleep 10
           done
-          docker compose pull
+          # GHCR downloads occasionally reset mid-transfer over IPv6. Retry a
+          # few times: already-downloaded layers are reused, so it is cheap.
+          for attempt in 1 2 3; do
+            if docker compose pull; then
+              echo "pull succeeded on attempt ${attempt}"
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::docker compose pull failed after 3 attempts"
+              exit 1
+            fi
+            echo "pull attempt ${attempt} failed — retrying in 10s"
+            sleep 10
+          done
 
       - name: Restart on the published images
         run: |
