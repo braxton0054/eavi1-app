@@ -136,7 +136,7 @@ export const whySection = {
     {
       title: "Three campuses in Eldoret",
       icon: "campuses" satisfies IconName,
-      detail: campuses.map((campus) => campus.name).join(" · "),
+      detail: campuses.map((campus) => campus.name).join(", "),
     },
     { title: "Qualified tutors", icon: "tutor" satisfies IconName, detail: null },
     { title: "Practical training", icon: "hands-on" satisfies IconName, detail: null },
@@ -288,7 +288,7 @@ export const faqSection = {
     },
     {
       question: "Which campuses can I join?",
-      answer: campuses.map((campus) => `${campus.name} — ${campus.place}`).join(" · "),
+      answer: campuses.map((campus) => `${campus.name} at ${campus.place}`).join(", "),
     },
     {
       question: "How do I sign in to the portal?",
@@ -303,7 +303,7 @@ export const faqSection = {
     {
       question: "What are the fees, and can I pay in instalments?",
       answer:
-        "Yes — fees are billed per programme and you can pay in instalments as you study. The full fee structure comes with your offer letter, or call the campus for the current figures.",
+        "Fees are billed per programme and you can pay in instalments as you study. The full fee structure comes with your offer letter, or call the campus for the current figures.",
     },
     {
       question: "Which certificates do you issue?",
@@ -331,7 +331,7 @@ export const contactSection = {
 
 export const footer = {
   name: site.name,
-  tagline: `${site.tagline} — quality and affordable education in ${site.location}.`,
+  tagline: `${site.tagline}. Quality and affordable education in ${site.location}.`,
   quickLinks: "Quick links",
   campusesHeading: "Campuses",
   contactHeading: "Talk to us",

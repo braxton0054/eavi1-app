@@ -126,3 +126,34 @@ Contrast scan: 0 controls below 4.5:1 across homepage, login, dashboard overview
 tutors, class form and accounts in both themes (after transitions settle).
 
 Rules: PASS
+
+---
+
+## Homepage rebuild (combined skills)
+
+Built with `frontend-ui-ux-rules` (structure, accessibility) + Anthropic's `frontend-design`
+(aesthetic direction). The old homepage carried every generic tell the design skill warns
+about: tracked-out ALL-CAPS eyebrows, middle-dot meta strings, a serif display face,
+shimmer CTAs, and identical rounded cards.
+
+**Direction — "institutional prospectus":** the one bold moment is a deep-violet hero with
+large Geist sans type and an edge-to-edge campus photo. Everything after it is quiet:
+hairline rules, a three-figure facts strip, programmes as a catalogue *list*, a true
+numbered 3-step admissions sequence, and a plain campus phone directory. FAQ uses native
+`<details>` so it works before JavaScript loads.
+
+**Tokens:** ink `#1A1626`, paper `#F7F5FA`, one violet accent (`--eavi-fill`), deep violet
+field (`--eavi-band`), mint for positive state, muted `#63566F`. One family (Geist), two
+weights; six type sizes. All values come from the token layer.
+
+**Review against defaults:** the violet field and "Leading the Leaders" are EAVI-specific,
+not cream/terracotta or near-black/acid. A course-catalogue list and phone directory are
+specific to a college, not a SaaS card kit. Numbered markers appear only where the content
+is genuinely a sequence (admissions). No ALL-CAPS labels, no middle dots, no serif display,
+no shimmer buttons, no per-section fade-up. Motion is one 500ms hero entrance, respecting
+`prefers-reduced-motion`.
+
+Implementation: `components/home/eavi-home.tsx`, `eavi-home.module.css`, and the small
+client-only `program-catalogue.tsx`; `app/(public)/page.tsx` composes them.
+
+Rules: PASS

@@ -1,15 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { labels } from "@/lib/content/dashboard";
-import { AdmissionsSection } from "@/components/home/admissions-section";
-import { CampusesSection } from "@/components/home/campuses-section";
-import { CtaBand } from "@/components/home/cta-band";
-import { FaqSection } from "@/components/home/faq-section";
-import { FeesSection } from "@/components/home/fees-section";
-import { Hero } from "@/components/home/hero";
 import { OrganizationJsonLd } from "@/components/home/organization-json-ld";
-import { PortalSection } from "@/components/home/portal-section";
-import { ProgramsSection } from "@/components/home/programs-section";
-import { WhySection } from "@/components/home/why-section";
+import { EaviHome } from "@/components/home/eavi-home";
 import type { Program } from "@/lib/content/home";
 
 // The programme list is read from the database on every request, so the public site
@@ -55,15 +47,7 @@ export default async function HomePage() {
   return (
     <>
       <OrganizationJsonLd />
-      <Hero programmeCount={programs.length} studentCount={students} />
-      <PortalSection />
-      <WhySection />
-      <ProgramsSection programs={programs} />
-      <AdmissionsSection />
-      <FeesSection />
-      <CampusesSection />
-      <FaqSection />
-      <CtaBand />
+      <EaviHome programs={programs} studentCount={students} />
     </>
   );
 }
