@@ -83,7 +83,7 @@
 /* Student view: one card, tap or press Enter/Space to flip (CSS 3D) */
 .flip{perspective:900px; width:340px; max-width:100%; margin:0 auto; cursor:pointer; border-radius:10px}
 .flip:focus-visible{outline:2px solid var(--ring); outline-offset:4px}
-.flipInner{position:relative; aspect-ratio:856/540; transition:transform .6s; transform-style:preserve-3d}
+.flipInner{position:relative; aspect-ratio:856/540; transition:transform .5s; transform-style:preserve-3d}
 .flipped .flipInner{transform:rotateY(180deg)}
 .face{position:absolute; inset:0; backface-visibility:hidden}
 .face svg{display:block; width:100%; height:auto; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.2)}
@@ -100,7 +100,7 @@
   display:inline-block; font-size:12px; font-weight:500; padding:3px 10px;
   border-radius:99px; background:var(--ok-bg); color:var(--ok-fg);
 }
-.badgePending{background:var(--muted); color:var(--mfg)}
+.badgePending{background:var(--muted); color:#5f6672}
 .badgeExpired{background:var(--danger-bg); color:var(--danger-fg)}
 
 .tableWrap{overflow-x:auto; -webkit-overflow-scrolling:touch}

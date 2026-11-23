@@ -213,6 +213,106 @@
       --topbar-height: 4rem; /* 64 */
     }
   }
+
+  /*
+   * Dark theme (DRK-01/02/03/07). A separate palette, never an inversion: surfaces get
+   * lighter as they rise, the accent is desaturated, and every text/on-colour pair below
+   * was measured with scripts/check-contrast.mjs (all pass 4.5:1). Only semantic names are
+   * overridden — components never reference a palette ramp directly.
+   */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg: #121317;
+    --surface: #1d1f27;
+    --surface-2: #262932;
+    --surface-3: #30343f;
+    --surface-inverse: #f2f3f5;
+
+    --text: #f2f3f5;          /* 16.72 on bg */
+    --text-muted: #b3bac8;    /* 9.52 on bg, 8.43 on surface */
+    --text-inverse: #161c26;
+
+    --border: #4b5261;        /* decorative */
+    --border-strong: #626b7d; /* 3.07 on surface */
+    --divider: #343844;
+
+    --primary: #b7acec;       /* violet-300, desaturated (DRK-02) */
+    --primary-hover: #c7bfef;
+    --primary-active: #d6d0f5;
+    --on-primary: #1a1630;    /* 8.43 on primary */
+    --primary-soft: color-mix(in oklab, var(--violet-300) 16%, var(--surface));
+
+    --link: #c7bfef;
+    --link-hover: #d6d0f5;
+
+    --positive: #6fd6a8;
+    --on-positive: #10231c;   /* 9.27 */
+    --positive-soft: color-mix(in oklab, #6fd6a8 16%, var(--surface));
+
+    --attention: #ffcb78;
+    --on-attention: #2a1c00;  /* 11.12 */
+    --attention-soft: color-mix(in oklab, #ffcb78 14%, var(--surface));
+
+    --danger: #ff9b92;
+    --on-danger: #2b0f0d;     /* 8.80 */
+    --danger-soft: color-mix(in oklab, #ff9b92 16%, var(--surface));
+
+    --info: #8ac4ff;
+    --on-info: #0d2030;       /* 9.02 */
+    --info-soft: color-mix(in oklab, #8ac4ff 16%, var(--surface));
+
+    --focus: #c7bfef;
+    --overlay: rgb(0 0 0 / 0.62);
+    --scrim: rgb(0 0 0 / 0.78);
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.30);
+    --shadow-md: 0 4px 12px rgb(0 0 0 / 0.42);
+    --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
+  }
+
+  /* System preference applies only when the person has not chosen explicitly. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121317;
+      --surface: #1d1f27;
+      --surface-2: #262932;
+      --surface-3: #30343f;
+      --surface-inverse: #f2f3f5;
+      --text: #f2f3f5;
+      --text-muted: #b3bac8;
+      --text-inverse: #161c26;
+      --border: #4b5261;
+      --border-strong: #626b7d;
+      --divider: #343844;
+      --primary: #b7acec;
+      --primary-hover: #c7bfef;
+      --primary-active: #d6d0f5;
+      --on-primary: #1a1630;
+      --primary-soft: color-mix(in oklab, var(--violet-300) 16%, var(--surface));
+      --link: #c7bfef;
+      --link-hover: #d6d0f5;
+      --positive: #6fd6a8;
+      --on-positive: #10231c;
+      --positive-soft: color-mix(in oklab, #6fd6a8 16%, var(--surface));
+      --attention: #ffcb78;
+      --on-attention: #2a1c00;
+      --attention-soft: color-mix(in oklab, #ffcb78 14%, var(--surface));
+      --danger: #ff9b92;
+      --on-danger: #2b0f0d;
+      --danger-soft: color-mix(in oklab, #ff9b92 16%, var(--surface));
+      --info: #8ac4ff;
+      --on-info: #0d2030;
+      --info-soft: color-mix(in oklab, #8ac4ff 16%, var(--surface));
+      --focus: #c7bfef;
+      --overlay: rgb(0 0 0 / 0.62);
+      --scrim: rgb(0 0 0 / 0.78);
+      --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.30);
+      --shadow-md: 0 4px 12px rgb(0 0 0 / 0.42);
+      --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
+    }
+  }
 }
 
 /*

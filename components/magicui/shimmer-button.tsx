@@ -17,7 +17,7 @@ export interface ShimmerButtonProps extends ComponentPropsWithoutRef<"button"> {
 }
 
 const ROOT =
-  "group relative z-0 flex cursor-pointer items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap border border-white/10 text-[var(--ink)] shadow-[inset_0_1px_0_var(--rim),inset_0_-1px_0_var(--groove),0_3px_8px_-3px_var(--cast)] [background:var(--bg)] [border-radius:var(--radius)] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
+  "group relative z-0 flex cursor-pointer items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap border border-white/10 text-[var(--eavi-on-fill)] shadow-[inset_0_1px_0_var(--rim),inset_0_-1px_0_var(--groove),0_3px_8px_-3px_var(--cast)] [background:var(--bg)] [border-radius:var(--radius)] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
 
 const PAD_DEFAULT = "px-6 py-3";
 

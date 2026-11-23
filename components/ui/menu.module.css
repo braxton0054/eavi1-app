@@ -31,6 +31,12 @@
     text-decoration: none;
   }
 
+  /* ACC-06: Radix handles arrow-key highlighting; keyboard focus still needs a visible ring. */
+  .item:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: -2px;
+  }
+
   .item[data-highlighted],
   .item:hover {
     background: var(--surface-2);

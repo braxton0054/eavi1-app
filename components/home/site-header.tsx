@@ -5,6 +5,7 @@ import { MenuIcon, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { SiteLogo } from "@/components/home/site-logo";
 import { nav, site } from "@/lib/content/home";
 
@@ -49,6 +50,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
+          <ThemeToggle />
           <Button
             asChild
             variant="outline"

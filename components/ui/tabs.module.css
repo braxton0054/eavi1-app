@@ -14,7 +14,7 @@
     width: fit-content;
     align-items: center;
     justify-content: center;
-    padding: 3px;
+    padding: 4px;
     border-radius: var(--radius-md);
     color: var(--text-muted);
   }

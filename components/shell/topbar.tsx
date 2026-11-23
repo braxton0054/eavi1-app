@@ -14,6 +14,7 @@ import {
   MenuTrigger,
 } from "@/components/ui/menu";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 import styles from "./topbar.module.css";
 
@@ -82,6 +83,7 @@ export function Topbar({
       <span className={styles.note}>{note}</span>
 
       <div className={styles.actions}>
+        <ThemeToggle />
         <NotificationBell />
 
         <Menu>

@@ -183,9 +183,68 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * Phase 0 bridge: older screens still read the eavi-* names. In dark mode those names
+ * point at the new semantic tokens so the whole app changes surface together. Components
+ * migrated to the token layer read --bg/--surface/--text directly and need no bridge.
+ * The logo plate and tick colours keep their light values on purpose (artwork assumes them).
+ */
+:root[data-theme="dark"] {
+  --eavi-bg: var(--bg);
+  --eavi-card: var(--surface);
+  --eavi-text: var(--text);
+  --eavi-muted: var(--surface-2);
+  --eavi-border: var(--border-strong);
+  /* Concrete values here break the legacy cycle: :root sets --primary from --eavi-fill. */
+  --eavi-primary: #b7acec;
+  --eavi-primary-text: #b7acec;
+  --eavi-secondary-text: #6fd6a8;
+  --eavi-fill: #b7acec;
+  --eavi-fill-hover: #c7bfef;
+  --eavi-on-fill: #1a1630;
+  --eavi-on-bg: var(--text);
+  --eavi-muted-text: var(--text-muted);
+  --eavi-destructive: var(--danger);
+  --eavi-primary-soft: var(--primary-soft);
+  --eavi-success-fill: var(--positive);
+  --eavi-on-success: var(--on-positive);
+  --eavi-info-text: var(--info);
+  --eavi-warn-text: var(--attention);
+  --eavi-info-soft: var(--info-soft);
+  --eavi-warn-soft: var(--attention-soft);
+  --eavi-success-soft: var(--positive-soft);
+  --eavi-danger-soft: var(--danger-soft);
+  --eavi-band: var(--surface-3);
+  --eavi-band-foreground: var(--text);
+  --eavi-band-muted: var(--text-muted);
+  --eavi-tooltip: var(--surface-3);
+  --eavi-tooltip-foreground: var(--text);
+  --eavi-neum-hi: var(--surface-3);
+  --eavi-neum-lo: var(--bg);
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface-2);
+  --popover-foreground: var(--text);
+  --primary-foreground: var(--on-primary);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--text);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--on-danger);
+  --border: var(--border-strong);
+  --input: var(--border-strong);
+  --ring: var(--focus);
+}
+
 body {
-  background: var(--eavi-bg);
-  color: var(--eavi-text);
+  /* Phase 0: the page surface follows the token layer so the dark theme applies. */
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 

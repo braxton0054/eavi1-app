@@ -416,7 +416,7 @@ export function ThreadPanel({
             disabled={!canSend || draft.trim().length === 0 || uploading}
             className="min-h-11 min-w-11 rounded-xl bg-[var(--eavi-primary)] px-4 text-sm font-bold text-[var(--eavi-on-bg)] shadow-sm disabled:opacity-50"
           >
-            Send
+            Send message
           </button>
         </div>
         {fileError ? (
