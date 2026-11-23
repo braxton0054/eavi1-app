@@ -28,6 +28,10 @@ concurrency:
 env:
   DEPLOY_PATH: /root/eavi1-app
   PUBLIC_HOST: eavi.college.eavi.shop
+  # No local image names here on purpose: if these are unset the pull step fails
+  # loudly rather than silently building stale images on the box.
+  APP_IMAGE: ghcr.io/${{ github.repository }}:pending
+  MIGRATE_IMAGE: ghcr.io/${{ github.repository }}:migrate-pending
 
 jobs:
   deploy:
@@ -72,8 +76,12 @@ jobs:
           # Both images are tagged by release.yml with the full commit SHA. Export
           # them so compose references the exact migration and app images for this
           # release instead of an older 'latest'.
-          echo "APP_IMAGE=ghcr.io/${{ github.repository }}:${SHA}" >> "$GITHUB_ENV"
-          echo "MIGRATE_IMAGE=ghcr.io/${{ github.repository }}:migrate-${SHA}" >> "$GITHUB_ENV"
+          # Export for THIS step as well as GITHUB_ENV for later steps — values
+          # written to GITHUB_ENV are only visible to subsequent steps.
+          export APP_IMAGE="ghcr.io/${{ github.repository }}:${SHA}"
+          export MIGRATE_IMAGE="ghcr.io/${{ github.repository }}:migrate-${SHA}"
+          echo "APP_IMAGE=${APP_IMAGE}" >> "$GITHUB_ENV"
+          echo "MIGRATE_IMAGE=${MIGRATE_IMAGE}" >> "$GITHUB_ENV"
           docker compose pull
 
       - name: Restart on the published images
