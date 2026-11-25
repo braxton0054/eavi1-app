@@ -11,11 +11,9 @@ export type Choice = { value: string; label: string };
  * system offers or shows a third — a record that stored one before this rule reads as
  * not stated until the office corrects it.
  */
-export const genderChoices: { value: "MALE" | "FEMALE" | "OTHER" | "UNDECLARED"; label: string }[] = [
+export const genderChoices: { value: "MALE" | "FEMALE"; label: string }[] = [
   { value: "MALE", label: "Male" },
   { value: "FEMALE", label: "Female" },
-  { value: "OTHER", label: "Other" },
-  { value: "UNDECLARED", label: "Prefer not to say" },
 ];
 
 /** The gender values a form may submit. */
@@ -156,7 +154,6 @@ export const applyPage = {
     letter: {
       buttonPdf: "Download your admission letter again",
       downloading: "Your details are being reviewed",
-      note: "Keep this letter safe. The campus office will check the QR code when you enrol.",
       failed: "Your letter could not be prepared just now. Try again, or show the office your reference above.",
       missing: "Your letter is being prepared. Show the office your reference above and ask them to print it.",
     },

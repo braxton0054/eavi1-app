@@ -486,10 +486,7 @@ function LetterPanel({
   }
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-eavi-plate p-4">
-      <div className="flex flex-col gap-1">
-        <p className="text-sm font-semibold">Admission letter (A4 PDF)</p>
-        <p className="text-xs leading-5 text-muted-foreground">{applyPage.applied.letter.note}</p>
-      </div>
+      <p className="text-sm font-semibold">Admission letter (A4 PDF)</p>
       <ShimmerButton
         type="button"
         disabled={busy}
