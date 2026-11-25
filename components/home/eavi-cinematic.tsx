@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import { campuses } from "@/lib/campuses";
 import styles from "./eavi-cinematic.module.css";
 
 /**
@@ -90,18 +89,12 @@ export function EaviCinematic({
             <div className={styles.statCard}>
               <p className={styles.statValue}>{students}</p>
               <p className={styles.statLabel}>Students enrolled</p>
-              <p className={styles.statNote}>Across {campuses.length} campuses</p>
+              <p className={styles.statNote}>Across 2 teaching campuses</p>
               <Link className={styles.statLink} href="/dashboard">
                 See the portal
               </Link>
             </div>
-            <div className={styles.photoCard}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/eavi-assets/web/018.jpg" alt="Students at an institute event" loading="lazy" />
-              <p className={styles.photoCaption}>
-                College photographs <span>{photos}</span>
-              </p>
-            </div>
+            <p className={styles.photoCaption}>{photos} college photographs in the gallery below</p>
           </div>
 
           <div className={styles.photoWrap}>
@@ -121,19 +114,12 @@ export function EaviCinematic({
 
           <div className={styles.rightColumn}>
             <p className={styles.available}>● Available for you</p>
-            <div className={styles.featureCard}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/eavi-assets/web/104.jpg" alt="A student in practical training" loading="lazy" />
-              <div className={styles.featureRow}>
-                <span>Practical training</span>
-                <span className={styles.featureArrow} aria-hidden="true" />
-              </div>
-            </div>
+            <p className={styles.featureRow}>Practical training that prepares you for work</p>
           </div>
 
           <div className={styles.counts}>
             <p><strong>{programmes}</strong> programmes</p>
-            <p><strong>{campuses.length}</strong> campuses</p>
+            <p><strong>2</strong> teaching campuses</p>
           </div>
         </div>
       </section>
