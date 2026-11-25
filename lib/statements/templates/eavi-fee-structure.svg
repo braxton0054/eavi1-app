@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="794" height="1123" viewBox="0 0 794 1123" font-family="Liberation Sans, Arial, Helvetica, sans-serif">
+<!-- EAVI fee structure (A4) | built from the programme's published fee plan. Slots: {{...}} -->
+<style>
+  .ink{fill:#1F2937}
+  .brand{fill:#800080}
+  .accent{fill:#5c005c}
+  .muted{fill:#6B7280}
+  .rule{stroke:#800080}
+  .soft{fill:#f1effb}
+</style>
+<rect width="794" height="1123" fill="#FFFFFF"/>
+
+<!-- header: same language as the student card -->
+<rect x="0" y="0" width="794" height="10" class="brand"/>
+<polygon points="660,10 794,10 794,120 620,120" class="brand"/>
+<text x="770" y="52" text-anchor="end" font-size="11" font-weight="bold" fill="#FFFFFF" letter-spacing="1">FEE STRUCTURE</text>
+<text x="770" y="74" text-anchor="end" font-size="9" fill="#FFFFFF" letter-spacing="1">{{program_code}}</text>
+<image xlink:href="{{logo_url}}" href="{{logo_url}}" x="40" y="28" width="84" height="80" preserveAspectRatio="xMidYMid meet"/>
+<text x="140" y="54" font-size="20" font-weight="bold" class="ink">EAST AFRICA VISION INSTITUTE</text>
+<text x="140" y="76" font-size="11" class="muted">P. O. Box 6662-30100, Eldoret, Kenya</text>
+<text x="140" y="92" font-size="11" class="muted">Tel: +254 726 044 022</text>
+
+<rect x="40" y="136" width="714" height="96" rx="12" class="soft"/>
+<text x="60" y="160" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">PROGRAMME</text>
+<text x="60" y="186" font-size="20" font-weight="bold" class="ink">{{program_name}}</text>
+<text x="60" y="212" font-size="12" class="ink">{{level}}  ·  {{duration}}</text>
+<text x="454" y="160" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">VERSION</text>
+<text x="454" y="186" font-size="14" font-weight="bold" class="brand">{{version}}</text>
+<text x="454" y="212" font-size="11" class="muted">Published {{issued_on}}</text>
+
+<text x="40" y="272" font-size="12" font-weight="bold" class="brand" letter-spacing="2">WHAT YOU PAY, PERIOD BY PERIOD</text>
+<rect x="40" y="284" width="714" height="28" class="brand"/>
+<text x="56" y="303" font-size="10" font-weight="bold" fill="#FFFFFF" letter-spacing="1">PERIOD</text>
+<text x="470" y="303" text-anchor="end" font-size="10" font-weight="bold" fill="#FFFFFF" letter-spacing="1">STAGE</text>
+<text x="738" y="303" text-anchor="end" font-size="10" font-weight="bold" fill="#FFFFFF" letter-spacing="1">AMOUNT (KES)</text>
+{{period_rows}}
+
+<line x1="40" y1="{{total_y}}" x2="754" y2="{{total_y}}" class="rule" stroke-width="2"/>
+<text x="56" y="{{total_text_y}}" font-size="14" font-weight="bold" class="ink">TOTAL PROGRAMME FEE</text>
+<text x="738" y="{{total_text_y}}" text-anchor="end" font-size="20" font-weight="bold" class="brand">KES {{total}}</text>
+
+<rect x="40" y="{{note_y}}" width="714" height="76" rx="8" fill="#FFFFFF" stroke="#800080" stroke-width="1"/>
+<text x="60" y="{{note_text_y}}" font-size="11" class="ink">Fees are billed per period. You may pay in instalments as you study.</text>
+<text x="60" y="{{note_text2_y}}" font-size="11" class="muted">Amounts above are the published version for this programme. Your invoice shows what you owe for each period.</text>
+
+<rect x="0" y="1083" width="794" height="40" class="brand"/>
+<text x="397" y="1108" text-anchor="middle" font-size="11" font-weight="bold" fill="#FFFFFF" letter-spacing="1">EAST AFRICA VISION INSTITUTE  |  ELDORET, KENYA  |  FEE STRUCTURE v{{version}}</text>
+</svg>

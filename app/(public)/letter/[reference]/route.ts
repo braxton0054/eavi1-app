@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { assembleOfferLetter } from "@/lib/admissions/letter";
+import { feeStructureForProgram } from "@/lib/statements/fee-structure-data";
+import { buildFeeStructureSvg } from "@/lib/statements/fee-structure";
 import { letterForDownload } from "@/lib/admissions/issue";
 import {
   renderAdmissionLetterSvg,
@@ -62,8 +64,21 @@ export async function GET(
   if (format === "pdf") {
     let pdfBytes: Uint8Array;
     try {
+      // The fee structure is generated from the programme's published plan, so the
+      // document in the letter cannot drift from the figures used for invoices.
+      let feeStructurePdf: Uint8Array | null = null;
+      try {
+        const doc = await feeStructureForProgram(letter.application.programId);
+        if (doc) {
+          const svg = buildFeeStructureSvg({ ...doc.input, logoUrl: `${publicOrigin()}/logo.png` });
+          feeStructurePdf = await renderAdmissionLetterPdf(svg);
+        }
+      } catch {
+        feeStructurePdf = null;
+      }
       const assembled = await assembleOfferLetter(view, {
-        feeStructureUrl: letter.feeStructureUrl,
+        feeStructureUrl: feeStructurePdf ? null : letter.feeStructureUrl,
+        feeStructurePdf,
         bursaryFormUrl: letter.bursaryFormUrl,
       });
       pdfBytes = new Uint8Array(assembled.bytes);

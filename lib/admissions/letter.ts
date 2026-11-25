@@ -126,7 +126,12 @@ async function loadInsert(
 
 export async function assembleOfferLetter(
   view: LetterView,
-  uploads: { feeStructureUrl: string | null; bursaryFormUrl: string | null },
+  uploads: {
+    feeStructureUrl: string | null;
+    bursaryFormUrl: string | null;
+    /** A fee structure generated from the programme's published plan, when one exists. */
+    feeStructurePdf?: Uint8Array | null;
+  },
 ): Promise<AssembledLetter> {
   const missing: string[] = [];
 
@@ -143,7 +148,7 @@ export async function assembleOfferLetter(
   const [feeDoc, bursaryDoc] = await Promise.all([
     loadInsert(
       "fee structure",
-      await fetchUploadedPdf(uploads.feeStructureUrl),
+      uploads.feeStructurePdf ?? (await fetchUploadedPdf(uploads.feeStructureUrl)),
       missing,
     ),
     loadInsert(

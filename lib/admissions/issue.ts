@@ -106,11 +106,12 @@ export async function letterForDownload(reference: string, token: string) {
       bursaryFormUrl: true,
       expiresAt: true,
       issuedAt: true,
-      program: { select: { name: true, code: true } },
+      program: { select: { id: true, name: true, code: true } },
       application: {
         select: {
           campus: { select: { name: true } },
           createdAt: true,
+          programId: true,
         },
       },
     },

@@ -85,6 +85,24 @@ export default async function ProgramFeesPage({
       <PageHeader
         title={feeCopy.title}
         description={feeCopy.description}
+        action={
+          plan ? (
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={`/api/programs/${program.id}/fee-structure`}
+                className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text underline-offset-4 hover:underline"
+              >
+                View fee structure (SVG)
+              </a>
+              <a
+                href={`/api/programs/${program.id}/fee-structure?format=pdf`}
+                className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text underline-offset-4 hover:underline"
+              >
+                Download fee structure (PDF)
+              </a>
+            </div>
+          ) : null
+        }
         meta={
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-eavi-muted-text">
             <span className="tabular-nums">{program.code}</span>

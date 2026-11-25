@@ -128,10 +128,9 @@ async function programmeAnswers(
  */
 async function programmeDocuments(formData: FormData) {
   const curriculum = await fileField(formData, "curriculum", fieldLabel("curriculum"), "pdf");
-  const feeStructure = await fileField(formData, "feeStructure", fieldLabel("feeStructure"), "pdf");
-  assertStorageFor([curriculum, feeStructure]);
+  assertStorageFor([curriculum]);
 
-  return { curriculum, feeStructure };
+  return { curriculum };
 }
 
 /** The stored path is named after the programme, so this runs once the row exists. */
@@ -139,10 +138,9 @@ async function saveProgrammeDocuments(
   programId: string,
   documents: Awaited<ReturnType<typeof programmeDocuments>>,
 ) {
-  const data: { curriculumUrl?: string; feeStructureUrl?: string } = {};
+  const data: { curriculumUrl?: string } = {};
   if (documents.curriculum) data.curriculumUrl = await putFile(documents.curriculum, "curricula", programId);
-  if (documents.feeStructure) data.feeStructureUrl = await putFile(documents.feeStructure, "fee-structures", programId);
-  if (data.curriculumUrl || data.feeStructureUrl) {
+  if (data.curriculumUrl) {
     await prisma.program.update({ where: { id: programId }, data });
   }
 }

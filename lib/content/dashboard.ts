@@ -473,12 +473,6 @@ const programmeDocuments = {
     none: "No curriculum uploaded yet.",
     view: "View curriculum",
   },
-  feeStructure: {
-    file: "Fee structure file (PDF)",
-    hint: "Optional. On an edit, leave this empty to keep the file already uploaded.",
-    none: "No fee structure uploaded yet.",
-    view: "View fee structure",
-  },
 };
 
 const profilePhoto = {
@@ -1000,7 +994,6 @@ export const pages = {
     title: "Programmes",
     description: "Courses on offer at this campus.",
     curriculum: programmeDocuments.curriculum,
-    feeStructure: programmeDocuments.feeStructure,
     // Code, Programme, Awarding body and Level alone were ~1058px with the Actions column
     // last, which a 1280 screen with the sidebar open cannot show. The table scrolls inside
     // its panel rather than pushing the page sideways, and the name column wraps instead of
@@ -1032,7 +1025,7 @@ export const pages = {
       status: "Status",
       noFee: "Set fees",
       curriculumMissing: "No curriculum",
-      feeStructureMissing: "No fee sheet",
+      feeStructureMissing: "Fee plan not published",
       open: "Open programme",
       actions: "Programme actions",
     },
@@ -1057,7 +1050,6 @@ export const pages = {
         { name: "minKcseGrade", label: "Minimum KCSE grade", type: "select", required: true, options: toOptions(labels.entryGrade) },
         { name: "description", label: "Description", type: "textarea", wide: true },
         { name: "curriculum", label: programmeDocuments.curriculum.file, type: "file", accept: "application/pdf", hint: programmeDocuments.curriculum.hint, wide: true },
-        { name: "feeStructure", label: programmeDocuments.feeStructure.file, type: "file", accept: "application/pdf", hint: programmeDocuments.feeStructure.hint, wide: true },
       ] satisfies Field[],
       created: "Programme saved.",
     },
