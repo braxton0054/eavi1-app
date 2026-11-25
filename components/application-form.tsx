@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
+import { ReviewAnimation } from "@/components/review-animation";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import {
   Card,
@@ -225,17 +226,11 @@ export function ApplicationForm({ programs }: { programs: (Choice & { minGrade?:
   if (busy) {
     return (
       <Card className="w-full gap-0 py-0">
-        <CardHeader className="items-center gap-4 px-6 pt-10 pb-4 text-center">
-          <span className="flex size-16 items-center justify-center rounded-full bg-eavi-primary-soft">
-            <Spinner className="size-8 text-eavi-primary-text" />
-          </span>
+        <CardHeader className="items-center gap-4 px-6 pt-8 pb-2 text-center">
           <CardTitle className="text-xl">{applyPage.applied.reviewing}</CardTitle>
-          <CardDescription className="text-sm leading-6 text-muted-foreground">
-            {applyPage.applied.letter.note}
-          </CardDescription>
         </CardHeader>
-        <CardContent className="px-6 pb-10 text-center text-sm text-muted-foreground">
-          {applyPage.submitting}
+        <CardContent className="px-6 pb-10">
+          <ReviewAnimation steps={applyPage.applied.reviewSteps} hint={applyPage.applied.reviewHint} />
         </CardContent>
       </Card>
     );
