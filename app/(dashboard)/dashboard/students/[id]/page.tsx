@@ -549,7 +549,7 @@ export default async function StudentProfilePage({
           }
           action={
             <div className="flex items-center gap-2">
-              <PrintButton pdfHref={`/api/students/${student.id}/print`} />
+              <PrintButton pdfHref={`/api/students/${student.id}/details`} />
               <Link
                 href="/dashboard/students"
                 className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-3 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"

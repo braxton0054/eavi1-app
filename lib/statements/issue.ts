@@ -51,7 +51,11 @@ export async function invoicePdf(input: Omit<InvoiceInput, "student"> & { studen
 /** A statement: every page the account needs, in order. */
 export async function statementPdf(input: Omit<StatementInput, "student"> & { student: FeeDocStudent }) {
   const pages = feeStatementPages(input);
-  return documentPdf(pages, {
+  const STATEMENT_QR_BOX = { x: 40, y: 988, size: 76 };
+  const withCodes = input.student.verifyUrl
+    ? await Promise.all(pages.map((page) => withQr(page, input.student.verifyUrl!, STATEMENT_QR_BOX)))
+    : pages;
+  return documentPdf(withCodes, {
     paper: "a4",
     title: `EAVI fee statement — ${input.student.admissionNo}`,
   });

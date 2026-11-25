@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import { createCard, moveCard } from "@/lib/actions/college/cards";
-import { getCards, getProgramOptions, getStudentOptions } from "@/lib/dal/college";
+import { moveCard } from "@/lib/actions/college/cards";
+import { getCards, getStudentOptions } from "@/lib/dal/college";
 import { getCardCandidates } from "@/lib/dal/cards";
 import { getClassOptions, getIntakeChoices } from "@/lib/dal/classes";
 import { CardGenerator } from "@/components/dashboard/card-generator";
@@ -10,7 +10,7 @@ import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { RecordCard, RecordCardGrid, type RecordCardData } from "@/components/dashboard/record-card";
 import { prisma } from "@/lib/prisma";
-import { DisclosureForm, RowForm, type OptionSets } from "@/components/dashboard/record-form";
+import { RowForm } from "@/components/dashboard/record-form";
 import { ListFilters, Paginator, ResultCount } from "@/components/dashboard/list-tools";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
 import { StatusChip } from "@/components/dashboard/status-chip";
@@ -40,10 +40,9 @@ export default async function CardsPage({
   const { q, status, page, invalid, empty, tooMany, ready } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  const [list, studentOptions, programOptions, classChoices, intakeChoices] = await Promise.all([
+  const [list, studentOptions, classChoices, intakeChoices] = await Promise.all([
     getCards({ q, status, page: Number(page) || 1 }),
     getStudentOptions(scope.campusId),
-    getProgramOptions(scope.campusId),
     getClassOptions(scope.campusId),
     getIntakeChoices(),
   ]);
@@ -79,7 +78,6 @@ export default async function CardsPage({
     select: { id: true, targetLabel: true, cardCount: true, sheetCount: true, createdAt: true },
   });
 
-  const options: OptionSets = { students: studentOptions, programs: programOptions };
 
   const statuses = Object.entries(labels.cardStatus).map(([value, label]) => ({ value, label }));
 
@@ -211,16 +209,6 @@ export default async function CardsPage({
           />
         </div>
       </Panel>
-
-      <DisclosureForm
-        id="new-card"
-        button={copy.create.button}
-        title={copy.create.title}
-        fields={copy.create.fields}
-        options={options}
-        action={createCard}
-        submitLabel={common.create}
-      />
 
       {batches.length > 0 ? (
         <Panel title={copy.history}>

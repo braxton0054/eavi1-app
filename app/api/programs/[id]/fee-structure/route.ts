@@ -31,7 +31,7 @@ export async function GET(
       return new NextResponse(Buffer.from(pdf), {
         headers: {
           "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="${name.replace(/\.svg$/, ".pdf")}"`,
+          "Content-Disposition": `inline; filename="${name.replace(/\.svg$/, ".pdf")}"`,
           "Content-Length": String(pdf.byteLength),
           "Cache-Control": "private, no-store",
           "X-Content-Type-Options": "nosniff",

@@ -85,12 +85,29 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
         title={card.student.user.fullName}
         description={`${copy.title} · ${card.serial}`}
         action={
-          <Link
-            href={`/dashboard/students/${card.student.id}`}
-            className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
-          >
-            {copy.openStudent}
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={`/dashboard/cards/${card.id}/card`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
+            >
+              View / print card
+            </a>
+            <a
+              href={`/dashboard/cards/${card.id}/card`}
+              download={`card-${card.serial}.pdf`}
+              className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
+            >
+              Download PDF
+            </a>
+            <Link
+              href={`/dashboard/students/${card.student.id}`}
+              className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
+            >
+              {copy.openStudent}
+            </Link>
+          </div>
         }
       />
 

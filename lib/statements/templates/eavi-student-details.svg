@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="794" height="1123" viewBox="0 0 794 1123" font-family="Liberation Sans, Arial, Helvetica, sans-serif">
+<!-- EAVI student record (A4) | enrolment details only — no fee figures. Slots: {{...}} -->
+<style>
+  .ink{fill:#1F2937}.brand{fill:#800080}.muted{fill:#6B7280}.rule{stroke:#800080}.soft{fill:#f1effb}
+</style>
+<rect width="794" height="1123" fill="#FFFFFF"/>
+<rect x="0" y="0" width="794" height="10" class="brand"/>
+<polygon points="660,10 794,10 794,120 620,120" class="brand"/>
+<text x="770" y="52" text-anchor="end" font-size="11" font-weight="bold" fill="#FFFFFF" letter-spacing="1">STUDENT RECORD</text>
+<text x="770" y="74" text-anchor="end" font-size="9" fill="#FFFFFF" letter-spacing="1">{{admission_no}}</text>
+<image xlink:href="{{logo_url}}" href="{{logo_url}}" x="40" y="28" width="84" height="80" preserveAspectRatio="xMidYMid meet"/>
+<text x="140" y="54" font-size="20" font-weight="bold" class="ink">EAST AFRICA VISION INSTITUTE</text>
+<text x="140" y="76" font-size="11" class="muted">P. O. Box 6662-30100, Eldoret, Kenya</text>
+<text x="140" y="92" font-size="11" class="muted">Tel: +254 726 044 022</text>
+
+<!-- photo plate -->
+<rect x="40" y="140" width="150" height="190" rx="8" class="soft" stroke="#800080"/>
+<image xlink:href="{{photo_url}}" href="{{photo_url}}" x="48" y="148" width="134" height="174" preserveAspectRatio="xMidYMid slice"/>
+<text x="115" y="350" text-anchor="middle" font-size="9" class="muted">Photograph on file</text>
+
+<!-- identity -->
+<text x="216" y="150" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">STUDENT NAME</text>
+<text x="216" y="176" font-size="20" font-weight="bold" class="ink">{{full_name}}</text>
+<text x="216" y="210" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">ADMISSION NUMBER</text>
+<text x="216" y="234" font-size="14" font-weight="bold" class="brand">{{admission_no}}</text>
+<text x="216" y="268" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">PROGRAMME</text>
+<text x="216" y="294" font-size="15" font-weight="bold" class="ink">{{program}}</text>
+<text x="216" y="320" font-size="11" class="muted">{{level}}  ·  {{duration}}</text>
+<text x="470" y="210" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">INTAKE</text>
+<text x="470" y="234" font-size="14" font-weight="bold" class="ink">{{intake}}</text>
+<text x="470" y="268" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">CAMPUS</text>
+<text x="470" y="294" font-size="14" font-weight="bold" class="ink">{{campus}}</text>
+<text x="470" y="320" font-size="11" class="muted">{{class_name}}</text>
+
+<text x="40" y="388" font-size="12" font-weight="bold" class="brand" letter-spacing="2">SCHOOLING BEFORE EAVI</text>
+<rect x="40" y="400" width="714" height="72" rx="8" fill="#FAFAFA" stroke="#E5E7EB"/>
+<text x="56" y="424" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">SECONDARY SCHOOL</text>
+<text x="56" y="450" font-size="13" font-weight="bold" class="ink">{{secondary_school}}</text>
+<text x="400" y="424" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">KCSE GRADE</text>
+<text x="400" y="450" font-size="13" font-weight="bold" class="ink">{{grade}}</text>
+<text x="56" y="490" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">BIRTH CERTIFICATE</text>
+<text x="220" y="490" font-size="12" class="ink">{{birth_certificate}}</text>
+
+<text x="40" y="548" font-size="12" font-weight="bold" class="brand" letter-spacing="2">GUARDIAN / NEXT OF KIN</text>
+<rect x="40" y="560" width="714" height="80" rx="8" fill="#FAFAFA" stroke="#E5E7EB"/>
+<text x="56" y="586" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">NAME</text>
+<text x="56" y="612" font-size="13" font-weight="bold" class="ink">{{guardian_name}}</text>
+<text x="360" y="586" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">RELATIONSHIP</text>
+<text x="360" y="612" font-size="13" class="ink">{{guardian_relationship}}</text>
+<text x="56" y="634" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">PHONE</text>
+<text x="150" y="634" font-size="12" font-weight="bold" class="ink">{{guardian_phone}}</text>
+<text x="400" y="634" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">ALTERNATE</text>
+<text x="510" y="634" font-size="12" class="ink">{{guardian_alt}}</text>
+
+<text x="40" y="692" font-size="12" font-weight="bold" class="brand" letter-spacing="2">CONTACT &amp; ADDRESS</text>
+<rect x="40" y="704" width="714" height="80" rx="8" fill="#FAFAFA" stroke="#E5E7EB"/>
+<text x="56" y="730" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">PHONE</text>
+<text x="56" y="756" font-size="13" font-weight="bold" class="ink">{{phone}}</text>
+<text x="300" y="730" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">EMAIL</text>
+<text x="300" y="756" font-size="12" class="ink">{{email}}</text>
+<text x="56" y="776" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">ADDRESS</text>
+<text x="130" y="776" font-size="12" class="ink">{{address}}</text>
+
+<line x1="40" y1="840" x2="754" y2="840" class="rule" stroke-width="2"/>
+<text x="40" y="872" font-size="11" class="muted">This record shows enrolment details as held by the college. It is not a fee statement.</text>
+<text x="40" y="900" font-size="11" class="muted">Prepared {{prepared_on}}  ·  {{reference}}</text>
+
+<rect x="0" y="1083" width="794" height="40" class="brand"/>
+<text x="397" y="1108" text-anchor="middle" font-size="11" font-weight="bold" fill="#FFFFFF" letter-spacing="1">EAST AFRICA VISION INSTITUTE  |  ELDORET, KENYA  |  STUDENT RECORD</text>
+</svg>

@@ -150,6 +150,7 @@ export const navGroups: NavGroup[] = [
     label: "Records",
     items: [
       { href: "/dashboard/accounts", label: "Accounts", icon: "accounts" },
+      { href: "/dashboard/fee-structures", label: "Fee structures", icon: "accounts" },
       { href: "/dashboard/cards", label: "ID cards", icon: "cards" },
     ],
   },

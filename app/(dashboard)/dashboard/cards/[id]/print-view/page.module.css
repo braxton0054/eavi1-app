@@ -1,0 +1,34 @@
+@layer components {
+  :global(html),
+  :global(body) {
+    margin: 0;
+    background: #ffffff;
+  }
+
+  .cardPrintSheet {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16mm;
+    padding: 18mm;
+    background: #ffffff;
+  }
+
+  .cardPrintSheet > div {
+    width: 85.6mm;
+    height: 54mm;
+  }
+
+  .cardPrintSheet svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  @media print {
+    .cardPrintSheet {
+      gap: 12mm;
+      padding: 14mm;
+    }
+  }
+}
