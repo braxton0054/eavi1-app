@@ -13,7 +13,7 @@ const PLACES_PER_CAMPUS = 5;
 const TAKEN = [ApplicationStatus.SUBMITTED, ApplicationStatus.REVIEWING];
 
 export type ApplyOptions = {
-  programs: { value: string; label: string }[];
+  programs: { value: string; label: string; minGrade: string | null }[];
 };
 
 /**
@@ -25,13 +25,14 @@ export async function getApplyOptions(): Promise<ApplyOptions> {
     // An archived course keeps its students but must not collect new applications.
     where: { archivedAt: null, campuses: { some: { takesApplicants: true } } },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, code: true },
+    select: { id: true, name: true, code: true, minKcseGrade: true },
   });
 
   return {
     programs: programs.map((program) => ({
       value: program.id,
       label: `${program.name} (${program.code})`,
+      minGrade: program.minKcseGrade,
     })),
   };
 }

@@ -11,9 +11,11 @@ export type Choice = { value: string; label: string };
  * system offers or shows a third — a record that stored one before this rule reads as
  * not stated until the office corrects it.
  */
-export const genderChoices: { value: "MALE" | "FEMALE"; label: string }[] = [
+export const genderChoices: { value: "MALE" | "FEMALE" | "OTHER" | "UNDECLARED"; label: string }[] = [
   { value: "MALE", label: "Male" },
   { value: "FEMALE", label: "Female" },
+  { value: "OTHER", label: "Other" },
+  { value: "UNDECLARED", label: "Prefer not to say" },
 ];
 
 /** The gender values a form may submit. */
@@ -49,16 +51,16 @@ export const gradeChoices = [
 export const applyGrade = {
   /** Shown under the grade field when the chosen programme needs better. */
   belowMinimum: (theirs: string, required: string) =>
-    `This course asks for KCSE ${required}, and you have ${theirs}.`,
+    `This course takes applicants with KCSE ${required} and above. You have ${theirs}, so choose one of the courses below.`,
 
   /** Heading above the list of courses that would take them. */
   suggestionsHeading: "Courses that accept your grade",
   suggestionsBody: "Choose one of these and submit again. Your other details stay filled in.",
 
   /** When their grade does not clear anything on offer. */
-  noneHeading: "No course matches your grade yet",
+  noneHeading: "No course matches your KCSE grade yet",
   noneBody:
-    "Nothing on offer this term takes your grade. Call the campus office — they can tell you about bridging courses and the next intake.",
+    "None of the courses on offer takes your grade. Please visit our campus offices — they will help you find a course that suits your needs, or tell you about the next intake.",
 
   /** Labels for the suggestion list. */
   requiresMinimum: (grade: string) => `Needs ${grade}`,
@@ -116,6 +118,19 @@ export const applyPage = {
       none: "No campus teaches this course right now. Call the campus office and they will tell you what is open.",
     },
   },
+  lookup: {
+    heading: "Already applied? Find your application",
+    body: "Enter the email or phone number you used to apply. We will show your letter and let you change your programme before you enrol.",
+    emailOrPhone: "Email or phone number",
+    placeholder: "you@example.com or 0712 345 678",
+    button: "Find my application",
+    searching: "Checking your details…",
+    none: "We could not find an application with those details. Apply below.",
+    onlyOne: "Enter the email or phone number you used to apply.",
+    enrolled: "You are already enrolled. Please visit the __CAMPUS__ offices for help.",
+    found: "Application found",
+    programme: "Programme",
+  },
   submit: "Submit application",
   submitting: "Sending your application",
   /** A field bots fill in and a person never sees or touches. */
@@ -125,21 +140,21 @@ export const applyPage = {
     failed: "We could not send that. Try again, or call the campus office.",
     tooLong: "That answer is too long. Shorten it and try again.",
     duplicate:
-      "That phone number already has an application for this programme. The campus office will call you.",
+      "You have already applied to this college. Use the form above to find your application, or call the campus office.",
     /** Refused by the rate limit, not by anything the applicant typed. */
     tooMany:
       "You have sent several applications from this connection. Please wait a little, then try again, or call the campus office.",
   },
   applied: {
-    heading: "Application received",
-    body: "Download your admission letter now and keep it safe — it is your proof that you applied, and you will need it when you enrol.",
+    heading: "Congratulations — your application was received",
+    body: "We hope you join us soon. Your admission letter has been downloaded automatically; keep it safe as proof that you applied.",
     reference: "Your reference",
     campus: "You report to",
+    reviewing: "Your details are being reviewed — please wait a moment.",
     letter: {
-      buttonSvg: "Download admission letter (SVG)",
-      buttonPdf: "Download admission letter (PDF)",
-      downloading: "Preparing your letter…",
-      note: "Your A4 acknowledgement letter shows your course details, campus reporting instructions, and a QR code the admissions office can verify.",
+      buttonPdf: "Download your admission letter again",
+      downloading: "Your details are being reviewed — please wait a moment.",
+      note: "Your A4 admission letter shows your course details, campus reporting instructions, and a QR code the admissions office can verify.",
       failed: "Your letter could not be prepared just now. Try again, or show the office your reference above.",
       missing: "Your letter is being prepared. Show the office your reference above and ask them to print it.",
     },
@@ -150,7 +165,10 @@ export const applyPage = {
       "Admission runs every month, so a place can be confirmed in the same month.",
     ],
     stepsHeading: "What happens next",
-    again: "Apply for another programme",
+    changeProgramme: "Change my programme",
+    changing: "Updating your programme…",
+    changeFailed: "We could not change that. Call the campus office.",
+    changeSuccess: "Your programme has been updated and your letter has been downloaded again.",
     home: "Back to home",
   },
   aside: {

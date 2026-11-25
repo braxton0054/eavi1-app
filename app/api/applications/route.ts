@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { ApplicationStatus, EntryGrade, Gender } from "@/generated/prisma/enums";
+import { EntryGrade, Gender } from "@/generated/prisma/enums";
 import { limitApplications } from "@/lib/chat/rate-limit";
 import { nextApplicationReference } from "@/lib/actions/college/_shared";
 import { applyPage, genderValues } from "@/lib/content/apply";
@@ -15,8 +15,6 @@ import { isEmail, normalizeKenyanPhone } from "@/lib/validation";
 const MAX_NAME = 120;
 const MAX_EMAIL = 200;
 
-/** An application still waiting on the campus office; a decided one may be repeated. */
-const OPEN = [ApplicationStatus.SUBMITTED, ApplicationStatus.REVIEWING];
 
 const str = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
@@ -138,14 +136,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // The same person applying twice for the same course only clutters the campus list.
+  /*
+   * One application per person, ever — by email or by phone, whatever the programme and
+   * whatever the status. A person already enrolled is told to visit their campus instead;
+   * everyone else is pointed at the lookup form so they can retrieve or update their letter.
+   */
   const alreadyIn = await prisma.application.findFirst({
-    where: { phone, programId, status: { in: OPEN } },
-    select: { id: true },
+    where: { OR: [...(email ? [{ email }] : []), { phone }] },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      campus: { select: { name: true } },
+      studentProfile: { select: { id: true } },
+    },
   });
   if (alreadyIn) {
+    if (alreadyIn.studentProfile) {
+      return NextResponse.json(
+        {
+          status: "enrolled",
+          message: applyPage.lookup.enrolled.replace("__CAMPUS__", alreadyIn.campus.name),
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
-      { fieldErrors: { phone: applyPage.errors.duplicate } },
+      { status: "applied", fieldErrors: { phone: applyPage.errors.duplicate } },
       { status: 409 },
     );
   }

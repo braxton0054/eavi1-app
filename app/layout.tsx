@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     siteName: "East Africa Vision Institute",
     title: "East Africa Vision Institute — Leading the Leaders",
     description:
-      "Three campuses in Eldoret, Kenya. Apply online, and sign in to the portal for results and class cards.",
+      "Two teaching campuses in Eldoret, Kenya. Apply online, and sign in to the portal for results and class cards.",
     locale: "en_KE",
     url: "/",
     images: [
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: "East Africa Vision Institute — Leading the Leaders",
     description:
-      "Three campuses in Eldoret, Kenya. Apply online, and sign in to the portal for results and class cards.",
+      "Two teaching campuses in Eldoret, Kenya. Apply online, and sign in to the portal for results and class cards.",
     images: ["/logo.png"],
   },
   robots: { index: true, follow: true },

@@ -134,7 +134,7 @@ export const whySection = {
       detail: null as string | null,
     },
     {
-      title: "Three campuses in Eldoret",
+      title: "Two campuses in Eldoret",
       icon: "campuses" satisfies IconName,
       detail: campuses.map((campus) => campus.name).join(", "),
     },

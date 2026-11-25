@@ -64,6 +64,11 @@ export function limitApplications(ip: string): void {
   spendToken(`apply:${ip}`, 5, 60 * 60_000);
 }
 
+/** Looking up an application by email or phone — public, so limited the same way. */
+export function limitApplicationLookup(ip: string): void {
+  spendToken(`apply-lookup:${ip}`, 12, 60 * 60_000);
+}
+
 /** Test seam: forget every bucket. */
 export function resetRateLimits(): void {
   buckets.clear();
