@@ -41,7 +41,7 @@ export function EaviHome({
       <section id={whySection.id} className={styles.section} aria-labelledby="why-title">
         <div className={styles.wrap}>
           <div className={styles.sectionHead}>
-            <p className={styles.sectionLabel}>Why EAVI</p>
+            <p className={styles.sectionLabel}>Why this college</p>
             <h2 id="why-title" className={styles.sectionTitle}>
               {whySection.heading}
             </h2>
@@ -152,7 +152,7 @@ export function EaviHome({
           <div className={styles.sectionHead}>
             <p className={styles.sectionLabel}>Campus life</p>
             <h2 id="gallery-title" className={styles.sectionTitle}>
-              Around EAVI
+              Around the institute
             </h2>
             <p className={styles.sectionIntro}>
               A look at the campus, the classrooms and the practical work students do here.

@@ -14,7 +14,7 @@ import { gallerySection } from "@/lib/content/home";
  * moment, because the office has not captioned the photographs yet.
  */
 
-const TITLES = ["Campus life", "Around EAVI", "On campus", "Student life", "The college", "Campus scenes"];
+const TITLES = ["Campus life", "Around the institute", "On campus", "Student life", "The college", "Campus scenes"];
 
 // Every photograph the college sent, in the order the folders give them. The gallery
 // loads textures lazily as cards approach, so the full set is safe on a phone.
@@ -23,8 +23,8 @@ const pad = (n: number) => String(n).padStart(3, "0");
 const items = Array.from({ length: PHOTO_COUNT }, (_, index) => ({
   image: `/eavi-assets/web/${pad(index + 1)}.jpg`,
   text: TITLES[index % TITLES.length],
-  alt: `A photograph of EAVI College — ${TITLES[index % TITLES.length].toLowerCase()}.`,
-  description: "A photo from around EAVI College's campuses in Eldoret.",
+  alt: `A photograph of the institute — ${TITLES[index % TITLES.length].toLowerCase()}.`,
+  description: "A photo from around the institute's campuses in Eldoret.",
 }));
 
 export function GallerySection() {

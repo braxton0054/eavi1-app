@@ -36,7 +36,7 @@ export const site = {
   location: "Eldoret, Kenya",
   logoAlt: "East Africa Vision Institute",
   description:
-    "Quality and affordable education across three campuses in Eldoret, Kenya. Apply online, then use the portal for results, class cards and campus notices.",
+    "Quality and affordable education at two campuses in Eldoret, Kenya. Apply online, then use the portal for results, class cards and campus notices.",
   /** Set NEXT_PUBLIC_SITE_URL to the deployed domain; used for metadata and JSON-LD. */
   url: process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000",
   whatsapp: {
@@ -70,18 +70,18 @@ export const hero = {
   eyebrow: "Eldoret · Kenya",
   heading: site.tagline,
   headingAccent: site.name,
-  subheading: `Quality and affordable education across ${campuses.length} campuses in Eldoret, Kenya.`,
+  subheading: `Quality and affordable education at two campuses in Eldoret, Kenya.`,
   apply: "Apply Now",
   portal: "Portal Login",
   photo: "/eavi-assets/web/hero.jpg",
-  photoAlt: "The EAVI College campus in Eldoret.",
+  photoAlt: "The institute campus in Eldoret.",
   photoLabel: "Campus photo",
   photoPending: "Add a campus photo in public/campus-life/",
   trustHeading: "EAVI at a glance",
   // Three figures, all real: campuses come from the campus register, programmes and
   // students are counted live on the page. No invented "years leading" statistic (AIT-03).
   trust: [
-    { label: "Campuses in Eldoret", value: campuses.length },
+    { label: "Teaching campuses", value: 2 },
     { label: "Programmes", value: null },
     { label: "Students", value: null },
   ] satisfies TrustItem[],
@@ -124,8 +124,8 @@ export const portalSection = {
 /** Titles are EAVI's own reason list; details only where a supplied fact backs them. */
 export const whySection = {
   id: "about",
-  eyebrow: "Why EAVI",
-  heading: "Why students choose EAVI",
+  eyebrow: "Why this college",
+  heading: "Why students choose the institute",
   subheading: "Quality and affordable education, led from three Eldoret campuses.",
   reasons: [
     {
@@ -228,7 +228,7 @@ export const campusesSection = {
   id: "campuses",
   eyebrow: "Campuses",
   heading: "Find us in Eldoret",
-  subheading: `All ${campuses.length} locations answer their own line.`,
+  subheading: `Our two teaching campuses and the town office each answer their own line.`,
   addressLabel: "Address",
   phoneLabel: "Direct line",
   alternateLabel: "Alternate line",
@@ -308,7 +308,7 @@ export const faqSection = {
     {
       question: "Which certificates do you issue?",
       answer:
-        "EAVI is accredited by the Ministry of Education and TVETA (KNEC Centre No. 26578004). On completing your programme you receive its certificate from the examining body.",
+        "The institute is accredited by the Ministry of Education and TVETA (KNEC Centre No. 26578004). On completing your programme you receive its certificate from the examining body.",
     },
   ] satisfies FaqItem[],
   pendingAnswer: "Answer needed from the academic office",
@@ -335,7 +335,7 @@ export const footer = {
   quickLinks: "Quick links",
   campusesHeading: "Campuses",
   contactHeading: "Talk to us",
-  socialHeading: "Follow EAVI",
+  socialHeading: "Follow the institute",
   /** TODO: real social profile URLs. */
   socials: [] as NavLink[],
   socialPending: "Add profile links",
@@ -346,7 +346,7 @@ export const footer = {
 } as const;
 
 export const pending = {
-  label: "Placeholder — needs EAVI data",
+  label: "Placeholder — needs institute data",
   note: "Fill the values in lib/content/home.ts",
 } as const;
 

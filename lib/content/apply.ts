@@ -70,7 +70,7 @@ export const applyGrade = {
 export const applyPage = {
   title: "Apply — East Africa Vision Institute",
   metaDescription:
-    "Apply to East Africa Vision Institute in Eldoret. Admissions run every month at three campuses.",
+    "Apply to East Africa Vision Institute in Eldoret. Admissions run every month at two campuses.",
   eyebrow: "Admissions",
   introHeading: "Apply to East Africa Vision Institute",
   introSubheading:

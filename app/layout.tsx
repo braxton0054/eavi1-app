@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     template: "%s | East Africa Vision Institute",
   },
   description:
-    "Quality and affordable education across three campuses in Eldoret, Kenya. Apply online, then use the portal for results, class cards and campus notices.",
+    "Quality and affordable education at two campuses in Eldoret, Kenya. Apply online, then use the portal for results, class cards and campus notices.",
   applicationName: "East Africa Vision Institute",
   keywords: [
     "EAVI",

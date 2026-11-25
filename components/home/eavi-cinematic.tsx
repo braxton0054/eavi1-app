@@ -79,7 +79,7 @@ export function EaviCinematic({
           <div className={styles.about}>
             <p className={styles.aboutLabel}>● (About)</p>
             <p className={styles.aboutCopy}>
-              Quality and affordable education across three campuses in Eldoret.
+              Quality and affordable education at two campuses in Eldoret.
             </p>
             <Link className={styles.aboutButton} href="/apply">
               Start your application
@@ -97,7 +97,7 @@ export function EaviCinematic({
             </div>
             <div className={styles.photoCard}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/eavi-assets/web/018.jpg" alt="Students at an EAVI college event" loading="lazy" />
+              <img src="/eavi-assets/web/018.jpg" alt="Students at an institute event" loading="lazy" />
               <p className={styles.photoCaption}>
                 College photographs <span>{photos}</span>
               </p>
@@ -108,7 +108,7 @@ export function EaviCinematic({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/eavi-assets/web/001.jpg"
-              alt="The EAVI College campus building and bus in Eldoret"
+              alt="The institute campus building and bus in Eldoret"
               className={styles.heroPhoto}
             />
             <div className={styles.brandPlate}>
@@ -139,13 +139,13 @@ export function EaviCinematic({
       </section>
 
       <div className={styles.bar} aria-hidden="true">
-        <span>EAVI College</span>
+        <span>East Africa Vision Institute</span>
         <span>Scroll to explore</span>
         <span>Eldoret, Kenya</span>
       </div>
 
       <section className={styles.statementSection} aria-labelledby="statement-title">
-        <h2 id="statement-title" className="sr-only">Why students choose EAVI</h2>
+        <h2 id="statement-title" className="sr-only">Our approach to education</h2>
         <div ref={statementRef} className={styles.statement} data-filled={filled || undefined}>
           {STATEMENT.split(" ").map((word, index) => (
             <span key={`${word}-${index}`} style={{ transitionDelay: `${index * 35}ms` }}>

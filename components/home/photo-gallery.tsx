@@ -12,7 +12,7 @@ const PHOTO_COUNT = 226;
 const pad = (n: number) => String(n).padStart(3, "0");
 const src = (index: number) => `/eavi-assets/web/${pad(index + 1)}.jpg`;
 
-const TITLES = ["Campus life", "Around EAVI", "On campus", "Student life", "The college", "Campus scenes"];
+const TITLES = ["Campus life", "Around the institute", "On campus", "Student life", "The college", "Campus scenes"];
 const caption = (index: number) => TITLES[index % TITLES.length];
 
 /** Show a manageable first batch; the rest arrive on demand. */
