@@ -179,25 +179,27 @@ function moneyDocumentSlots(input: {
   const { student } = input;
   const lines = settlementLines(input.items, input.closingLabel);
 
+  // Each artwork column has a fixed width. Truncating the few long values here keeps a
+  // long name, number or reference inside its own cell instead of printing over the next.
   const slots: Slots = {
-    receipt_no: input.reference,
-    receipt_date: input.date,
-    student_name: student.fullName,
-    reg_no: student.admissionNo,
-    course: student.course,
-    intake: student.intake ?? "",
-    method: input.method,
-    reference: input.referenceText || "",
-    received_by: input.receivedBy,
+    receipt_no: fit(input.reference, 30),
+    receipt_date: fit(input.date, 22),
+    student_name: fit(student.fullName, 34),
+    reg_no: fit(student.admissionNo, 28),
+    course: fit(student.course, 34),
+    intake: fit(student.intake ?? "", 28),
+    method: fit(input.method, 22),
+    reference: fit(input.referenceText || "", 25),
+    received_by: fit(input.receivedBy, 18),
     amount_paid: kes(input.amount),
-    amount_words: amountInWords(input.amount),
+    amount_words: fit(amountInWords(input.amount), 62),
     total_fees: kes(input.totalFees),
     paid_to_date: kes(input.paidToDate),
     balance: kes(input.balance),
     // The QR points at the college's verification page; the printed code is the number a
     // cashier can read out when the camera is not around.
     qr_data: student.verifyUrl ?? input.reference,
-    verify_code: student.verifyCode || input.reference,
+    verify_code: fit(student.verifyCode || input.reference, 30),
   };
 
   for (let i = 1; i <= 4; i += 1) {
@@ -333,25 +335,25 @@ export function feeStatementPages(input: StatementInput) {
   return chunks.map((chunk, pageIndex) => {
     const isFirst = pageIndex === 0;
     const slots: Slots = {
-      statement_no: input.statementNo,
-      generated_date: input.generatedDate,
-      admission_date: student.admissionDate,
-      student_name: student.fullName,
-      reg_no: student.admissionNo,
-      course: student.course,
-      intake: student.intake ?? "",
-      campus: student.campus,
-      student_phone: student.phone ?? "",
+      statement_no: fit(input.statementNo, 28),
+      generated_date: fit(input.generatedDate, 18),
+      admission_date: fit(student.admissionDate, 18),
+      student_name: fit(student.fullName, 30),
+      reg_no: fit(student.admissionNo, 28),
+      course: fit(student.course, 28),
+      intake: fit(student.intake ?? "", 26),
+      campus: fit(student.campus, 24),
+      student_phone: fit(student.phone ?? "", 18),
       // The totals are the whole account on every page; the continuation page's closing
       // line does not print "KES" itself, so that page's balance carries the unit.
       total_charged: kes(totalCharged),
       total_paid: kes(totalPaid),
       balance: isFirst ? kes(balance) : `KES ${kes(balance)}`,
       qr_data: student.verifyUrl ?? input.statementNo,
-      verify_code: student.verifyCode || input.statementNo,
+      verify_code: fit(student.verifyCode || input.statementNo, 26),
       page: String(pageIndex + 1),
       pages: String(pages),
-      prepared_by: input.preparedBy,
+      prepared_by: fit(input.preparedBy, 40),
     };
 
     const rowCount = isFirst ? ROWS_FIRST_PAGE : ROWS_NEXT_PAGE;

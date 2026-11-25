@@ -19,11 +19,26 @@ export type StudentDetails = {
   className: string;
   secondarySchool: string;
   grade: string;
+  dateOfBirth: string;
+  gender: string;
+  nationalId: string;
+  primarySchool: string;
+  admissionCategory: string;
+  previousInstitution: string;
+  recordedOn: string;
   birthCertificate: string;
+  primarySchoolDoc: string;
+  secondarySchoolDoc: string;
+  medicalInfo: string;
   guardianName: string;
   guardianRelationship: string;
   guardianPhone: string;
   guardianAlt: string;
+  guardianEmail: string;
+  guardianOccupation: string;
+  guardianAddress: string;
+  emergencyName: string;
+  emergencyPhone: string;
   phone: string;
   email: string;
   address: string;
@@ -44,7 +59,7 @@ export function buildStudentDetailsSvg(input: StudentDetails): string {
   const values: Record<string, string> = {
     logo_url: input.logoUrl ?? "/logo.png",
     photo_url: input.photoUrl ?? "/logo.png",
-    full_name: input.fullName,
+    full_name: fit(input.fullName, 28),
     admission_no: input.admissionNo,
     program: fit(input.program, 27),
     level: input.level,
@@ -52,13 +67,28 @@ export function buildStudentDetailsSvg(input: StudentDetails): string {
     intake: input.intake,
     campus: input.campus,
     class_name: input.className,
-    secondary_school: input.secondarySchool,
+    secondary_school: fit(input.secondarySchool, 30),
     grade: input.grade,
+    date_of_birth: input.dateOfBirth,
+    gender: input.gender,
+    national_id: input.nationalId,
+    primary_school: input.primarySchool,
+    admission_category: input.admissionCategory,
+    previous_institution: fit(input.previousInstitution, 16),
+    recorded_on: input.recordedOn,
     birth_certificate: input.birthCertificate,
-    guardian_name: input.guardianName,
+    primary_school_doc: input.primarySchoolDoc,
+    secondary_school_doc: input.secondarySchoolDoc,
+    medical_info: input.medicalInfo,
+    guardian_name: fit(input.guardianName, 29),
     guardian_relationship: input.guardianRelationship,
     guardian_phone: input.guardianPhone,
     guardian_alt: input.guardianAlt,
+    guardian_email: input.guardianEmail,
+    guardian_occupation: fit(input.guardianOccupation, 18),
+    guardian_address: fit(input.guardianAddress, 24),
+    emergency_name: fit(input.emergencyName, 24),
+    emergency_phone: input.emergencyPhone,
     phone: input.phone,
     email: input.email,
     address: input.address,

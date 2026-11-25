@@ -103,8 +103,13 @@ export async function withQr(svg: string, url: string, box: { x: number; y: numb
 
   const code = await QRCode.toString(url, { type: "svg", margin: 0, errorCorrectionLevel: "M", version: 6 });
   const inner = code.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>[\s\S]*$/, "");
-  // The library's own viewBox is its module count (33 for version 6), hence size / 33.
-  const scale = (box.size / 33).toFixed(4);
+  /*
+   * The viewBox is the code's real module count. Hard-coding 33 for a version-6 code made
+   * every QR overflow its box (41 modules instead of 33) and print over the text beside it.
+   * Measuring it keeps the code inside its reserved zone at every version.
+   */
+  const modules = Number(code.match(/viewBox="0 0 (\d+)/)?.[1] ?? 33);
+  const scale = (box.size / modules).toFixed(4);
 
   return svg.replace(
     match[0],

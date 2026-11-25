@@ -33,7 +33,7 @@ async function main() {
     });
   }
 
-  console.log("worker ready: cards, maintenance (chat attachment sweep hourly)");
+  console.log("worker ready: cards, documents, maintenance (chat attachment sweep hourly)");
 }
 
 main().catch((error) => {

@@ -21,6 +21,7 @@ export const KNOWN_SLOTS = [
   "full_name",
   "course",
   "campus",
+  "class_name",
   "intake",
   "expiry_date",
   "issue_date",

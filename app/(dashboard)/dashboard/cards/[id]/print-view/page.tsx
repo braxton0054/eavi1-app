@@ -2,13 +2,13 @@ import { notFound } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
-import { getCardFace } from "@/lib/dal/cards";
+import { ensureDocument } from "@/lib/documents/service";
 
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
 
-/** A clean, print-only view of one card, front and back, for the PDF route. */
+/** A print-only view of the saved card artwork — front and back on one A4 sheet. */
 export default async function CardPrintView({ params }: { params: Promise<{ id: string }> }) {
   const scope = await requireCollegeAdmin();
   const { id } = await params;
@@ -17,13 +17,12 @@ export default async function CardPrintView({ params }: { params: Promise<{ id: 
     select: { id: true },
   });
   if (!card) notFound();
-  const face = await getCardFace(card.id, scope.campusId);
-  if (!face) notFound();
+  const document = await ensureDocument("ID_CARD", card.id);
+  if (!document) notFound();
 
   return (
     <div className={styles.cardPrintSheet}>
-      <div dangerouslySetInnerHTML={{ __html: face.frontSvg }} />
-      <div dangerouslySetInnerHTML={{ __html: face.backSvg }} />
+      <div dangerouslySetInnerHTML={{ __html: document.svgText }} />
     </div>
   );
 }

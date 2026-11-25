@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { CardStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
+import { touchDocument } from "@/lib/documents/service";
 import { requireCollegeAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
@@ -110,5 +111,9 @@ export async function moveCard(formData: FormData) {
         data: { status: CardStatus.REPLACED, issuedAt: null },
       });
     }
+
+    // Issue date and status are printed on the card, so a status move changes the
+    // saved artwork through the same background path as any other student change.
+    await touchDocument("ID_CARD", card.id);
   });
 }

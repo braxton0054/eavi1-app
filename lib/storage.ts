@@ -27,7 +27,7 @@ function apiBucket() {
 }
 
 /** Identifies an object without exposing how to reach it. */
-function keyFromUrl(url: string): string {
+export function keyFromUrl(url: string): string {
   const endpoint = process.env.S3_ENDPOINT?.replace(/\/$/, "") ?? "";
   const accountId = process.env.S3_ACCOUNT_ID;
   const bucket = process.env.S3_BUCKET ?? "";

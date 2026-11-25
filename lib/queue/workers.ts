@@ -3,7 +3,7 @@ import { Worker } from "bullmq";
 import { prisma } from "@/lib/prisma";
 
 import { createConnection } from "./connection";
-import { processCardBatch, processAttachmentSweep } from "./processors";
+import { processCardBatch, processAttachmentSweep, processDocumentRefresh } from "./processors";
 import {
   QUEUES,
   SWEEP_CRON,
@@ -11,6 +11,7 @@ import {
   getMaintenanceQueue,
   closeQueues,
   type CardBatchJobData,
+  type DocumentRefreshJobData,
 } from "./queues";
 
 export type RunningWorkers = {
@@ -49,6 +50,14 @@ export async function startWorkers(): Promise<RunningWorkers> {
     concurrency: 1,
   });
 
+  // Document renders use the same sharp/PDF pipeline as receipts; one at a time keeps the
+  // worker inside the container's memory budget.
+  const documentsWorker = new Worker<DocumentRefreshJobData>(
+    QUEUES.documents,
+    processDocumentRefresh,
+    { connection: createConnection(), concurrency: 1 },
+  );
+
   /*
    * The `failed` event fires for every attempt. The job has truly run out of tries only
    * when BullMQ has moved it to the failed state — a retryable failure sits in `delayed`
@@ -66,7 +75,7 @@ export async function startWorkers(): Promise<RunningWorkers> {
   });
 
   // Without this, an unhandled worker error is an unhandled exception that kills the process.
-  for (const worker of [cardWorker, maintenanceWorker]) {
+  for (const worker of [cardWorker, maintenanceWorker, documentsWorker]) {
     worker.on("error", (error) => console.error(`queue worker error (${worker.name}):`, error));
   }
 
@@ -79,7 +88,7 @@ export async function startWorkers(): Promise<RunningWorkers> {
        */
       const gracePeriod = new Promise((resolve) => setTimeout(resolve, 30_000));
       await Promise.race([
-        Promise.allSettled([cardWorker.close(), maintenanceWorker.close()]),
+        Promise.allSettled([cardWorker.close(), maintenanceWorker.close(), documentsWorker.close()]),
         gracePeriod,
       ]);
       await closeQueues();

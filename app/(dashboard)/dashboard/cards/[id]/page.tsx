@@ -4,9 +4,11 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
+import { site } from "@/lib/content/home";
 import { DetailList, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
-import { getCardFace } from "@/lib/dal/cards";
+import { ensureDocument } from "@/lib/documents/service";
+import { savedCardFaces } from "@/lib/documents/renderers";
 import { listAudit } from "@/lib/academics/audit";
 import { formatDate } from "@/lib/format";
 
@@ -30,6 +32,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
     select: {
       id: true,
       serial: true,
+      verifyToken: true,
       status: true,
       issuedAt: true,
       expiresAt: true,
@@ -52,7 +55,8 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
 
   if (!card) notFound();
 
-  const face = await getCardFace(card.id, scope.campusId);
+  const saved = await ensureDocument("ID_CARD", card.id);
+  const face = saved ? savedCardFaces(saved.svgText) : null;
   const history = await listAudit("card", card.id);
 
   const facts = [
@@ -101,6 +105,14 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
             >
               Download PDF
             </a>
+            <a
+              href={`${site.url ?? ""}/verify/${card.verifyToken}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
+            >
+              Share verification
+            </a>
             <Link
               href={`/dashboard/students/${card.student.id}`}
               className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
@@ -130,13 +142,6 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
                   className="w-full overflow-hidden rounded-lg ring-1 ring-eavi-border [&>svg]:h-auto [&>svg]:w-full"
                   dangerouslySetInnerHTML={{ __html: face.backSvg }}
                 />
-                {face.missing.length > 0 ? (
-                  <Notice
-                    tone="warning"
-                    title={copy.missingTitle}
-                    body={copy.missing(face.missing.join(", "))}
-                  />
-                ) : null}
               </>
             ) : null}
           </div>

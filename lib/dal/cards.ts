@@ -32,7 +32,7 @@ export type CardFace = {
   missing: string[];
 };
 
-type FaceInput = {
+export type FaceInput = {
   serial: string;
   status: string;
   verifyToken: string;
@@ -40,6 +40,7 @@ type FaceInput = {
   expiresAt: Date | null;
   createdAt: Date;
   campusName: string;
+  className: string | null;
   programName: string | null;
   admissionNo: string;
   photoUrl: string | null;
@@ -51,7 +52,7 @@ type FaceInput = {
 };
 
 /** Fills the artwork's slots from one student's record, and reports what was missing. */
-async function mergeFace(input: FaceInput) {
+export async function mergeFace(input: FaceInput) {
   const intakeLabel = input.period
     ? `${labels.months[input.period.month - 1] ?? ""} ${input.period.year}`.trim()
     : null;
@@ -64,6 +65,7 @@ async function mergeFace(input: FaceInput) {
     full_name: input.fullName,
     course: input.programName ?? input.enrollmentProgram ?? null,
     campus: input.campusName,
+    class_name: input.className,
     intake: intakeLabel,
     expiry_date: input.expiresAt ? formatDate(input.expiresAt) : null,
     // An unprinted card has no issue date yet, so it shows the day it was requested.
@@ -127,6 +129,11 @@ export async function getCardFace(cardId: string, campusId: number | null) {
             select: {
               period: { select: { month: true, year: true } },
               program: { select: { name: true } },
+              memberships: {
+                where: { leftAt: null },
+                take: 1,
+                select: { class: { select: { name: true } } },
+              },
             },
           },
         },
@@ -146,6 +153,7 @@ export async function getCardFace(cardId: string, campusId: number | null) {
     expiresAt: card.expiresAt,
     createdAt: card.createdAt,
     campusName: card.campus.name,
+    className: enrollment?.memberships[0]?.class.name ?? null,
     programName: card.program?.name ?? null,
     admissionNo: card.student.admissionNo,
     photoUrl: card.student.profilePhotoUrl,

@@ -1,44 +1,29 @@
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
-import { getCardFace } from "@/lib/dal/cards";
-import { renderPdf } from "@/lib/print/pdf";
-import { SESSION_COOKIE } from "@/lib/auth";
-import { cookies } from "next/headers";
+import { documentPdf, ensureDocument } from "@/lib/documents/service";
+import { pdfResponse } from "@/lib/statements/document";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * One ID card as a print-ready A4 PDF, built from the card's live face.
+ * The saved card, viewable inline and downloadable with `?download`.
  *
- * The artwork is merged from the stored card row and the student's current record each
- * time, so a photo uploaded after the card was issued appears here without regeneration.
+ * The card row was created at enrolment and its document was saved then; this route only
+ * loads it. A campus check still gates the file, because a serial is a borrowed identifier
+ * and the route takes one from the URL.
  */
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const scope = await requireCollegeAdmin();
   const { id } = await context.params;
   const card = await prisma.idCard.findFirst({
     where: { id, ...(scope.campusId === null ? {} : { campusId: scope.campusId }) },
-    select: { id: true },
+    select: { id: true, serial: true },
   });
   if (!card) return new Response("Not found", { status: 404 });
 
-  const session = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!session) return new Response("Not signed in", { status: 401 });
+  const document = await ensureDocument("ID_CARD", card.id);
+  if (!document) return new Response("Card not available", { status: 404 });
 
-  const origin = new URL(request.url).origin;
-  const pdf = await renderPdf({
-    url: `${origin}/dashboard/cards/${id}/print-view`,
-    cookie: { name: SESSION_COOKIE, value: session },
-    subject: { fullName: "", admissionNo: id.slice(0, 8) },
-  });
-
-  return new Response(new Uint8Array(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline",
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+  return pdfResponse(request, await documentPdf(document), `id-card-${card.serial}`);
 }

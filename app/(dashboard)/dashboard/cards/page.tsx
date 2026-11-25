@@ -5,7 +5,9 @@ import { getCards, getStudentOptions } from "@/lib/dal/college";
 import { getCardCandidates } from "@/lib/dal/cards";
 import { getClassOptions, getIntakeChoices } from "@/lib/dal/classes";
 import { CardGenerator } from "@/components/dashboard/card-generator";
-import { getCardFace } from "@/lib/dal/cards";
+import { ensureDocument } from "@/lib/documents/service";
+import { savedCardFaces } from "@/lib/documents/renderers";
+import { syncCardTemplate } from "@/lib/cards/template-version";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { RecordCard, RecordCardGrid, type RecordCardData } from "@/components/dashboard/record-card";
@@ -39,6 +41,10 @@ export default async function CardsPage({
 }) {
   const { q, status, page, invalid, empty, tooMany, ready } = await searchParams;
   const scope = await requireCollegeAdmin();
+
+  // Opening the card register is where a changed template is noticed: it refreshes every
+  // saved card in the background, never through a button on this page.
+  await syncCardTemplate().catch(() => null);
 
   const [list, studentOptions, classChoices, intakeChoices] = await Promise.all([
     getCards({ q, status, page: Number(page) || 1 }),
@@ -81,12 +87,17 @@ export default async function CardsPage({
 
   const statuses = Object.entries(labels.cardStatus).map(([value, label]) => ({ value, label }));
 
-  // The card face is rendered from the student's own record, so it is fetched for the
-  // visible page only — one artwork merge per row, never for the whole table.
-  const faces = await Promise.all(
-    list.rows.map((card) => getCardFace(card.id, scope.campusId)),
+  // Previews come from the saved card documents. Opening this list never re-merges the
+  // artwork: a card is a record, and the record is what the office sees and prints.
+  const documents = await Promise.all(
+    list.rows.map((card) => ensureDocument("ID_CARD", card.id)),
   );
-  const faceByCard = new Map(list.rows.map((card, index) => [card.id, faces[index]]));
+  const faceByCard = new Map(
+    list.rows.map((card, index) => [
+      card.id,
+      documents[index] ? savedCardFaces(documents[index]!.svgText) : null,
+    ]),
+  );
 
   // One card, one record card — the same treatment as programmes, students and invoices.
   // The whole card opens the card's own page, and the actions stay in the footer strip so a
@@ -132,11 +143,6 @@ export default async function CardsPage({
                   dangerouslySetInnerHTML={{ __html: faceData.backSvg }}
                 />
               </div>
-            ) : null}
-            {faceData && faceData.missing.length > 0 ? (
-              <p className="mt-2 text-[11px] text-eavi-destructive">
-                {copy.print.missing(faceData.missing.join(", "))}
-              </p>
             ) : null}
             <dl className="mt-2 space-y-1">
               {face.map((line) => (

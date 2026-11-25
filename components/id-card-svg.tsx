@@ -53,7 +53,7 @@ export const CARD_TEMPLATES: { front: string; back: string } = {
     <image xlink:href="{{logo_url}}" href="{{logo_url}}" x="24" y="8" width="100" height="94" preserveAspectRatio="xMidYMid meet"/>
 
     <text x="140" y="52" font-size="26" font-weight="bold" class="ink">EAST AFRICA VISION INSTITUTE</text>
-    <text x="140" y="82" font-size="16" font-weight="bold" class="brand" letter-spacing="2">EAVI COLLEGE  |  ELDORET, KENYA</text>
+    <text x="140" y="82" font-size="16" font-weight="bold" class="brand" letter-spacing="2">ELDORET, KENYA</text>
     <text x="820" y="64" text-anchor="end" font-size="20" font-weight="bold" class="white" letter-spacing="3">STUDENT</text>
     <text x="820" y="90" text-anchor="end" font-size="14" class="white" letter-spacing="4">ID CARD</text>
 
@@ -77,7 +77,11 @@ export const CARD_TEMPLATES: { front: string; back: string } = {
     <text data-slot="course" data-max-width="545" x="275" y="272" class="value">{{course}}</text>
 
     <text x="275" y="312" class="label">CAMPUS</text>
-    <text data-slot="campus" data-max-width="545" x="275" y="340" class="value">{{campus}}</text>
+    <text data-slot="campus" data-max-width="270" x="275" y="340" class="value">{{campus}}</text>
+
+    <!-- class occupies the free right column; it never crosses the campus or intake cells -->
+    <text x="560" y="312" class="label">CLASS</text>
+    <text data-slot="class_name" data-max-width="260" x="560" y="340" font-size="18" font-weight="bold" class="ink">{{class_name}}</text>
 
     <!-- intake and expiry share a row, so intake stops where the expiry column starts -->
     <text x="275" y="380" class="label">INTAKE</text>

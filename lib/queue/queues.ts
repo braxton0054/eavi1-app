@@ -14,7 +14,12 @@ export const QUEUES = {
   cards: "cards",
   /** Scheduled housekeeping. Today that is one job: the chat attachment retention sweep. */
   maintenance: "maintenance",
+  /** One job per saved document whose source changed: re-render and overwrite its row. */
+  documents: "documents",
 } as const;
+
+/** The source document a refresh job must re-render. */
+export type DocumentRefreshJobData = { kind: string; scopeKey: string };
 
 /** Everything a card worker needs to finish a run without re-reading the session. */
 export type CardBatchJobData = {
@@ -61,6 +66,12 @@ const defaultJobOptions = {
     removeOnComplete: RETAIN_COMPLETED,
     removeOnFail: RETAIN_FAILED,
   },
+  documents: {
+    attempts: 3,
+    backoff: { type: "exponential", delay: 10_000 },
+    removeOnComplete: RETAIN_COMPLETED,
+    removeOnFail: RETAIN_FAILED,
+  },
 } as const;
 
 /*
@@ -86,12 +97,35 @@ export function getMaintenanceQueue(): Queue {
   return getQueue(QUEUES.maintenance, defaultJobOptions.maintenance);
 }
 
+export function getDocumentsQueue(): Queue<DocumentRefreshJobData> {
+  return getQueue(QUEUES.documents, defaultJobOptions.documents) as Queue<DocumentRefreshJobData>;
+}
+
 /**
  * Enqueues one card run. The batch row's id is the BullMQ job id, so a double submit can
  * never put the same run in the queue twice.
  */
 export async function enqueueCardBatch(data: CardBatchJobData) {
   await getCardsQueue().add("card-batch", data, { jobId: data.batchId });
+}
+
+/**
+ * Repeated edits to the same document collapse into one queued refresh.
+ *
+ * Redis clients here deliberately never give up on a command (`maxRetriesPerRequest: null`),
+ * which is right for a worker and wrong for a write: a queue outage must never hold the
+ * HTTP request that recorded a payment. The row is marked STALE first, so a missed enqueue
+ * is repaired later; only the enqueue waits, and only briefly.
+ */
+export async function enqueueDocumentRefresh(data: DocumentRefreshJobData) {
+  /*
+   * No fixed job id: a completed job with that id would make every later edit a no-op.
+   * Every touch queues a job instead, and the processor's hash check makes the extras
+   * harmless — the second job sees the new hash already saved and renders nothing.
+   */
+  const add = getDocumentsQueue().add("document-refresh", data);
+  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
+  await Promise.race([add, timeout]);
 }
 
 /**
@@ -132,20 +166,17 @@ async function countsWithinTimeout(queue: Queue): Promise<QueueCounts> {
 }
 
 export async function queueCounts(): Promise<Record<string, QueueCounts>> {
-  const [cards, maintenance] = await Promise.allSettled([
+  const [cards, maintenance, documents] = await Promise.allSettled([
     countsWithinTimeout(getCardsQueue()),
     countsWithinTimeout(getMaintenanceQueue()),
+    countsWithinTimeout(getDocumentsQueue()),
   ]);
+  const unavailable: QueueCounts = { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, unavailable: true };
 
   return {
-    [QUEUES.cards]:
-      cards.status === "fulfilled"
-        ? cards.value
-        : { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, unavailable: true },
-    [QUEUES.maintenance]:
-      maintenance.status === "fulfilled"
-        ? maintenance.value
-        : { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, unavailable: true },
+    [QUEUES.cards]: cards.status === "fulfilled" ? cards.value : unavailable,
+    [QUEUES.maintenance]: maintenance.status === "fulfilled" ? maintenance.value : unavailable,
+    [QUEUES.documents]: documents.status === "fulfilled" ? documents.value : unavailable,
   };
 }
 

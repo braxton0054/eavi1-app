@@ -36,7 +36,10 @@ export async function qrSvgGroup(url: string, size = 132) {
   // a <g> so it can be dropped straight into the card's `data-slot="qr"` group.
   const inner = svg.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>[\s\S]*$/, "");
 
-  return `<g transform="scale(${(size / 33).toFixed(4)})">${inner}</g>`;
+  // Measure the real module count: a version-6 code has 41 modules, not 33. Hard-coding
+  // 33 printed the code larger than its reserved square and crowded the label below it.
+  const modules = Number(svg.match(/viewBox="0 0 (\d+)/)?.[1] ?? 33);
+  return `<g transform="scale(${(size / modules).toFixed(4)})">${inner}</g>`;
 }
 
 /**

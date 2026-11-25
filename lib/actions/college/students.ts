@@ -3,18 +3,24 @@
 import { EnrollmentStatus, Role, Status } from "@/generated/prisma/enums";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { touchStudent } from "@/lib/documents/service";
 import { requireCollegeAdmin } from "@/lib/session";
 import { genderValues } from "@/lib/content/apply";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
+  assertPhotoDimensions,
+  assertStorageFor,
   dateField,
   emailField,
+  fileField,
+  hiddenId,
   enumField,
   nextAdmissionNo,
   onSave,
   passwordField,
   phoneField,
+  putFile,
   requiredText,
   text,
   unique,
@@ -25,6 +31,32 @@ const fieldLabel = (name: string) =>
 
 /** The roster, the overview counters and the enrolment screen all read this. */
 const AFFECTED = ["/dashboard/students", "/dashboard", "/dashboard/enrollments"];
+
+/**
+ * Replaces a student's photograph after enrolment.
+ *
+ * The card and record are saved documents: this write marks both stale, and the worker
+ * puts the new photograph into them. Nobody has to regenerate a card by hand.
+ */
+export async function updateStudentPhoto(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+  const studentId = hiddenId(formData, "studentId", "Student");
+  const student = await prisma.studentProfile.findFirst({
+    where: { id: studentId, ...(scope.campusId === null ? {} : { campusId: scope.campusId }) },
+    select: { id: true, userId: true },
+  });
+  if (!student) throw new FieldError(fieldErrors.notOnCampus);
+
+  const file = await fileField(formData, "photo", "Photograph", "image", false);
+  const path = `/dashboard/students/${studentId}`;
+  return onSave(path, [...AFFECTED, path], async () => {
+    assertStorageFor([file]);
+    await assertPhotoDimensions(file, "Photograph");
+    const url = await putFile(file, "profile-photos", student.userId);
+    await prisma.studentProfile.update({ where: { id: student.id }, data: { profilePhotoUrl: url } });
+    await touchStudent(student.id);
+  });
+}
 
 export async function createStudent(formData: FormData) {
   const scope = await requireCollegeAdmin();

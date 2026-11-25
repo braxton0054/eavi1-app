@@ -51,6 +51,8 @@
 <text x="150" y="634" font-size="12" font-weight="bold" class="ink">{{guardian_phone}}</text>
 <text x="400" y="634" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">ALTERNATE</text>
 <text x="510" y="634" font-size="12" class="ink">{{guardian_alt}}</text>
+<text x="56" y="664" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">EMAIL</text>
+<text x="110" y="664" font-size="11" class="ink">{{guardian_email}}</text>
 
 <text x="40" y="692" font-size="12" font-weight="bold" class="brand" letter-spacing="2">CONTACT &amp; ADDRESS</text>
 <rect x="40" y="704" width="714" height="80" rx="8" fill="#FAFAFA" stroke="#E5E7EB"/>
@@ -64,6 +66,23 @@
 <line x1="40" y1="840" x2="754" y2="840" class="rule" stroke-width="2"/>
 <text x="40" y="872" font-size="11" class="muted">This record shows enrolment details as held by the college. It is not a fee statement.</text>
 <text x="40" y="900" font-size="11" class="muted">Prepared {{prepared_on}}  ·  {{reference}}</text>
+
+<text x="40" y="930" font-size="12" font-weight="bold" class="brand" letter-spacing="2">ADMISSION &amp; PERSONAL DETAILS</text>
+<rect x="40" y="940" width="714" height="62" rx="8" fill="#FAFAFA" stroke="#E5E7EB"/>
+<text x="56" y="963" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">DATE OF BIRTH</text>
+<text x="180" y="963" font-size="11" class="ink">{{date_of_birth}}</text>
+<text x="360" y="963" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">GENDER</text>
+<text x="440" y="963" font-size="11" class="ink">{{gender}}</text>
+<text x="520" y="963" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">NATIONAL ID</text>
+<text x="610" y="963" font-size="11" class="ink">{{national_id}}</text>
+<text x="56" y="988" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">ADMISSION CATEGORY</text>
+<text x="195" y="988" font-size="11" class="ink">{{admission_category}}</text>
+<text x="400" y="988" font-size="10" font-weight="bold" class="muted" letter-spacing="1.5">PREVIOUS INSTITUTION</text>
+<text x="560" y="988" font-size="11" class="ink">{{previous_institution}}</text>
+
+<text x="40" y="1020" font-size="12" font-weight="bold" class="brand" letter-spacing="2">SCHOOLING RECORDS &amp; MEDICAL DECLARATION</text>
+<text x="56" y="1040" font-size="10" class="muted">Primary: {{primary_school}}  ·  {{primary_school_doc}}  |  Secondary: {{secondary_school_doc}}  |  Medical: {{medical_info}}</text>
+<text x="56" y="1058" font-size="10" class="muted">Guardian: {{guardian_occupation}}, {{guardian_address}}  |  Emergency: {{emergency_name}} · {{emergency_phone}}</text>
 
 <rect x="0" y="1083" width="794" height="40" class="brand"/>
 <text x="397" y="1108" text-anchor="middle" font-size="11" font-weight="bold" fill="#FFFFFF" letter-spacing="1">EAST AFRICA VISION INSTITUTE  |  ELDORET, KENYA  |  STUDENT RECORD</text>

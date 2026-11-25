@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { EnrollmentStatus, Role, Status } from "@/generated/prisma/enums";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { touchInvoicesForStudent, touchStudent } from "@/lib/documents/service";
 import { requireCollegeAdmin } from "@/lib/session";
 import { genderValues } from "@/lib/content/apply";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
@@ -434,6 +435,20 @@ export async function enrolStudent(formData: FormData) {
      */
     if (classRecord) {
       await syncClassConversation(classRecord.id).catch(() => null);
+    }
+
+    /*
+     * The documents are made here, not by a click on a later screen. The card row was
+     * written in the transaction above; this saves its artwork and the student's record,
+     * and marks every invoice from the plan for background rendering.
+     */
+    const saved = await prisma.studentProfile.findUnique({
+      where: { admissionNo: issuedAdmissionNo },
+      select: { id: true },
+    });
+    if (saved) {
+      await touchStudent(saved.id);
+      await touchInvoicesForStudent(saved.id);
     }
   } catch (error) {
     if (error instanceof FieldError) {

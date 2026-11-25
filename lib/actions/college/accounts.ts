@@ -2,6 +2,7 @@
 
 import { InvoiceStatus, PaymentMethod } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
+import { touchInvoice, touchReceipt } from "@/lib/documents/service";
 import { requireCollegeAdmin } from "@/lib/session";
 import { fieldErrors, labels, pages } from "@/lib/content/dashboard";
 import { money } from "@/lib/format";
@@ -45,6 +46,18 @@ const AFFECTED = ["/dashboard/accounts", "/dashboard", "/dashboard/students"];
 
 /** The status of one invoice is recomputed from its own rows after every write. */
 const recompute = (invoiceId: string) => recomputeInvoice(prisma, invoiceId);
+
+/** One receipt can settle several invoices; every affected saved document is marked stale. */
+async function touchReceiptDocuments(receiptNo: string) {
+  const rows = await prisma.payment.findMany({
+    where: { receiptNo: { equals: receiptNo, mode: "insensitive" } },
+    select: { invoiceId: true },
+  });
+  await Promise.all([
+    ...[...new Set(rows.map((row) => row.invoiceId))].map((id) => touchInvoice(id)),
+    touchReceipt(receiptNo),
+  ]);
+}
 
 /** Proves a form-supplied invoice id sits on the admin's campus and returns its owner. */
 async function campusInvoice(campusId: number | null, invoiceId: string) {
@@ -172,6 +185,10 @@ export async function recordPayment(formData: FormData) {
 
     await recompute(invoice.id);
 
+    // The invoice is a saved document: this payment changes its figures, so its artwork is
+    // refreshed in the background. Nothing is rendered in this request.
+    await touchInvoice(invoice.id);
+
     // The student's portal hears the money is in, and what (if anything) is still owed —
     // the balance is read back after the recompute, so the notice cannot drift from the ledger.
     const owner = await prisma.studentProfile.findUnique({
@@ -248,6 +265,8 @@ export async function recordStudentPayment(formData: FormData) {
           : new FieldError(pages.accounts.payment.student.nothingOwed);
       }
     });
+
+    await touchReceiptDocuments(receiptNo);
 
     // One notice per receipt, never one per invoice the receipt settled: the office
     // records a receipt, the student hears about the receipt.
@@ -352,6 +371,7 @@ export async function recordWizardPayment(formData: FormData) {
     });
 
     const appliedRows = result;
+    await touchReceiptDocuments(receiptNo);
 
     const owner = await prisma.studentProfile.findUnique({
       where: { id: student.id },
@@ -419,6 +439,12 @@ export async function generateEnrollmentFees(formData: FormData) {
         numbers,
       });
     });
+
+    const invoices = await prisma.invoice.findMany({
+      where: { enrollmentId: enrollment.id },
+      select: { id: true },
+    });
+    await Promise.all(invoices.map((invoice) => touchInvoice(invoice.id)));
   });
 }
 
@@ -433,5 +459,6 @@ export async function voidInvoice(formData: FormData) {
       where: { id: invoice.id },
       data: { status: InvoiceStatus.VOID },
     });
+    await touchInvoice(invoice.id);
   });
 }

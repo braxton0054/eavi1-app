@@ -1,7 +1,6 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
-import { IdCardBack, IdCardFront, type IdCardStudent } from "@/components/id-card-svg";
-import { downloadCardPng } from "./actions";
+import type { IdCardStudent } from "@/components/id-card-svg";
 import s from "./id-cards.white.module.css";
 
 type CardSummary = {
@@ -16,8 +15,6 @@ type CardSummary = {
 type Props = {
   /** The signed-in student's own record, ready for the card components. */
   initial: IdCardStudent;
-  /** False when no card has been issued yet: the proof previews, but nothing prints. */
-  hasCard: boolean;
   /** The real merged artwork the printer uses, QR and photo filled server-side. */
   faceFront: string | null;
   faceBack: string | null;
@@ -26,13 +23,12 @@ type Props = {
 };
 
 const TABS = [
-  ["gen", "1. Generate"],
-  ["view", "2. Student view"],
-  ["list", "3. Cards list"],
+  ["view", "My card"],
+  ["list", "Card history"],
 ] as const;
 type TabKey = (typeof TABS)[number][0];
 
-const CAMPUSES = ["Main Campus", "West Campus", "Town Campus"] as const;
+const CAMPUSES = ["Main Campus", "West Campus"] as const;
 
 const statusLabel = (row: CardSummary) =>
   row.expired
@@ -42,85 +38,16 @@ const statusLabel = (row: CardSummary) =>
 const statusClass = (row: CardSummary) =>
   row.expired ? s.badgeExpired : row.status === "ISSUED" ? s.badge : s.badgePending;
 
-export default function IdCardsClient({ initial, hasCard, faceFront, faceBack, verifyUrl, cards: seed }: Props) {
-  const [tab, setTab] = useState<TabKey>("gen");
+export default function IdCardsClient({ initial, faceFront, faceBack, verifyUrl, cards: seed }: Props) {
+  const [tab, setTab] = useState<TabKey>("view");
   const [d, setD] = useState<IdCardStudent>(initial);
   const [cards, setCards] = useState<CardSummary[]>(seed);
   const [flipped, setFlipped] = useState(false);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   // Cards list: search + campus filter
   const [query, setQuery] = useState("");
   const [campusFilter, setCampusFilter] = useState("All");
-
-  // Generate runs briefly (validate + apply to the proof) so the press shows its state.
-  const [issuing, setIssuing] = useState(false);
-  const [flash, setFlash] = useState("");
-  const [pngPending, setPngPending] = useState(false);
-  const [pngError, setPngError] = useState(false);
-
-  const previewRef = useRef<HTMLDivElement>(null);
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-
-  const set = (k: keyof IdCardStudent) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setD((prev) => ({ ...prev, [k]: e.target.value }));
-
-  // Data URL, so the photo travels inside the SVG preview.
-  const onPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = () => setD((prev) => ({ ...prev, photoUrl: String(r.result) }));
-    r.readAsDataURL(f);
-  };
-
-  // Generate: apply the form to the proof, with the press-state UX.
-  const issue = () => {
-    if (issuing) return;
-    setIssuing(true);
-    setFlash("");
-    window.setTimeout(() => {
-      setCards((prev) => {
-        const row: CardSummary = {
-          id: d.serial ?? `proof-${prev.length + 1}`,
-          serial: d.serial ?? "PROOF",
-          status: "ISSUED",
-          issuedAt: d.issueDate ?? null,
-          expiresAt: null,
-          expired: d.status === "Expired",
-        };
-        const i = prev.findIndex((x) => x.serial === row.serial);
-        if (i === -1) return [row, ...prev];
-        const next = [...prev];
-        next[i] = row;
-        return next;
-      });
-      setIssuing(false);
-      setFlash(`Card ready — ${d.name}'s card is in the list.`);
-    }, 700);
-  };
-
-  // Download PNG: rendered server-side by the print pipeline at CR80/300 DPI.
-  const downloadPng = async () => {
-    if (!hasCard || pngPending) return;
-    setPngPending(true);
-    setPngError(false);
-    try {
-      const res = await downloadCardPng("front");
-      if (!res.ok) throw new Error(res.error);
-      const blob = await (await fetch(`data:image/png;base64,${res.data}`)).blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `id-card-${res.serial.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-front.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    } catch {
-      setPngError(true);
-    } finally {
-      setPngPending(false);
-    }
-  };
 
   const flip = () => setFlipped((f) => !f);
   const onFlipKey = (e: React.KeyboardEvent) => {
@@ -182,64 +109,6 @@ export default function IdCardsClient({ initial, hasCard, faceFront, faceBack, v
         ))}
       </div>
 
-      {/* 1. GENERATE: form left, live preview right */}
-      {tab === "gen" && (
-        <section className={s.grid}>
-          <div className={s.panel} aria-busy={issuing}>
-            <h2>Student details</h2>
-            <label className={s.label} htmlFor="id-name">Full name</label>
-            <input id="id-name" className={s.input} value={d.name} onChange={set("name")} autoComplete="off" />
-
-            <div className={s.row}>
-              <div>
-                <label className={s.label} htmlFor="id-adm">Admission no.</label>
-                <input id="id-adm" className={s.input} value={d.adm} onChange={set("adm")} autoComplete="off" />
-              </div>
-              <div>
-                <label className={s.label} htmlFor="id-valid">Valid until</label>
-                <input id="id-valid" className={s.input} value={d.validUntil} onChange={set("validUntil")} autoComplete="off" />
-              </div>
-            </div>
-
-            <label className={s.label} htmlFor="id-course">Course</label>
-            <input id="id-course" className={s.input} value={d.course} onChange={set("course")} autoComplete="off" />
-
-            <label className={s.label} htmlFor="id-campus">Campus</label>
-            <select id="id-campus" className={s.input} value={d.campus} onChange={set("campus")}>
-              {CAMPUSES.map((c) => <option key={c}>{c}</option>)}
-            </select>
-
-            <label className={s.label} htmlFor="id-photo">Photo</label>
-            <input id="id-photo" className={s.input} type="file" accept="image/*" onChange={onPhoto} />
-
-            <div className={s.actions}>
-              <button className={`${s.btn} ${s.btnPrimary}`} onClick={issue} disabled={issuing}>
-                {issuing ? <><span className={s.spinner} aria-hidden="true" />Issuing…</> : "Generate card"}
-              </button>
-              <button className={s.btn} onClick={downloadPng} disabled={!hasCard || pngPending || issuing}>
-                {pngPending ? <><span className={s.spinner} aria-hidden="true" />Rendering…</> : "Download PNG"}
-              </button>
-              <button className={s.btn} onClick={() => window.print()} disabled={issuing}>Print (CR80)</button>
-            </div>
-            <p className={`${s.notice} ${pngError ? s.noticeError : ""}`} aria-live="polite">
-              {pngError
-                ? "Could not render the PNG — try again."
-                : !hasCard
-                  ? "No card issued yet — the registry issues cards; this preview is a proof."
-                  : flash}
-            </p>
-          </div>
-
-          <div className={s.panel}>
-            <h2>Live preview</h2>
-            <div ref={previewRef} className={`${s.cards} ${s.printArea}`}>
-              <IdCardFront student={d} />
-              <IdCardBack student={d} />
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* 2. STUDENT VIEW: the real card, tap to flip */}
       {tab === "view" && (
         <section className={s.panel}>
@@ -271,7 +140,10 @@ export default function IdCardsClient({ initial, hasCard, faceFront, faceBack, v
           </div>
           <div className={`${s.actions} ${s.center}`}>
             <button className={`${s.btn} ${s.btnPrimary}`} onClick={flip} aria-expanded={flipped}>Flip card</button>
-            <button className={s.btn} onClick={() => window.print()}>Download PDF</button>
+            <a className={s.btn} href="/student/id/card" target="_blank" rel="noopener noreferrer">View PDF</a>
+            <a className={s.btn} href="/student/id/card?download=1" download>Download PDF</a>
+            <button className={s.btn} onClick={() => window.print()}>Print card</button>
+            {verifyUrl ? <a className={s.btn} href={verifyUrl} target="_blank" rel="noopener noreferrer">Share verification</a> : null}
           </div>
         </section>
       )}
@@ -327,8 +199,8 @@ export default function IdCardsClient({ initial, hasCard, faceFront, faceBack, v
                     <td>{row.serial}</td>
                     <td><span className={statusClass(row)}>{statusLabel(row)}</span></td>
                     <td>
-                      <button className={s.btn} onClick={() => openIn(row, row.expired ? "gen" : "view")}>
-                        {row.expired ? "Reissue" : "View"}
+                      <button className={s.btn} onClick={() => openIn(row, "view")}>
+                        View
                       </button>
                     </td>
                   </tr>

@@ -12,7 +12,10 @@ import { storageConfigured, uploadFile } from "@/lib/storage";
 import { recordAudit } from "@/lib/academics/audit";
 import { sweepExpiredAttachments } from "@/lib/chat/attachments";
 
-import type { CardBatchJobData } from "./queues";
+import { regenerateDocument } from "@/lib/documents/service";
+import type { DocumentKind } from "@/lib/documents/types";
+
+import type { CardBatchJobData, DocumentRefreshJobData } from "./queues";
 
 const copy = pages.cards.generate;
 
@@ -123,6 +126,19 @@ export async function processCardBatch(job: Job<CardBatchJobData>) {
   });
 
   return { batchId, cards: cards.length, sheets: sheets.length };
+}
+
+/**
+ * Re-renders one saved document after its source changed.
+ *
+ * Idempotent by construction: the service compares hashes and upserts one row by
+ * (kind, scopeKey). A retry after a partial storage failure cannot create a second document.
+ */
+export async function processDocumentRefresh(job: Job<DocumentRefreshJobData>) {
+  const { kind, scopeKey } = job.data;
+  const row = await regenerateDocument(kind as DocumentKind, scopeKey);
+  await job.updateProgress(100);
+  return { kind, scopeKey, version: row?.version ?? null };
 }
 
 /**

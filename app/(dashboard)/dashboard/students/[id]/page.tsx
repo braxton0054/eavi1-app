@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { generateEnrollmentFees } from "@/lib/actions/college/accounts";
 import { registerUnitPeriod, saveUnitResult } from "@/lib/actions/college/program-units";
 import { recordStudentAttachment } from "@/lib/actions/college/attachments";
 import { getStudent } from "@/lib/dal/college";
@@ -8,6 +7,8 @@ import { genderLabel } from "@/lib/content/apply";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
+import { SubmitButton } from "@/components/dashboard/submit-button";
+import { updateStudentPhoto } from "@/lib/actions/college/students";
 import { PrintButton } from "@/components/dashboard/print-button";
 import { StudentPrintDocument, type PrintFact } from "@/components/dashboard/student-print-document";
 import { EmptyState, PageHeader, Panel, StatTile } from "@/components/dashboard/panel";
@@ -617,6 +618,28 @@ export default async function StudentProfilePage({
         </div>
       </Panel>
 
+      {/* Changing the photograph marks the saved card and record stale; the worker puts it
+          into both. There is no "regenerate card" step on this page. */}
+      <Panel title="Student photograph">
+        <form action={updateStudentPhoto} className="flex flex-wrap items-end gap-4 p-4">
+          <input type="hidden" name="studentId" value={student.id} />
+          <label className="flex min-w-56 flex-1 flex-col gap-1.5 text-sm">
+            <span className="font-medium text-eavi-primary-text">New photograph</span>
+            <input
+              type="file"
+              name="photo"
+              accept="image/*"
+              required
+              className="min-h-11 w-full rounded-lg border border-eavi-border bg-eavi-card px-3 py-2 text-sm"
+            />
+          </label>
+          <SubmitButton label="Save photograph" />
+          <p className="w-full text-xs text-eavi-muted-text">
+            The ID card and student record update themselves after this is saved.
+          </p>
+        </form>
+      </Panel>
+
       {/* Details grouped by what they are about. A field with nothing in it is dropped
           rather than printed as "Not recorded" ten times, and the count of what is missing
           is stated once so the gap is still visible without filling the page with dashes. */}
@@ -681,18 +704,10 @@ export default async function StudentProfilePage({
         {feeTableRows.length === 0 ? (
           <div className="space-y-4 p-4">
             <p className="text-sm text-eavi-muted-text">{feeCopy.empty}</p>
-            {activeEnrollment ? (
-              <RowForm
-                id={`generate-fees-${activeEnrollment.id}`}
-                button={feeCopy.generate}
-                fields={[]}
-                hidden={{ enrollmentId: activeEnrollment.id }}
-                action={generateEnrollmentFees}
-                submitLabel={feeCopy.generate}
-              />
-            ) : (
-              <p className="text-sm text-eavi-muted-text">{feeCopy.noEnrollment}</p>
-            )}
+            <p className="text-sm text-eavi-muted-text">
+              Invoices are raised automatically from the published fee plan when a
+              student is enrolled. They appear here as soon as a plan exists.
+            </p>
           </div>
         ) : (
           <>

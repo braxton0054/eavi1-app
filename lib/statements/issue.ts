@@ -18,7 +18,7 @@ import { documentPdf, withQr } from "@/lib/statements/document";
  */
 
 /** The QR placeholder in the receipt artwork, in the artwork's own units (10 = 1mm). */
-const RECEIPT_QR_BOX = { x: 28, y: 616, size: 112 };
+const RECEIPT_QR_BOX = { x: 28, y: 612, size: 104 };
 
 /** A receipt: a payment's rows on the college's receipt design. */
 export async function receiptPdf(input: Omit<ReceiptInput, "student"> & { student: FeeDocStudent }) {
@@ -51,7 +51,7 @@ export async function invoicePdf(input: Omit<InvoiceInput, "student"> & { studen
 /** A statement: every page the account needs, in order. */
 export async function statementPdf(input: Omit<StatementInput, "student"> & { student: FeeDocStudent }) {
   const pages = feeStatementPages(input);
-  const STATEMENT_QR_BOX = { x: 40, y: 988, size: 76 };
+  const STATEMENT_QR_BOX = { x: 40, y: 986, size: 80 };
   const withCodes = input.student.verifyUrl
     ? await Promise.all(pages.map((page) => withQr(page, input.student.verifyUrl!, STATEMENT_QR_BOX)))
     : pages;

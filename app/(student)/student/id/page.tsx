@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { labels } from "@/lib/content/dashboard";
 import { site } from "@/lib/content/home";
 import { formatDate } from "@/lib/format";
-import { getCardFace } from "@/lib/dal/cards";
+import { ensureDocument } from "@/lib/documents/service";
+import { savedCardFaces } from "@/lib/documents/renderers";
 import { getStudentCard, getStudentProfile } from "@/lib/dal/student-portal";
 import type { IdCardStudent } from "@/components/id-card-svg";
 import IdCardsClient from "./id-cards-client";
@@ -36,9 +37,11 @@ export default async function StudentCardPage() {
     verifyToken: card?.verifyToken ?? null,
   };
 
-  // The card is read through the same scope-checked getter the office uses, so artwork and
-  // the QR link are identical to what is printed on the plastic.
-  const face = card ? await getCardFace(card.id, student.campusId) : null;
+  // The card is a saved document. Opening this page loads that record; nothing is merged
+  // or rendered again, so the screen and the printed plastic are the same artwork.
+  const saved = card ? await ensureDocument("ID_CARD", card.id) : null;
+  const faces = saved ? savedCardFaces(saved.svgText) : null;
+  const where = card ? `/verify/${card.verifyToken}` : null;
 
   // Every card this student has ever held: the newest first, replaced and lost ones included.
   const rows = await prisma.idCard.findMany({
@@ -50,10 +53,9 @@ export default async function StudentCardPage() {
   return (
     <IdCardsClient
       initial={initial}
-      hasCard={Boolean(card && face)}
-      faceFront={face?.frontSvg ?? null}
-      faceBack={face?.backSvg ?? null}
-      verifyUrl={card ? face?.where ?? null : null}
+      faceFront={faces?.frontSvg ?? null}
+      faceBack={faces?.backSvg ?? null}
+      verifyUrl={where}
       cards={rows.map((row) => ({
         id: row.id,
         serial: row.serial,

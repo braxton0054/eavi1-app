@@ -1517,3 +1517,25 @@ model NotificationPreference {
 
   @@map("notification_preferences")
 }
+
+/// A saved document: the data snapshot, its rendered SVG/PDF and the hash of the source.
+/// One row per document (kind + scope), so a document is loaded, never rebuilt on view.
+/// A source change only marks it STALE; a worker re-renders it in the background.
+model GeneratedDocument {
+  id         String   @id @default(uuid())
+  kind       String
+  scopeKey   String
+  version    Int      @default(1)
+  sourceHash String
+  snapshot   Json
+  svgText    String
+  storageUrl String?
+  fileName   String
+  status     String   @default("CURRENT")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([kind, scopeKey])
+  @@index([status])
+  @@map("generated_documents")
+}

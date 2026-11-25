@@ -45,7 +45,7 @@ async function dataUri(filename: string): Promise<string> {
 /**
  * Generates an SVG group containing the vector QR code scaled to the target size.
  */
-async function generateLetterQrGroup(url: string, targetSize = 185): Promise<string> {
+async function generateLetterQrGroup(url: string, targetSize = 68): Promise<string> {
   const qrSvg = await QRCode.toString(url, {
     type: "svg",
     margin: 0,
@@ -71,7 +71,7 @@ function fillQrSlot(templateSvg: string, qrGroupSvg: string): string {
 
   return templateSvg.replace(
     match[0],
-    `<g data-slot="qr" transform="translate(1215, 2060)">${qrGroupSvg}</g>`,
+    `<g data-slot="qr" transform="translate(532, 1022)">${qrGroupSvg}</g>`,
   );
 }
 
@@ -99,7 +99,7 @@ export async function renderAdmissionLetterSvg(
 
   // 2. Generate vector QR code
   const verificationUrl = view.verificationUrl;
-  const qrGroup = await generateLetterQrGroup(verificationUrl, 185);
+  const qrGroup = await generateLetterQrGroup(verificationUrl, 68);
 
   // 3. Inject QR code into the SVG template
   const withQr = fillQrSlot(ADMISSION_LETTER_SVG_TEMPLATE, qrGroup);

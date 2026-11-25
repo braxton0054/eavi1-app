@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { EntryGrade, FeePeriodKind, ProgramStructure } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
+import { touchProgram } from "@/lib/documents/service";
 import { requireSuperAdmin } from "@/lib/session";
 import { fieldErrors, pages, programStructureChoices } from "@/lib/content/dashboard";
 import {
@@ -387,6 +388,10 @@ export async function saveProgramFeePlan(formData: FormData) {
         })),
       });
     });
+
+    // The saved fee-structure document watches the published plan. Any edit here changes
+    // its source hash, so the worker re-renders it without anyone clicking "generate".
+    await touchProgram(program.id);
   });
 }
 
