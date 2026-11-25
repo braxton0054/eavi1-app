@@ -316,11 +316,41 @@ export default async function AccountsPage({
           <EmptyState title={copy.empty.title} body={copy.empty.body} icon="accounts" />
         ) : (
           <>
-            <RecordCardGrid>
-              {cards.map((card) => (
+            <DataTable
+              columns={[
+                { key: "invoice", label: "Invoice" },
+                { key: "status", label: "Status" },
+                { key: "issued", label: "Issued" },
+                { key: "due", label: "Due" },
+                { key: "billed", label: "Billed", align: "end" },
+                { key: "balance", label: "Balance", align: "end" },
+              ]}
+              rows={list.rows.map((invoice): Row => ({
+                id: invoice.id,
+                href: `/dashboard/students/${invoice.student.id}`,
+                cells: {
+                  invoice: (
+                    <span className="block">
+                      <span className="font-medium">{invoice.student.user.fullName}</span>
+                      <span className="block text-xs text-eavi-muted-text">{invoice.number}</span>
+                    </span>
+                  ),
+                  status: (
+                    <StatusChip tone={invoiceTone[invoice.status] ?? "neutral"}>
+                      {labels.invoiceStatus[invoice.status]}
+                    </StatusChip>
+                  ),
+                  issued: formatDate(invoice.createdAt),
+                  due: invoice.dueAt ? formatDate(invoice.dueAt) : common.notSet,
+                  billed: money(invoice.billed),
+                  balance: invoice.balance > 0 ? money(invoice.balance) : copy.card.settled,
+                },
+              }))}
+              caption={copy.title}
+              mobile={<RecordCardGrid>{cards.map((card) => (
                 <RecordCard key={card.id} card={card} openLabel={copy.card.open} />
-              ))}
-            </RecordCardGrid>
+              ))}</RecordCardGrid>}
+            />
             <div className="border-t border-eavi-border p-4">
               <Paginator
                 basePath="/dashboard/accounts"

@@ -6,6 +6,7 @@ import { getApplications, getProgramOptions, getReportingDates } from "@/lib/dal
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages, shell } from "@/lib/content/dashboard";
 import { RecordCard, RecordCardGrid, type RecordCardData } from "@/components/dashboard/record-card";
+import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { DisclosureForm, RowForm } from "@/components/dashboard/record-form";
 import { ListFilters, Paginator, ResultCount, StepLink } from "@/components/dashboard/list-tools";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
@@ -154,11 +155,39 @@ export default async function ApplicationsPage({
           <EmptyState title={copy.empty.title} body={copy.empty.body} icon="applications" />
         ) : (
           <>
-            <RecordCardGrid>
-              {cards.map((card) => (
+            <DataTable
+              columns={[
+                { key: "applicant", label: "Applicant" },
+                { key: "programme", label: "Programme" },
+                { key: "status", label: "Status" },
+                { key: "contact", label: "Contact" },
+                { key: "received", label: "Received" },
+              ]}
+              rows={list.rows.map((application): Row => ({
+                id: application.id,
+                href: `/dashboard/applications/${application.id}`,
+                cells: {
+                  applicant: (
+                    <span className="block">
+                      <span className="font-medium">{application.fullName}</span>
+                      <span className="block text-xs text-eavi-muted-text">{application.reference}</span>
+                    </span>
+                  ),
+                  programme: `${application.program.code} · ${application.program.name}`,
+                  status: (
+                    <StatusChip tone={applicationTone[application.status] ?? "info"}>
+                      {labels.applicationStatus[application.status]}
+                    </StatusChip>
+                  ),
+                  contact: application.phone,
+                  received: formatDate(application.createdAt),
+                },
+              }))}
+              caption={copy.title}
+              mobile={<RecordCardGrid>{cards.map((card) => (
                 <RecordCard key={card.id} card={card} openLabel={copy.card.open} />
-              ))}
-            </RecordCardGrid>
+              ))}</RecordCardGrid>}
+            />
             <div className="border-t border-eavi-border p-4">
               <Paginator
                 basePath="/dashboard/applications"

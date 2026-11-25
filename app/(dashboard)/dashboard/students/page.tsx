@@ -1,4 +1,5 @@
 import { getStudents } from "@/lib/dal/college";
+import { DataTable, type Row } from "@/components/dashboard/data-table";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
 import { ListFilters, Paginator, ResultCount } from "@/components/dashboard/list-tools";
@@ -87,11 +88,44 @@ export default async function StudentsPage({
           <EmptyState title={copy.empty.title} body={copy.empty.body} icon="students" />
         ) : (
           <>
-            <RecordCardGrid>
-              {cards.map((card) => (
+            {/* Stripe-style table-first on desktop; the same records become cards on a phone. */}
+            <DataTable
+              columns={[
+                { key: "student", label: "Student" },
+                { key: "programme", label: "Programme" },
+                { key: "card", label: "ID card" },
+                { key: "phone", label: "Phone" },
+                { key: "balance", label: "Fee balance", align: "end" },
+              ]}
+              rows={list.rows.map((student): Row => {
+                const program = student.enrollments[0]?.program;
+                const idCard = student.idCards[0];
+                return {
+                  id: student.id,
+                  href: `/dashboard/students/${student.id}`,
+                  cells: {
+                    student: (
+                      <span className="block">
+                        <span className="font-medium">{student.user.fullName}</span>
+                        <span className="block text-xs text-eavi-muted-text">{student.admissionNo}</span>
+                      </span>
+                    ),
+                    programme: program ? `${program.code} · ${program.name}` : cardCopy.noProgram,
+                    card: idCard ? (
+                      <StatusChip tone={cardTone[idCard.status] ?? "neutral"}>
+                        {labels.cardStatus[idCard.status as keyof typeof labels.cardStatus]}
+                      </StatusChip>
+                    ) : cardCopy.noCard,
+                    phone: student.user.phone ?? cardCopy.noPhone,
+                    balance: student.balance > 0 ? money(student.balance) : cardCopy.cleared,
+                  },
+                };
+              })}
+              caption={copy.title}
+              mobile={<RecordCardGrid>{cards.map((card) => (
                 <RecordCard key={card.id} card={card} openLabel={cardCopy.open} />
-              ))}
-            </RecordCardGrid>
+              ))}</RecordCardGrid>}
+            />
             <div className="border-t border-eavi-border p-4">
               <Paginator basePath="/dashboard/students" page={list.page} total={list.total} q={q} />
             </div>

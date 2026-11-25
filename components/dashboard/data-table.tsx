@@ -93,7 +93,10 @@ export function DataTable({
         </Table>
       </div>
 
-      {mobile ?? (
+      {/* The custom mobile view must also hide at md, otherwise it renders on desktop. */}
+      {mobile ? (
+        <div className="md:hidden">{mobile}</div>
+      ) : (
         <ul className="space-y-3 p-4 md:hidden">
           {rows.map((row) => {
             const href = linkFor(row);
