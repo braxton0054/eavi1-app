@@ -1,0 +1,377 @@
+/*
+ * Cinematic EAVI hero — adapted from the Orvante editorial structure.
+ * All sizes are fluid; every colour comes from the project token layer.
+ * Motion is transform/opacity/color only, and reduced motion shows the final state.
+ */
+
+@layer components {
+  .hero {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--eavi-text);
+  }
+
+  .heroInner {
+    position: relative;
+    width: 100%;
+    max-width: 90rem;
+    min-height: 46rem;
+    margin-inline: auto;
+    padding: clamp(1.25rem, 3vw, 3.5rem) var(--gutter) clamp(3rem, 6vw, 6rem);
+  }
+
+  @media (min-width: 64rem) {
+    .heroInner { min-height: 58rem; }
+  }
+
+  /* ------------------------------------------------------------------- nav */
+  .nav {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: var(--space-1);
+    padding: var(--space-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+  }
+
+  .nav::-webkit-scrollbar { display: none; }
+
+  .navLink {
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-height: var(--touch-target);
+    align-items: center;
+    padding-inline: var(--space-4);
+    border-radius: var(--radius-pill);
+    color: var(--eavi-text);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    text-decoration: none;
+    transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  }
+
+  .navLink:hover,
+  .navLink[data-active] {
+    background: var(--eavi-fill);
+    color: var(--eavi-on-fill);
+  }
+
+  .topRight {
+    position: absolute;
+    top: clamp(1.25rem, 3vw, 3.5rem);
+    right: var(--gutter);
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .location {
+    color: var(--eavi-muted-text);
+    font-size: var(--text-sm);
+  }
+
+  .applyButton {
+    display: inline-flex;
+    min-height: var(--touch-target);
+    align-items: center;
+    padding-inline: var(--space-5);
+    border-radius: var(--radius-pill);
+    background: var(--eavi-fill);
+    color: var(--eavi-on-fill);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    text-decoration: none;
+  }
+
+  /* ------------------------------------------------------------------ title */
+  .title {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    margin: clamp(2.5rem, 6vw, 5rem) 0 0;
+    font-family: var(--font-display);
+    font-size: clamp(3.5rem, 1.8rem + 8vw, 9rem);
+    font-weight: var(--weight-semibold);
+    line-height: 0.86;
+    letter-spacing: -0.06em;
+  }
+
+  .titleMark {
+    margin-left: var(--space-2);
+    color: var(--eavi-primary-text);
+    font-family: var(--font-ui);
+    font-size: var(--text-xs);
+    letter-spacing: 0.08em;
+    vertical-align: super;
+  }
+
+  .about {
+    position: relative;
+    z-index: 2;
+    max-width: 22rem;
+    margin-top: clamp(2rem, 4vw, 3.5rem);
+  }
+
+  .aboutLabel {
+    margin: 0 0 var(--space-3);
+    color: var(--eavi-primary-text);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+  }
+
+  .aboutCopy {
+    margin: 0 0 var(--space-5);
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+  }
+
+  .aboutButton {
+    display: inline-flex;
+    min-height: var(--touch-target);
+    align-items: center;
+    padding-inline: var(--space-6);
+    border-radius: var(--radius-pill);
+    background: var(--eavi-fill);
+    color: var(--eavi-on-fill);
+    font-weight: var(--weight-semibold);
+    text-decoration: none;
+  }
+
+  /* ------------------------------------------------------------ stats frame */
+  .statsFrame {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    gap: var(--space-3);
+    width: min(100%, 23rem);
+    margin-top: clamp(2rem, 4vw, 3.5rem);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .statCard {
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--eavi-primary-soft);
+  }
+
+  .statValue {
+    margin: 0;
+    color: var(--eavi-primary-text);
+    font-size: var(--text-4xl);
+    font-weight: var(--weight-semibold);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .statLabel { margin: var(--space-2) 0 0; font-weight: var(--weight-semibold); }
+  .statNote { margin: var(--space-1) 0 0; color: var(--eavi-muted-text); font-size: var(--text-sm); }
+
+  .statLink {
+    display: inline-flex;
+    min-height: var(--touch-target);
+    align-items: center;
+    margin-top: var(--space-3);
+    color: var(--eavi-primary-text);
+    font-weight: var(--weight-semibold);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .photoCard {
+    overflow: hidden;
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+  }
+
+  .photoCard img {
+    display: block;
+    width: 100%;
+    height: 7rem;
+    object-fit: cover;
+  }
+
+  .photoCaption {
+    display: flex;
+    justify-content: space-between;
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* -------------------------------------------------------------- hero photo */
+  .photoWrap {
+    position: absolute;
+    z-index: 1;
+    top: clamp(7rem, 14vw, 12rem);
+    right: var(--gutter);
+    width: min(46vw, 34rem);
+    aspect-ratio: 3 / 4;
+    pointer-events: none;
+  }
+
+  @media (max-width: 63.99rem) {
+    .photoWrap {
+      position: relative;
+      top: auto;
+      right: auto;
+      width: 100%;
+      margin-top: var(--space-8);
+    }
+  }
+
+  .heroPhoto {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+    /* The reference melts the photo edges into the paper. */
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  }
+
+  .brandPlate {
+    position: absolute;
+    top: 46%;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+    border: 1px solid rgb(255 255 255 / 0.3);
+    border-radius: var(--radius-md);
+    background: rgb(20 10 25 / 0.62);
+    color: #f7f5fa;
+    backdrop-filter: blur(10px);
+    transform: translate(-50%, -50%);
+  }
+
+  .brandMark {
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 2px solid #f7f5fa;
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+  }
+
+  .brandName { font-family: var(--font-display); font-size: var(--text-xl); letter-spacing: 0.14em; }
+  .brandMenu { width: 1.25rem; height: 0.75rem; border-block: 1px solid #f7f5fa; }
+
+  .photoLogos {
+    position: absolute;
+    bottom: var(--space-4);
+    left: 0;
+    right: 0;
+    margin: 0;
+    color: #f7f5fa;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    text-align: center;
+    text-shadow: 0 1px 4px rgb(0 0 0 / 0.7);
+  }
+
+  /* ------------------------------------------------------------ right column */
+  .rightColumn {
+    position: absolute;
+    z-index: 2;
+    right: var(--gutter);
+    bottom: clamp(3rem, 6vw, 6rem);
+    width: min(20vw, 15rem);
+  }
+
+  @media (max-width: 63.99rem) {
+    .rightColumn { position: static; width: 100%; margin-top: var(--space-6); }
+  }
+
+  .available {
+    margin: 0 0 var(--space-3);
+    color: var(--eavi-primary-text);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    text-align: right;
+  }
+
+  .featureCard {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .featureCard img { display: block; width: 100%; height: 8rem; object-fit: cover; }
+  .featureRow { display: flex; justify-content: space-between; align-items: center; padding: var(--space-3); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+  .featureArrow { width: 0.6rem; height: 0.6rem; border-block-end: 2px solid var(--eavi-primary-text); border-inline-end: 2px solid var(--eavi-primary-text); transform: rotate(-45deg); }
+
+  .counts {
+    position: absolute;
+    z-index: 2;
+    bottom: clamp(2rem, 4vw, 4rem);
+    left: var(--gutter);
+    display: flex;
+    gap: var(--space-6);
+  }
+
+  .counts p { margin: 0; color: var(--eavi-muted-text); font-size: var(--text-sm); }
+  .counts strong { color: var(--eavi-primary-text); font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
+
+  /* -------------------------------------------------------------------- bar */
+  .bar {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--gutter);
+    background: var(--eavi-band);
+    color: #f7f5fa;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+  }
+
+  .bar span:nth-child(2) { color: #d9c3dd; }
+
+  /* --------------------------------------------------------------- statement */
+  .statementSection {
+    background: var(--eavi-band);
+    color: #f7f5fa;
+    padding: clamp(4rem, 10vw, 9rem) var(--gutter);
+  }
+
+  .statement {
+    max-width: 54rem;
+    margin-inline: auto;
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 1rem + 2.4vw, 3.25rem);
+    line-height: 1.25;
+    letter-spacing: -0.028em;
+    text-align: center;
+  }
+
+  .statement span {
+    color: #8c7491;
+    transition: color 500ms var(--ease-out);
+  }
+
+  .statement[data-filled] span { color: #f7f5fa; }
+
+  .statementSub {
+    max-width: 36rem;
+    margin: clamp(2rem, 5vw, 4rem) auto 0;
+    color: #d9c3dd;
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+    text-align: center;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .navLink, .statement span { transition: none; }
+    .statement span { color: #f7f5fa; }
+  }
+}

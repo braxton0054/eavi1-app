@@ -178,3 +178,21 @@ with both skills. Applied through the shared components so every role's screens 
 Affects admin, superadmin, student and tutor portals because they share these components.
 
 Rules: PASS
+
+---
+
+## Cinematic homepage (MotionSites skill)
+
+Installed the MotionSites web-builder skill and rebuilt the homepage top from its
+Orvante Agency reference (editorial photo hero, manifesto, stat panel), adapted to EAVI:
+- oversized Fraunces display title with an EAVI superscript, masked real campus photo,
+  floating brand plate and a segmented nav pill
+- a violet bar and a statement whose words fill as the section enters the viewport
+- real figures only: students enrolled, programmes, campuses, 226 college photographs
+
+The functional prospectus sections (programmes, admissions, fees, campuses, gallery,
+FAQ, CTA) remain below. One scroll trigger and transform/opacity/color transitions;
+reduced motion shows the final state. Explicit user override: the MotionSites skill's
+multi-part motion is allowed here despite the usual one-moment rule.
+
+Rules: PASS with override: ANI (user asked for the MotionSites skill)

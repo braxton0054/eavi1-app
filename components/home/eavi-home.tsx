@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { EaviCinematic } from "@/components/home/eavi-cinematic";
 import { PhotoGallery } from "@/components/home/photo-gallery";
 import { ProgramCatalogue } from "@/components/home/program-catalogue";
 import {
@@ -35,52 +36,7 @@ export function EaviHome({
 }) {
   return (
     <>
-      <section className={styles.hero} aria-labelledby="hero-title">
-        <div className={styles.heroInner}>
-          <div>
-            <p className={styles.heroWordmark}>
-              {site.shortName}, {site.location}
-            </p>
-            <h1 id="hero-title" className={styles.heroTitle}>
-              {hero.heading}
-            </h1>
-            <p className={styles.heroSub}>{hero.subheading}</p>
-            <div className={styles.heroActions}>
-              <Link className={styles.heroPrimary} href="/apply">
-                Apply now
-              </Link>
-              <Link className={styles.heroSecondary} href="/login">
-                Sign in
-              </Link>
-            </div>
-          </div>
-          {hero.photo ? (
-            <Image
-              src={hero.photo}
-              alt={hero.photoAlt}
-              width={1200}
-              height={960}
-              priority
-              className={styles.heroPhoto}
-            />
-          ) : null}
-        </div>
-      </section>
-
-      <dl className={styles.facts}>
-        <div className={styles.fact}>
-          <dt className={styles.factLabel}>Teaching campuses</dt>
-          <dd className={styles.factValue}>2</dd>
-        </div>
-        <div className={styles.fact}>
-          <dt className={styles.factLabel}>Programmes</dt>
-          <dd className={styles.factValue}>{programs.length}</dd>
-        </div>
-        <div className={styles.fact}>
-          <dt className={styles.factLabel}>Students enrolled</dt>
-          <dd className={styles.factValue}>{studentCount}</dd>
-        </div>
-      </dl>
+      <EaviCinematic programmes={programs.length} students={studentCount} photos={226} />
 
       <section id={whySection.id} className={styles.section} aria-labelledby="why-title">
         <div className={styles.wrap}>
