@@ -8,10 +8,54 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireStudent } from "@/lib/session";
+import { invoicePosition } from "@/lib/fees/ledger";
+import { sumAmountCents } from "@/lib/fees/money";
 
-/** Money as a plain number, so totals add up without decimal drift in the view. */
-const money = (value: { toString(): string } | null | undefined) =>
+/** Academic scores are not currency and may still be read as ordinary numbers. */
+const scoreNumber = (value: { toString(): string } | null | undefined) =>
   value === null || value === undefined ? 0 : Number(value.toString());
+
+type LedgerInvoice = { status: string; lines: { amount: unknown }[]; payments: { amount: unknown }[] };
+type FinancialInvoiceStatus = "OPEN" | "PARTIAL" | "PAID" | "CREDIT";
+
+function financialInvoice(invoice: LedgerInvoice) {
+  const position = invoicePosition(invoice.lines, invoice.payments);
+  const status: FinancialInvoiceStatus =
+    position.balanceCents < 0
+      ? "CREDIT"
+      : invoice.lines.length > 0 && position.balanceCents === 0
+        ? "PAID"
+        : position.paidCents > 0 && position.paidCents < position.billedCents
+          ? "PARTIAL"
+          : "OPEN";
+
+  return {
+    ...position,
+    amount: position.billedCents / 100,
+    paid: position.paidCents / 100,
+    balance: position.balanceCents / 100,
+    outstanding: position.outstandingCents / 100,
+    credit: position.creditCents / 100,
+    status,
+  };
+}
+
+function ledgerSummary(invoices: LedgerInvoice[]) {
+  const positions = invoices.map(financialInvoice);
+  const billedCents = sumAmountCents(invoices.flatMap((invoice) => invoice.lines));
+  const paidCents = sumAmountCents(invoices.flatMap((invoice) => invoice.payments));
+  const outstandingCents = positions.reduce((sum, row) => sum + row.outstandingCents, 0);
+  const creditCents = positions.reduce((sum, row) => sum + row.creditCents, 0);
+
+  return {
+    positions,
+    billed: billedCents / 100,
+    paid: paidCents / 100,
+    balance: (billedCents - paidCents) / 100,
+    outstanding: outstandingCents / 100,
+    credit: creditCents / 100,
+  };
+}
 
 /**
  * The student's one enrolment, or null when they have been admitted but not yet placed on a
@@ -58,7 +102,7 @@ export async function getStudentOverview() {
 
   const place = { yearIndex: enrollment.yearIndex, semesterNo: enrollment.semesterNo };
 
-  const [units, invoices, paid] = await Promise.all([
+  const [units, invoices] = await Promise.all([
     /*
      * Read from the programme's own units, not from the student's registrations.
      *
@@ -85,22 +129,20 @@ export async function getStudentOverview() {
     }),
     prisma.invoice.findMany({
       where: { studentId: student.studentId, status: { not: "VOID" } },
-      select: { status: true, dueAt: true, lines: { select: { amount: true } } },
+      select: {
+        status: true,
+        dueAt: true,
+        lines: { select: { amount: true } },
+        payments: { select: { amount: true } },
+      },
       orderBy: { dueAt: "asc" },
-    }),
-    prisma.payment.aggregate({
-      where: { studentId: student.studentId },
-      _sum: { amount: true },
     }),
   ]);
 
-  const totalOf = (row: { lines: { amount: { toString(): string } }[] }) =>
-    row.lines.reduce((sum, line) => sum + money(line.amount), 0);
-
-  const billed = invoices.reduce((sum, row) => sum + totalOf(row), 0);
-  const settled = money(paid._sum.amount);
-  const open = invoices.filter((row) => row.status !== "PAID");
-  const nextDue = open.find((row) => row.dueAt !== null) ?? null;
+  const fees = ledgerSummary(invoices);
+  const nextDue = invoices
+    .map((invoice, index) => ({ invoice, position: fees.positions[index] }))
+    .find((row) => row.position.outstandingCents > 0 && row.invoice.dueAt !== null) ?? null;
 
   const current = enrollment.memberships[0]?.class ?? null;
 
@@ -116,11 +158,13 @@ export async function getStudentOverview() {
       grade: row.studentUnits[0]?.grade ?? null,
     })),
     fees: {
-      billed,
-      paid: settled,
-      balance: Math.max(0, billed - settled),
-      nextDueAt: nextDue?.dueAt ?? null,
-      nextDueAmount: nextDue ? totalOf(nextDue) : null,
+      billed: fees.billed,
+      paid: fees.paid,
+      balance: fees.balance,
+      outstanding: fees.outstanding,
+      credit: fees.credit,
+      nextDueAt: nextDue?.invoice.dueAt ?? null,
+      nextDueAmount: nextDue ? nextDue.position.outstandingCents / 100 : null,
       hasInvoices: invoices.length > 0,
     },
     classroom: current
@@ -191,8 +235,8 @@ export async function getStudentUnits() {
                 title: unit.unit.name,
                 status: mine?.status ?? "NOT_STARTED",
                 grade: mine?.grade ?? null,
-                score: mine?.score !== null && mine !== null ? money(mine.score) : null,
-                maxScore: mine?.maxScore !== null && mine !== null ? money(mine.maxScore) : null,
+                score: mine?.score !== null && mine !== null ? scoreNumber(mine.score) : null,
+                maxScore: mine?.maxScore !== null && mine !== null ? scoreNumber(mine.maxScore) : null,
               };
             }),
           })),
@@ -245,46 +289,47 @@ export async function getStudentClass() {
   };
 }
 
-/** What the student has been billed, what they have paid, and every payment on record. */
+/** What the student has been billed, what they have paid, and every payment on a nonvoid bill. */
 export async function getStudentFees() {
   const { student, enrollment } = await getStudentEnrolment();
 
-  const [invoices, payments] = await Promise.all([
-    prisma.invoice.findMany({
-      where: { studentId: student.studentId, status: { not: "VOID" } },
-      orderBy: [{ periodYear: "asc" }, { periodSemester: "asc" }, { dueAt: "asc" }],
-      select: {
-        id: true,
-        number: true,
-        status: true,
-        dueAt: true,
-        createdAt: true,
-        periodYear: true,
-        periodSemester: true,
-        lines: { select: { label: true, amount: true } },
+  const invoices = await prisma.invoice.findMany({
+    where: { studentId: student.studentId, status: { not: "VOID" } },
+    orderBy: [{ periodYear: "asc" }, { periodSemester: "asc" }, { dueAt: "asc" }],
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      dueAt: true,
+      createdAt: true,
+      periodYear: true,
+      periodSemester: true,
+      lines: { select: { label: true, amount: true } },
+      payments: {
+        orderBy: { paidAt: "desc" },
+        select: { id: true, invoiceId: true, amount: true, paidAt: true, reference: true, method: true, receiptNo: true },
       },
-    }),
-    prisma.payment.findMany({
-      where: { studentId: student.studentId },
-      orderBy: { paidAt: "desc" },
-      select: { id: true, invoiceId: true, amount: true, paidAt: true, reference: true, method: true, receiptNo: true },
-    }),
-  ]);
+    },
+  });
 
-  const rows = invoices.map((row) => ({
-    ...row,
-    amount: row.lines.reduce((sum, line) => sum + money(line.amount), 0),
-  }));
-
-  const billed = rows.reduce((sum, row) => sum + row.amount, 0);
-  const settled = payments.reduce((sum, row) => sum + money(row.amount), 0);
+  const rows = invoices.map((row) => ({ ...row, ...financialInvoice(row) }));
+  const payments = invoices
+    .flatMap((invoice) => invoice.payments)
+    .sort((a, b) => b.paidAt.getTime() - a.paidAt.getTime());
+  const totals = ledgerSummary(invoices);
 
   return {
     student,
     enrollment,
     invoices: rows,
     payments,
-    totals: { billed, paid: settled, balance: Math.max(0, billed - settled) },
+    totals: {
+      billed: totals.billed,
+      paid: totals.paid,
+      balance: totals.balance,
+      outstanding: totals.outstanding,
+      credit: totals.credit,
+    },
   };
 }
 

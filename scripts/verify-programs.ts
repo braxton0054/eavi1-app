@@ -376,7 +376,27 @@ async function main() {
   );
 
   // --- cleanup -------------------------------------------------------------------
-  await prisma.user.deleteMany({ where: { email: { startsWith: tag } } });
+  // Remove only rows owned by this fixture. Posted money and invoice lines restrict their
+  // headers, so financial children must go first.
+  const fixtureInvoices = await prisma.invoice.findMany({
+    where: { enrollmentId: enrollment.id },
+    select: { id: true },
+  });
+  const invoiceIds = fixtureInvoices.map((invoice) => invoice.id);
+  const fixtureReceipts = await prisma.receipt.findMany({
+    where: { OR: [{ campusId: campus.id }, { studentId: student.id }] },
+    select: { id: true },
+  });
+  const receiptIds = fixtureReceipts.map((receipt) => receipt.id);
+  await prisma.payment.deleteMany({
+    where: { OR: [{ invoiceId: { in: invoiceIds } }, { studentId: student.id }, { receiptId: { in: receiptIds } }] },
+  });
+  await prisma.receipt.deleteMany({ where: { id: { in: receiptIds } } });
+  await prisma.invoiceLine.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+  await prisma.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
+  await prisma.studentUnit.deleteMany({ where: { enrollmentId: enrollment.id } });
+  await prisma.studentAttachment.deleteMany({ where: { enrollmentId: enrollment.id } });
+  await prisma.enrollment.delete({ where: { id: enrollment.id } });
   await prisma.attachmentRequirement.deleteMany({ where: { programId: semesterProgram.id } });
   await prisma.feeItem.deleteMany({ where: { programId: semesterProgram.id } });
   await prisma.programFeePlan.deleteMany({ where: { programId: semesterProgram.id } });
@@ -384,14 +404,10 @@ async function main() {
     where: { id: { in: [semesterProgram.id, monthly.id, modular.id] } },
   });
   await prisma.unit.deleteMany({ where: { code: { startsWith: tag } } });
-  await prisma.invoice.deleteMany({ where: { campusId: campus.id } });
-  await prisma.studentUnit.deleteMany({ where: { enrollment: { campusId: campus.id } } });
-  await prisma.enrollment.deleteMany({ where: { campusId: campus.id } });
+  await prisma.studentProfile.delete({ where: { id: student.id } });
+  await prisma.user.delete({ where: { id: user.id } });
   if (periodIdForCleanup) {
-    await prisma.exam.deleteMany({ where: { periodId: periodIdForCleanup } });
-    await prisma.timetableSlot.deleteMany({ where: { periodId: periodIdForCleanup } });
-    await prisma.calendarEvent.deleteMany({ where: { periodId: periodIdForCleanup } });
-    await prisma.academicPeriod.delete({ where: { id: periodIdForCleanup } }).catch(() => {});
+    await prisma.academicPeriod.delete({ where: { id: periodIdForCleanup } });
   }
   await prisma.campus.delete({ where: { id: campus.id } });
   await prisma.department.delete({ where: { id: department.id } });

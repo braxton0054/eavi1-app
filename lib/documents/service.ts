@@ -30,12 +30,13 @@ function objectKey(kind: string, scopeKey: string, hash: string) {
   return `generated/${kind.toLowerCase()}/${safe}/${hash.slice(0, 16)}.pdf`;
 }
 
-/** Loads the saved document. Only a missing row ever renders synchronously. */
+/** Loads the current saved document; stale financial records are repaired synchronously. */
 export async function ensureDocument(kind: DocumentKind, scopeKey: string) {
   const row = await prisma.generatedDocument.findUnique({
     where: { kind_scopeKey: { kind, scopeKey } },
   });
-  return row ?? regenerateDocument(kind, scopeKey);
+  if (!row) return regenerateDocument(kind, scopeKey);
+  return row.status === "CURRENT" ? row : regenerateDocument(kind, scopeKey);
 }
 
 /**
@@ -53,7 +54,7 @@ export async function touchDocument(kind: DocumentKind, scopeKey: string) {
     await enqueueDocumentRefresh({ kind, scopeKey });
   } catch (error) {
     // Redis being down must not fail the write that caused the change. The row is STALE;
-    // the next worker start, or the next ensureDocument for a missing row, repairs it.
+    // the next worker start, or the next ensureDocument request, repairs it.
     console.error(`document refresh queue unavailable (${kind}:${scopeKey}):`, error);
   }
 }

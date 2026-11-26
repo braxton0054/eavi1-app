@@ -13,6 +13,14 @@ import { fieldErrors } from "@/lib/content/dashboard";
 import { isEmail, normalizeKenyanPhone } from "@/lib/validation";
 import { prisma } from "@/lib/prisma";
 import { storageConfigured, uploadFile } from "@/lib/storage";
+import {
+  nextAdmissionNo,
+  nextInvoiceNumber,
+  nextInvoiceNumbers,
+  nextReceiptNumber,
+} from "@/lib/fees/references";
+
+export { nextAdmissionNo, nextInvoiceNumber, nextInvoiceNumbers, nextReceiptNumber };
 
 /** Thrown with wording the administrator can act on; the error boundary prints it as-is. */
 export class FieldError extends Error {}
@@ -355,14 +363,6 @@ async function issueCode(
   throw new FieldError(fieldErrors.exhausted);
 }
 
-export function nextAdmissionNo() {
-  return issueCode(
-    () => prisma.studentProfile.count(),
-    (sequence) => `EAVI/${year()}/${pad(sequence, 4)}`,
-    (code) => prisma.studentProfile.count({ where: { admissionNo: code } }),
-  );
-}
-
 export function nextStaffNo() {
   return issueCode(
     () => prisma.tutorProfile.count(),
@@ -376,44 +376,6 @@ export function nextApplicationReference() {
     () => prisma.application.count(),
     (sequence) => `APP/${year()}/${pad(sequence, 4)}`,
     (code) => prisma.application.count({ where: { reference: code } }),
-  );
-}
-
-export function nextInvoiceNumber() {
-  return issueCode(
-    () => prisma.invoice.count(),
-    (sequence) => `INV/${year()}/${pad(sequence, 5)}`,
-    (code) => prisma.invoice.count({ where: { number: code } }),
-  );
-}
-
-/**
- * A whole fee schedule is billed in one transaction, so it needs its numbers reserved up
- * front: each one is checked against the table and against the ones already reserved here,
- * because `count()` cannot see rows the transaction has not written yet.
- */
-export async function nextInvoiceNumbers(count: number): Promise<string[]> {
-  const reserved: string[] = [];
-  let sequence = (await prisma.invoice.count()) + 1;
-
-  while (reserved.length < count) {
-    const code = `INV/${year()}/${pad(sequence, 5)}`;
-    if (!reserved.includes(code) && (await prisma.invoice.count({ where: { number: code } })) === 0) {
-      reserved.push(code);
-    }
-    sequence += 1;
-    if (sequence > 10_000_000) throw new FieldError(fieldErrors.exhausted);
-  }
-
-  return reserved;
-}
-
-/** The reference a payer is given; one receipt may settle several periods. */
-export function nextReceiptNumber() {
-  return issueCode(
-    () => prisma.payment.count({ where: { receiptNo: { not: null } } }),
-    (sequence) => `RCP/${year()}/${pad(sequence, 4)}`,
-    (code) => prisma.payment.count({ where: { receiptNo: code } }),
   );
 }
 
@@ -473,5 +435,10 @@ export async function onSave(
     throw error;
   }
 
-  refresh(...revalidate);
+  try {
+    refresh(...revalidate);
+  } catch (error) {
+    // The write is already committed. Cache refresh must never make the administrator retry it.
+    console.error("[accounts] post-commit refresh failed:", error);
+  }
 }

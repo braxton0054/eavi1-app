@@ -8,6 +8,7 @@ import { campusWhere, requireCollegeAdmin } from "@/lib/session";
 import { placementLabel, type MergePreview, type ClassShape } from "@/lib/academics/classes";
 import { describeMerge } from "@/lib/academics/classes";
 import { generatedPeriods, type Structure } from "@/lib/academics/structure";
+import { invoicePosition } from "@/lib/fees/ledger";
 
 export type ClassRow = {
   id: string;
@@ -181,13 +182,12 @@ export async function getClassMembers(classId: string): Promise<ClassMember[]> {
   });
 
   return rows.map(({ joinedAt, enrollment }) => {
-    // Outstanding is what was billed minus what was paid, counted only on bills still open.
-    const owes = enrollment.invoices.reduce((total: number, invoice) => {
-      if (invoice.status !== "OPEN" && invoice.status !== "PARTIAL") return total;
-      const billed = invoice.lines.reduce((sum: number, line) => sum + Number(line.amount), 0);
-      const paid = invoice.payments.reduce((sum: number, payment) => sum + Number(payment.amount), 0);
-      return total + Math.max(0, billed - paid);
+    // Every nonvoid invoice contributes its exact positive balance, whatever its stored status.
+    const owesCents = enrollment.invoices.reduce((total, invoice) => {
+      if (invoice.status === "VOID") return total;
+      return total + invoicePosition(invoice.lines, invoice.payments).outstandingCents;
     }, 0);
+    const owes = owesCents / 100;
 
     return {
       enrollmentId: enrollment.id,

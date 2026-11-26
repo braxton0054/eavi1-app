@@ -14,9 +14,19 @@ const kes = new Intl.NumberFormat("en-KE", {
 });
 
 const plainNumber = new Intl.NumberFormat("en-KE", { maximumFractionDigits: 0 });
+const kesExact = new Intl.NumberFormat("en-KE", {
+  style: "currency",
+  currency: "KES",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 export function money(value: Numeric): string {
   return kes.format(toNumber(value));
+}
+
+export function moneyExact(value: Numeric): string {
+  return kesExact.format(toNumber(value));
 }
 
 export function count(value: Numeric): string {

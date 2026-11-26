@@ -101,6 +101,7 @@ enum InvoiceStatus {
   OPEN
   PARTIAL
   PAID
+  CREDIT
   VOID
 }
 
@@ -163,6 +164,30 @@ enum PaymentMethod {
   CHEQUE
 }
 
+enum ReceiptStatus {
+  ISSUED
+  REVERSED
+  REFUNDED
+}
+
+enum ReceiptKind {
+  RECEIPT
+  CREDIT_NOTE
+}
+
+enum PaymentEntryType {
+  PAYMENT
+  REVERSAL
+  REFUND
+}
+
+enum InvoiceLineKind {
+  CHARGE
+  CREDIT_NOTE
+  VOID
+  VOID_REVERSAL
+}
+
 enum CardStatus {
   PENDING
   PRINTING
@@ -204,6 +229,7 @@ model Campus {
   timetableSlots   TimetableSlot[]
   exams            Exam[]
   invoices         Invoice[]
+  receipts         Receipt[]
   announcements    Announcement[]
   idCards          IdCard[]
   cardTemplates    CardTemplate[]
@@ -443,6 +469,7 @@ model StudentProfile {
   enrollments            Enrollment[]
   invoices               Invoice[]
   payments               Payment[]
+  receipts               Receipt[]
   attachments            StudentAttachment[]
   idCards                IdCard[]
   createdAt              DateTime            @default(now())
@@ -945,32 +972,37 @@ model FeeItem {
 }
 
 model Invoice {
-  id             String          @id @default(uuid())
-  number         String          @unique
-  studentId      String
-  student        StudentProfile  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  campusId       Int
-  campus         Campus          @relation(fields: [campusId], references: [id])
-  periodId       String?
-  period         AcademicPeriod? @relation(fields: [periodId], references: [id])
-  programId      String?
+  id               String          @id @default(uuid())
+  number           String          @unique
+  studentId        String
+  student          StudentProfile  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  campusId         Int
+  campus           Campus          @relation(fields: [campusId], references: [id])
+  periodId         String?
+  period           AcademicPeriod? @relation(fields: [periodId], references: [id])
+  programId        String?
   /// Set on a bill generated from a programme's fee plan. Null on a manually raised bill.
-  enrollmentId   String?
-  enrollment     Enrollment?     @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
-  feePlanId      String?
-  feePlan        ProgramFeePlan? @relation(fields: [feePlanId], references: [id], onDelete: SetNull)
-  feePeriodId    String?
-  feePeriod      FeeItem?        @relation("FeePeriodInvoices", fields: [feePeriodId], references: [id], onDelete: SetNull)
+  enrollmentId     String?
+  enrollment       Enrollment?     @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  feePlanId        String?
+  feePlan          ProgramFeePlan? @relation(fields: [feePlanId], references: [id], onDelete: SetNull)
+  feePeriodId      String?
+  feePeriod        FeeItem?        @relation("FeePeriodInvoices", fields: [feePeriodId], references: [id], onDelete: SetNull)
   /// Which academic year and semester of the student's programme this period belongs to.
-  periodYear     Int?
-  periodSemester Int?
-  dueAt          DateTime?
-  status         InvoiceStatus   @default(OPEN)
-  note           String?
-  lines          InvoiceLine[]
-  payments       Payment[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  periodYear       Int?
+  periodSemester   Int?
+  dueAt            DateTime?
+  status           InvoiceStatus   @default(OPEN)
+  voidedAt         DateTime?
+  voidedById       String?
+  voidReason       String?
+  voidedFromStatus InvoiceStatus?
+  note             String?
+  lines            InvoiceLine[]
+  payments         Payment[]
+  receipts         Receipt[]       @relation("ReceiptSourceInvoice")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   /// Retrying the same enrolment can never bill a period twice.
   @@unique([enrollmentId, feePeriodId])
@@ -981,32 +1013,86 @@ model Invoice {
 }
 
 model InvoiceLine {
-  id        String  @id @default(uuid())
-  invoiceId String
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  label     String
-  amount    Decimal @db.Decimal(12, 2)
+  id             String          @id @default(uuid())
+  invoiceId      String
+  invoice        Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  label          String
+  amount         Decimal         @db.Decimal(12, 2)
+  kind           InvoiceLineKind @default(CHARGE)
+  reference      String?
+  idempotencyKey String?         @unique
+  reason         String?
+  createdById    String?
+  createdByEmail String?
+  createdAt      DateTime        @default(now())
 
   @@index([invoiceId])
   @@map("invoice_lines")
 }
 
+model Receipt {
+  id                          String         @id @default(uuid())
+  number                      String         @unique
+  numberNormalized            String         @unique
+  kind                        ReceiptKind    @default(RECEIPT)
+  studentId                   String
+  student                     StudentProfile @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  campusId                    Int
+  campus                      Campus         @relation(fields: [campusId], references: [id])
+  amount                      Decimal        @db.Decimal(18, 2)
+  method                      PaymentMethod?
+  reference                   String?
+  providerReferenceNormalized String?        @unique
+  paidAt                      DateTime
+  status                      ReceiptStatus  @default(ISSUED)
+  idempotencyKey              String?        @unique
+  requestHash                 String?
+  legacyPaymentId             String?        @unique
+  createdById                 String?
+  createdByEmail              String?
+  reversedAt                  DateTime?
+  refundedAt                  DateTime?
+  reason                      String?
+  sourceInvoiceId             String?
+  sourceInvoice               Invoice?       @relation("ReceiptSourceInvoice", fields: [sourceInvoiceId], references: [id], onDelete: Restrict)
+  allocationSnapshot          Json?
+  totalFees                   Decimal        @db.Decimal(18, 2)
+  paidToDate                  Decimal        @db.Decimal(18, 2)
+  balance                     Decimal        @db.Decimal(18, 2)
+  createdAt                   DateTime       @default(now())
+  payments                    Payment[]
+
+  @@index([studentId, paidAt])
+  @@index([campusId, paidAt])
+  @@map("receipts")
+}
+
 model Payment {
-  id        String         @id @default(uuid())
-  invoiceId String
-  invoice   Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  studentId String
-  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  amount    Decimal        @db.Decimal(12, 2)
-  method    PaymentMethod
-  reference String?
-  /// One receipt can be split across several overdue periods; every row it created carries
-  /// the same number, which is how a finance officer traces the money back to one payment.
-  receiptNo String?
-  paidAt    DateTime       @default(now())
+  id                String           @id @default(uuid())
+  receiptId         String
+  receipt           Receipt          @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  invoiceId         String
+  invoice           Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  studentId         String
+  student           StudentProfile   @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  amount            Decimal          @db.Decimal(12, 2)
+  method            PaymentMethod
+  reference         String?
+  /// Denormalized for legacy document routes; Receipt.number is the unique identity.
+  receiptNo         String
+  entryType         PaymentEntryType @default(PAYMENT)
+  reversesPaymentId String?
+  reversesPayment   Payment?         @relation("PaymentReversal", fields: [reversesPaymentId], references: [id], onDelete: Restrict)
+  reversedBy        Payment[]        @relation("PaymentReversal")
+  reason            String?
+  createdById       String?
+  createdByEmail    String?
+  paidAt            DateTime         @default(now())
+  createdAt         DateTime         @default(now())
 
   @@index([invoiceId])
   @@index([studentId])
+  @@index([receiptId])
   @@index([receiptNo])
   @@map("payments")
 }

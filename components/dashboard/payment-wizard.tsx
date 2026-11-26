@@ -1,26 +1,17 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { CheckIcon, ChevronRightIcon, Loader2Icon, SearchIcon } from "lucide-react";
 
 import { recordWizardPayment } from "@/lib/actions/college/accounts";
-import { money } from "@/lib/format";
+import { allocationFingerprint, planPaymentAllocation, type PlannedAllocation } from "@/lib/fees/allocation";
+import { fromCents, parsePaymentAmount } from "@/lib/fees/money";
+import { moneyExact } from "@/lib/format";
 import { StatusChip } from "@/components/dashboard/status-chip";
 
 import styles from "./payment-wizard.module.css";
 
-/**
- * THE one way a payment is recorded.
- *
- * Five steps, in order: the student, the semester they owe (only semesters with a real
- * invoice on the student's ledger are offered), the money, a review, and the submit.
- * Nothing is written until the confirmation step's button — and after a receipt is
- * issued the wizard is spent, so a double click cannot record a payment twice.
- *
- * This replaces the two separate payment forms this page used to carry and the copy on
- * every student's record page: one flow, one ledger entry point.
- */
-
+/** The single payment flow: student, lead invoice, exact amount, shared preview, receipt. */
 type SearchOption = { value: string; label: string };
 
 type Allocation = {
@@ -32,8 +23,12 @@ type Allocation = {
   billed: number;
   paid: number;
   outstanding: number;
+  outstandingCents: number;
+  creditCents: number;
   status: string;
   settled: boolean;
+  dueAt: string | null;
+  createdAt: string;
 };
 
 type StudentSummary = {
@@ -47,14 +42,14 @@ type StudentSummary = {
 
 type Props = {
   students: SearchOption[];
-  /** A campus-scoped administrator raises nothing; the wizard says so instead. */
   campusLocked: boolean;
 };
 
-const STEPS = ["Student", "Semester", "Payment", "Review", "Done"] as const;
+const STEPS = ["Student", "Invoice", "Payment", "Review", "Done"] as const;
+const exact = (cents: number) => moneyExact(fromCents(cents));
 
 export function PaymentWizard({ students, campusLocked }: Props) {
-  const [step, setStep] = useState(-1); // -1 = the entry button; 0..4 = the flow.
+  const [step, setStep] = useState(-1);
   const [student, setStudent] = useState<StudentSummary | null>(null);
   const [allocations, setAllocations] = useState<Allocation[] | null>(null);
   const [loadingAllocations, setLoadingAllocations] = useState(false);
@@ -63,48 +58,109 @@ export function PaymentWizard({ students, campusLocked }: Props) {
   const [method, setMethod] = useState("");
   const [reference, setReference] = useState("");
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [submissionKey, setSubmissionKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [receiptNo, setReceiptNo] = useState<string | null>(null);
-  const [applied, setApplied] = useState<Array<{ invoice: string; amount: number }>>([]);
+  const [applied, setApplied] = useState<PlannedAllocation[]>([]);
   const [error, setError] = useState<string | null>(null);
-
-  // The student picker: the full list arrives as props; a short filter narrows it.
   const [query, setQuery] = useState("");
+  const allocationRequest = useRef(0);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return students.slice(0, 8);
-    return students.filter((s) => s.label.toLowerCase().includes(q)).slice(0, 8);
+    return students.filter((option) => option.label.toLowerCase().includes(q)).slice(0, 8);
   }, [students, query]);
 
+  const fetchAllocations = useCallback(async (studentId: string) => {
+    const response = await fetch(`/dashboard/accounts/allocations/${studentId}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("This student could not be loaded on your campus.");
+    return (await response.json()) as { student: StudentSummary; allocations: Allocation[] };
+  }, []);
+
   const loadAllocations = useCallback(async (studentId: string) => {
+    const request = ++allocationRequest.current;
     setLoadingAllocations(true);
     setError(null);
     try {
-      const res = await fetch(`/dashboard/accounts/allocations/${studentId}`, { cache: "no-store" });
-      if (!res.ok) {
-        setError("This student could not be loaded on your campus.");
-        setAllocations(null);
-        return;
-      }
-      const data = (await res.json()) as { student: StudentSummary; allocations: Allocation[] };
+      const data = await fetchAllocations(studentId);
+      if (request !== allocationRequest.current) return null;
       setStudent(data.student);
       setAllocations(data.allocations);
+      return data;
+    } catch (cause) {
+      if (request !== allocationRequest.current) return null;
+      setError(cause instanceof Error ? cause.message : "The allocations could not be loaded. Try again.");
+      setAllocations(null);
+      return null;
+    } finally {
+      if (request === allocationRequest.current) setLoadingAllocations(false);
+    }
+  }, [fetchAllocations]);
+
+  const selected = allocations?.find((row) => row.invoiceId === allocation?.invoiceId) ?? null;
+  const amountCents = useMemo(() => {
+    try {
+      return parsePaymentAmount(amount);
     } catch {
-      setError("The allocations could not be loaded. Try again.");
+      return null;
+    }
+  }, [amount]);
+  const amountValid = amountCents !== null;
+  const totalOutstandingCents = allocations?.reduce((sum, row) => sum + row.outstandingCents, 0) ?? 0;
+  const plan = useMemo(() => {
+    if (!allocations || !selected || amountCents === null) return null;
+    return planPaymentAllocation(
+      allocations.map((row) => ({
+        id: row.invoiceId,
+        invoiceNumber: row.number,
+        status: row.status,
+        dueAt: row.dueAt,
+        createdAt: row.createdAt,
+        outstandingCents: row.outstandingCents,
+      })),
+      amountCents,
+      { leadInvoiceId: selected.invoiceId },
+    );
+  }, [allocations, selected, amountCents]);
+  const planValid = plan?.ok === true;
+  const mpesaReferenceMissing = method === "MPESA" && !reference.trim();
+  const paymentDetailsValid = amountValid && Boolean(method) && !mpesaReferenceMissing && Boolean(paidAt);
+
+  const clearSubmissionKey = () => setSubmissionKey(null);
+
+  const review = async () => {
+    if (!student || !selected || !paymentDetailsValid || !planValid) return;
+    setLoadingAllocations(true);
+    setError(null);
+    try {
+      const data = await fetchAllocations(student.id);
+      const refreshed = data.allocations.find((row) => row.invoiceId === selected.invoiceId) ?? null;
+      if (!refreshed || refreshed.settled) {
+        setAllocations(data.allocations);
+        setAllocation(null);
+        setError("That invoice changed while you were reviewing. Choose an outstanding invoice again.");
+        setStep(1);
+        return;
+      }
+      setStudent(data.student);
+      setAllocations(data.allocations);
+      setAllocation(refreshed);
+      setSubmissionKey((current) => current ?? crypto.randomUUID());
+      setStep(3);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The allocations could not be refreshed. Try again.");
     } finally {
       setLoadingAllocations(false);
     }
-  }, []);
-
-  const selected = allocations?.find((a) => a.invoiceId === allocation?.invoiceId) ?? null;
-  const amountValue = Number(amount);
-  const amountValid = Number.isFinite(amountValue) && amountValue > 0;
-  const afterBalance = selected && amountValid ? Math.max(0, selected.outstanding - amountValue) : null;
+  };
 
   const submit = async () => {
-    if (submitting || !student || !selected) return;
+    if (submitting || !student || !selected || !planValid) return;
     setSubmitting(true);
     setError(null);
+    const key = submissionKey ?? crypto.randomUUID();
+    setSubmissionKey(key);
     try {
       const body = new FormData();
       body.set("studentId", student.id);
@@ -113,21 +169,29 @@ export function PaymentWizard({ students, campusLocked }: Props) {
       body.set("method", method);
       body.set("reference", reference);
       body.set("paidAt", paidAt);
+      body.set("idempotencyKey", key);
+      body.set("expectedAllocationFingerprint", allocationFingerprint(plan.allocations));
       const result = await recordWizardPayment(body);
       if (result.ok) {
         setReceiptNo(result.receiptNo);
+        setApplied(result.applied);
         setStep(4);
       } else {
         setError(result.error);
+        if (result.error.includes("changed after review")) {
+          setStep(2);
+          setSubmissionKey(null);
+        }
       }
     } catch {
-      setError("The payment could not be recorded. Try again.");
+      setError("The payment could not be confirmed. Retry with the same details; a submitted payment will not be duplicated.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const reset = () => {
+    allocationRequest.current += 1;
     setStep(-1);
     setStudent(null);
     setAllocations(null);
@@ -137,10 +201,11 @@ export function PaymentWizard({ students, campusLocked }: Props) {
     setReference("");
     setReceiptNo(null);
     setApplied([]);
+    setSubmissionKey(null);
     setError(null);
+    setQuery("");
   };
 
-  // The wizard's step rail, rendered for every step (FRM-16).
   const rail = (
     <>
       <div
@@ -153,27 +218,24 @@ export function PaymentWizard({ students, campusLocked }: Props) {
       >
         <div
           className="h-full rounded-full bg-eavi-fill transition-[width] duration-300"
-          style={{
-            width: `${((receiptNo ? STEPS.length - 1 : Math.max(0, step)) / (STEPS.length - 1)) * 100}%`,
-          }}
+          style={{ width: `${((receiptNo ? STEPS.length - 1 : Math.max(0, step)) / (STEPS.length - 1)) * 100}%` }}
         />
       </div>
       <ol className={styles.rail}>
-      {STEPS.map((label, index) => (
-        <li
-          key={label}
-          className={styles.railStep}
-          data-state={receiptNo ? "done" : index === step ? "current" : index < step ? "done" : "todo"}
-        >
-          <span className={styles.railIndex}>{receiptNo || index < step ? <CheckIcon aria-hidden /> : index + 1}</span>
-          {label}
-        </li>
-      ))}
+        {STEPS.map((label, index) => (
+          <li
+            key={label}
+            className={styles.railStep}
+            data-state={receiptNo ? "done" : index === step ? "current" : index < step ? "done" : "todo"}
+          >
+            <span className={styles.railIndex}>{receiptNo || index < step ? <CheckIcon aria-hidden /> : index + 1}</span>
+            {label}
+          </li>
+        ))}
       </ol>
     </>
   );
 
-  // The entry state: one clear button — the flow starts when the office asks for it.
   if (step === -1) {
     return (
       <div className={styles.root}>
@@ -182,8 +244,7 @@ export function PaymentWizard({ students, campusLocked }: Props) {
         ) : (
           <>
             <p className={styles.note}>
-              Guided flow: find the student, see their fee status per term, pay against a
-              semester or module, review, record. The receipt number appears at the end.
+              Find the student, choose the invoice this payment starts at, review the exact allocation, then record one receipt.
             </p>
             <button type="button" className={styles.confirm} onClick={() => setStep(0)}>
               <SearchIcon aria-hidden /> Record fee payment
@@ -197,30 +258,22 @@ export function PaymentWizard({ students, campusLocked }: Props) {
   return (
     <div className={styles.root}>
       {rail}
+      {error ? <p role="alert" className={styles.error}>{error}</p> : null}
 
-      {error && (
-        <p role="alert" className={styles.error}>
-          {error}
-        </p>
-      )}
-
-      {/* Step 1 — the student */}
       {step === 0 && (
         <div className={styles.stepBody}>
           {campusLocked ? (
             <p className={styles.note}>Choose a campus from the College overview to record payments.</p>
           ) : (
             <>
-              <label className={styles.label} htmlFor="wizard-student-search">
-                Find the student (name or admission number)
-              </label>
+              <label className={styles.label} htmlFor="wizard-student-search">Find the student (name or admission number)</label>
               <div className={styles.searchRow}>
                 <SearchIcon aria-hidden className={styles.searchIcon} />
                 <input
                   id="wizard-student-search"
                   className={styles.searchInput}
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(event) => setQuery(event.target.value)}
                   placeholder="e.g. 2026/0042 or Faith"
                   autoComplete="off"
                 />
@@ -231,270 +284,189 @@ export function PaymentWizard({ students, campusLocked }: Props) {
                     <button
                       type="button"
                       className={styles.result}
-                      onClick={() => {
-                        void loadAllocations(option.value);
-                      }}
+                      disabled={loadingAllocations}
+                      onClick={() => void loadAllocations(option.value)}
                     >
-                      {option.label}
-                      <ChevronRightIcon aria-hidden className={styles.chev} />
+                      {option.label}<ChevronRightIcon aria-hidden className={styles.chev} />
                     </button>
                   </li>
                 ))}
-                {filtered.length === 0 && <li className={styles.empty}>No student matches.</li>}
+                {filtered.length === 0 ? <li className={styles.empty}>No student matches.</li> : null}
               </ul>
-              {loadingAllocations && (
-                <p className={styles.loading}>
-                  <Loader2Icon aria-hidden className={styles.spin} /> Loading their ledger…
-                </p>
-              )}
-              {student && allocations && (
+              {loadingAllocations ? <p className={styles.loading}><Loader2Icon aria-hidden className={styles.spin} /> Loading their ledger…</p> : null}
+              {student && allocations ? (
                 <div className={styles.picked}>
                   <p className={styles.pickedName}>{student.name}</p>
+                  <p className={styles.pickedMeta}>{student.admissionNo} · {student.program ?? "—"} · {student.intake ?? "—"}</p>
                   <p className={styles.pickedMeta}>
-                    {student.admissionNo} · {student.program ?? "—"} · {student.intake ?? "—"}
+                    {totalOutstandingCents === 0
+                      ? "No outstanding invoice on their ledger — nothing to record."
+                      : `${exact(totalOutstandingCents)} outstanding across ${allocations.filter((row) => !row.settled).length} invoice(s).`}
                   </p>
-                  <p className={styles.pickedMeta}>
-                    {allocations.length === 0
-                      ? "No unpaid semester on their ledger — nothing to record."
-                      : `${allocations.length} semester${allocations.length === 1 ? "" : "s"} with a balance.`}
-                  </p>
-                  <button
-                    type="button"
-                    className={styles.primary}
-                    disabled={allocations.length === 0}
-                    onClick={() => setStep(1)}
-                  >
-                    Continue
+                  <button type="button" className={styles.primary} disabled={totalOutstandingCents === 0} onClick={() => setStep(1)}>
+                    Choose invoice
                   </button>
                 </div>
-              )}
+              ) : null}
             </>
           )}
         </div>
       )}
 
-      {/* Step 2 — the fee status per term, and where this payment lands */}
       {step === 1 && (
         <div className={styles.stepBody}>
-          <p className={styles.stepTitle}>
-            {student?.name} — fee status per term. Pick the term this payment starts at
-          </p>
+          <p className={styles.stepTitle}>{student?.name} — choose the invoice this payment starts at</p>
           <ul className={styles.allocations}>
-            {allocations?.map((a) => (
-              <li key={a.invoiceId}>
-                {a.settled ? (
+            {allocations?.map((row) => (
+              <li key={row.invoiceId}>
+                {row.settled ? (
                   <div className={styles.allocation} data-settled="true">
-                    <span className={styles.allocLabel}>
-                      {a.label}
-                      <span className={styles.allocNumber}>{a.number}</span>
-                    </span>
+                    <span className={styles.allocLabel}>{row.label}<span className={styles.allocNumber}>{row.number}</span></span>
                     <span className={styles.allocOutstanding} data-done="true">
-                      <StatusChip tone="success">Completed</StatusChip>
+                      {row.creditCents > 0 ? `Credit ${exact(row.creditCents)}` : <StatusChip tone="success">Completed</StatusChip>}
                     </span>
                   </div>
                 ) : (
                   <button
                     type="button"
                     className={styles.allocation}
-                    aria-pressed={allocation?.invoiceId === a.invoiceId}
-                    onClick={() => setAllocation(a)}
+                    aria-pressed={allocation?.invoiceId === row.invoiceId}
+                    onClick={() => { setAllocation(row); clearSubmissionKey(); setError(null); }}
                   >
-                    <span className={styles.allocLabel}>
-                      {a.label}
-                      <span className={styles.allocNumber}>{a.number}</span>
-                    </span>
+                    <span className={styles.allocLabel}>{row.label}<span className={styles.allocNumber}>{row.number}</span></span>
                     <span className={styles.allocOutstanding}>
-                      {a.status === "PARTIAL" ? "Part paid · " : "Unpaid · "}
-                      {money(a.outstanding)}
+                      {row.status === "PARTIAL" ? "Part paid · " : row.status === "CREDIT" ? "Credit due · " : "Unpaid · "}
+                      {exact(row.outstandingCents)}
                     </span>
                   </button>
                 )}
               </li>
             ))}
           </ul>
-          {selected && (
+          {selected ? (
             <p className={styles.summaryLine}>
-              {money(selected.billed)} billed · {money(selected.paid)} paid ·{" "}
-              {money(selected.outstanding)} outstanding on {selected.label}. Anything above
-              the outstanding rolls to the next term automatically.
+              {exact(selected.outstandingCents)} outstanding on {selected.label}. Any excess moves to the oldest remaining unpaid invoice.
             </p>
-          )}
+          ) : null}
           <div className={styles.buttons}>
-            <button type="button" className={styles.secondary} onClick={() => setStep(0)}>
-              Back
-            </button>
-            <button type="button" className={styles.primary} disabled={!selected} onClick={() => setStep(2)}>
-              Continue
-            </button>
+            <button type="button" className={styles.secondary} onClick={() => setStep(0)}>Back</button>
+            <button type="button" className={styles.primary} disabled={!selected} onClick={() => setStep(2)}>Continue</button>
           </div>
         </div>
       )}
 
-      {/* Step 3 — the money */}
       {step === 2 && (
         <div className={styles.stepBody}>
-          <p className={styles.stepTitle}>
-            Paying {selected?.label} — {money(selected?.outstanding ?? 0)} outstanding on it
-          </p>
-          <label className={styles.label} htmlFor="wizard-amount">
-            Amount received (KES) — any extra moves to the next term
-          </label>
+          <p className={styles.stepTitle}>Paying {selected?.label} — {exact(selected?.outstandingCents ?? 0)} outstanding on it</p>
+          <label className={styles.label} htmlFor="wizard-amount">Amount received (KES)</label>
           <input
             id="wizard-amount"
             className={styles.input}
-            type="number"
-            min="0.01"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
+            pattern="[0-9]+([.][0-9]{1,2})?"
+            placeholder="0.00"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(event) => { setAmount(event.target.value); clearSubmissionKey(); }}
+            aria-describedby="wizard-amount-hint"
           />
-          {selected && amountValid && amountValue > selected.outstanding && (
-            <p className={styles.warn}>
-              More than the outstanding on {selected.label} ({money(selected.outstanding)}) — the
-              balance rolls to the student&apos;s next unpaid term automatically.
-            </p>
-          )}
-          <label className={styles.label} htmlFor="wizard-method">
-            Method
-          </label>
-          <select id="wizard-method" className={styles.input} value={method} onChange={(e) => setMethod(e.target.value)}>
+          <p id="wizard-amount-hint" className={styles.note}>Use no more than two decimal places. Total outstanding: {exact(totalOutstandingCents)}.</p>
+          {amountValid && amountCents > totalOutstandingCents ? (
+            <p className={styles.error}>That is more than the {exact(totalOutstandingCents)} this student owes.</p>
+          ) : null}
+          <label className={styles.label} htmlFor="wizard-method">Method</label>
+          <select id="wizard-method" className={styles.input} value={method} onChange={(event) => { setMethod(event.target.value); clearSubmissionKey(); }}>
             <option value="">—</option>
             <option value="MPESA">M-PESA</option>
             <option value="BANK">Bank transfer</option>
             <option value="CASH">Cash</option>
             <option value="CHEQUE">Cheque</option>
           </select>
-          <label className={styles.label} htmlFor="wizard-ref">
-            Transaction / reference number
-          </label>
+          <label className={styles.label} htmlFor="wizard-ref">Transaction / reference number{method === "MPESA" ? " (required)" : ""}</label>
           <input
             id="wizard-ref"
             className={styles.input}
             value={reference}
-            onChange={(e) => setReference(e.target.value)}
+            onChange={(event) => { setReference(event.target.value); clearSubmissionKey(); }}
             placeholder="e.g. the M-PESA code"
+            aria-invalid={mpesaReferenceMissing || undefined}
           />
-          <label className={styles.label} htmlFor="wizard-date">
-            Payment date
-          </label>
-          <input
-            id="wizard-date"
-            className={styles.input}
-            type="date"
-            value={paidAt}
-            onChange={(e) => setPaidAt(e.target.value)}
-          />
+          {mpesaReferenceMissing ? <p className={styles.error}>Enter the M-Pesa transaction reference so duplicate payments can be blocked.</p> : null}
+          <label className={styles.label} htmlFor="wizard-date">Payment date</label>
+          <input id="wizard-date" className={styles.input} type="date" value={paidAt} onChange={(event) => { setPaidAt(event.target.value); clearSubmissionKey(); }} />
           <div className={styles.buttons}>
-            <button type="button" className={styles.secondary} onClick={() => setStep(1)}>
-              Back
-            </button>
+            <button type="button" className={styles.secondary} onClick={() => setStep(1)}>Back</button>
             <button
               type="button"
               className={styles.primary}
-              disabled={!amountValid || !method}
-              onClick={() => setStep(3)}
+              aria-busy={loadingAllocations}
+              disabled={!paymentDetailsValid || !planValid || loadingAllocations}
+              onClick={() => void review()}
             >
-              Review
+              {loadingAllocations ? <Loader2Icon aria-hidden className={styles.spin} /> : null} Review payment
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 4 — the review */}
       {step === 3 && (
         <div className={styles.stepBody}>
           <p className={styles.stepTitle}>Review before recording</p>
           <dl className={styles.review}>
-            <div>
-              <dt>Student</dt>
-              <dd>
-                {student?.name} · {student?.admissionNo}
-              </dd>
-            </div>
-            <div>
-              <dt>Programme</dt>
-              <dd>{student?.program ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Semester</dt>
-              <dd>
-                {selected?.label} ({selected?.number})
-              </dd>
-            </div>
-            <div>
-              <dt>Amount</dt>
-              <dd>{money(amountValue)}</dd>
-            </div>
-            <div>
-              <dt>Method</dt>
-              <dd>{method}</dd>
-            </div>
-            <div>
-              <dt>Reference</dt>
-              <dd>{reference || "—"}</dd>
-            </div>
-            <div>
-              <dt>Balance now</dt>
-              <dd>{money(selected?.outstanding ?? 0)}</dd>
-            </div>
-            <div>
-              <dt>Balance after</dt>
-              <dd>{money(afterBalance ?? 0)}</dd>
-            </div>
+            <div><dt>Student</dt><dd>{student?.name} · {student?.admissionNo}</dd></div>
+            <div><dt>Programme</dt><dd>{student?.program ?? "—"}</dd></div>
+            <div><dt>Starts with</dt><dd>{selected?.label} ({selected?.number})</dd></div>
+            <div><dt>Amount</dt><dd>{exact(amountCents ?? 0)}</dd></div>
+            <div><dt>Method</dt><dd>{method}</dd></div>
+            <div><dt>Reference</dt><dd>{reference || "—"}</dd></div>
+            <div><dt>Payment date</dt><dd>{paidAt}</dd></div>
+            <div><dt>Debt before</dt><dd>{exact(totalOutstandingCents)}</dd></div>
+            <div><dt>Debt after</dt><dd>{exact(Math.max(0, totalOutstandingCents - (amountCents ?? 0)))}</dd></div>
           </dl>
+          {plan?.ok ? (
+            <div>
+              <p className={styles.stepTitle}>Allocation preview</p>
+              <ul className={styles.allocations}>
+                {plan.allocations.map((row) => (
+                  <li key={row.invoiceId} className={styles.allocation} data-settled="true">
+                    <span className={styles.allocLabel}>{row.invoiceNumber}<span className={styles.allocNumber}>Balance after: {exact(row.balanceAfterCents)}</span></span>
+                    <span className={styles.allocOutstanding} data-done="true">{exact(row.amountCents)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className={styles.buttons}>
-            <button type="button" className={styles.secondary} onClick={() => setStep(2)}>
-              Back
-            </button>
-            <button type="button" className={styles.confirm} disabled={submitting} onClick={() => void submit()}>
+            <button type="button" className={styles.secondary} onClick={() => { setStep(2); clearSubmissionKey(); }}>Back</button>
+            <button
+              type="button"
+              className={styles.confirm}
+              aria-busy={submitting}
+              disabled={submitting || !planValid}
+              onClick={() => void submit()}
+            >
               {submitting ? <Loader2Icon aria-hidden className={styles.spin} /> : <CheckIcon aria-hidden />}
-              Confirm and record
+              {submitting ? "Recording…" : "Confirm and record"}
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 5 — done */}
       {(step === 4 || receiptNo) && (
         <div className={styles.stepBody}>
           <p className={styles.doneTitle}>Payment recorded</p>
           <dl className={styles.review}>
-            <div>
-              <dt>Student</dt>
-              <dd>{student?.name}</dd>
-            </div>
-            <div>
-              <dt>Semester</dt>
-              <dd>{selected?.label}</dd>
-            </div>
-            <div>
-              <dt>Amount</dt>
-              <dd>{money(amountValue)}</dd>
-            </div>
-            <div>
-              <dt>Receipt number</dt>
-              <dd>{receiptNo}</dd>
-            </div>
+            <div><dt>Student</dt><dd>{student?.name}</dd></div>
+            <div><dt>Amount</dt><dd>{exact(amountCents ?? 0)}</dd></div>
+            <div><dt>Receipt number</dt><dd>{receiptNo}</dd></div>
             {applied.map((row) => (
-              <div key={row.invoice}>
-                <dt>{row.invoice}</dt>
-                <dd>{money(row.amount)}</dd>
-              </div>
+              <div key={row.invoiceId}><dt>{row.invoiceNumber}</dt><dd>{exact(row.amountCents)} · balance {exact(row.balanceAfterCents)}</dd></div>
             ))}
           </dl>
           <div className={styles.buttons}>
-            <a className={styles.primary} href={`/dashboard/accounts/receipt/${encodeURIComponent(receiptNo ?? "")}`}>
-              View receipt
-            </a>
-            <a
-              className={styles.secondary}
-              href={`/dashboard/accounts/receipt/${encodeURIComponent(receiptNo ?? "")}?download=1`}
-            >
-              Download
-            </a>
-            <button type="button" className={styles.secondary} onClick={reset}>
-              Record another
-            </button>
+            <a className={styles.primary} href={`/dashboard/accounts/receipt/${encodeURIComponent(receiptNo ?? "")}`}>View receipt</a>
+            <a className={styles.secondary} href={`/dashboard/accounts/receipt/${encodeURIComponent(receiptNo ?? "")}?download=1`}>Download</a>
+            <button type="button" className={styles.secondary} onClick={reset}>Record another</button>
           </div>
         </div>
       )}

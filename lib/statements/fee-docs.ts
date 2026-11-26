@@ -14,6 +14,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { sumAmountCents, toCents } from "@/lib/fees/money";
+
 /**
  * The templates are read once per process. They are part of the build (like the card
  * artwork), not per-request data, so re-reading them for every receipt would spend disk
@@ -72,9 +74,10 @@ function wordsBelow1000(n: number): string {
 
 /** "one thousand two hundred and thirty-four and 50/100" — the words line on the receipt. */
 export function amountInWords(value: number) {
-  const safe = Number.isFinite(value) && value > 0 ? value : 0;
-  const whole = Math.floor(safe);
-  const cents = Math.round((safe - whole) * 100);
+  const safeCents = Number.isFinite(value) ? Math.round(Math.abs(value) * 100) : 0;
+  const negative = value < 0 && safeCents > 0;
+  const whole = Math.floor(safeCents / 100);
+  const cents = safeCents % 100;
 
   const scales: Array<[number, string]> = [
     [1_000_000_000, "billion"],
@@ -93,7 +96,7 @@ export function amountInWords(value: number) {
   }
   if (rest > 0 || parts.length === 0) parts.push(wordsBelow1000(rest) || "zero");
 
-  return `${parts.join(" ")} and ${String(cents).padStart(2, "0")}/100`;
+  return `${negative ? "minus " : ""}${parts.join(" ")} and ${String(cents).padStart(2, "0")}/100`;
 }
 
 /** The student whose name the document carries, already formatted for print. */
@@ -140,7 +143,7 @@ function settlementLines(lines: FeeDocLine[], closingLabel: (count: number) => s
     ...lines.slice(0, 3),
     {
       description: closingLabel(lines.length - 3),
-      amount: lines.slice(3).reduce((sum, line) => sum + line.amount, 0),
+      amount: sumAmountCents(lines.slice(3)) / 100,
     },
   ];
 }
@@ -159,6 +162,9 @@ export type ReceiptInput = {
   method: string;
   reference: string | null;
   receivedBy: string;
+  /** Absent on legacy/default receipts, whose supplied artwork must stay unchanged. */
+  kind?: "RECEIPT" | "CREDIT_NOTE";
+  correctionType?: "REVERSAL" | "REFUND" | "CREDIT_NOTE" | null;
 };
 
 /** Slots both money documents share, so the invoice cannot drift from the receipt. */
@@ -211,9 +217,27 @@ function moneyDocumentSlots(input: {
   return slots;
 }
 
-/** The receipt: one receipt number's payment rows, on the receipt design. */
+/** Correction labels are applied to generated fee SVGs only; card artwork is untouched. */
+function markCreditNote(svg: string, input: Pick<ReceiptInput, "kind" | "correctionType">) {
+  if (input.kind !== "CREDIT_NOTE" && !input.correctionType) return svg;
+  const title = input.correctionType === "REFUND"
+    ? "CREDIT NOTE — REFUND"
+    : input.correctionType === "REVERSAL"
+      ? "CREDIT NOTE — REVERSAL"
+      : "CREDIT NOTE — CORRECTION";
+  return svg
+    .replace("FEE PAYMENT RECEIPT", title)
+    .replace("RECEIPT NO.", "CREDIT NOTE NO.")
+    .replace("PAYMENT FOR", "CORRECTION FOR")
+    .replace("PAYMENT METHOD", "CORRECTION METHOD")
+    .replace("AMOUNT PAID (KES)", "CORRECTION AMOUNT (KES)")
+    .replace("Computer-generated receipt", "Computer-generated credit note")
+    .replace("this payment with the college.", "this correction with the college.");
+}
+
+/** The receipt: one Receipt record's allocations, on the receipt design. */
 export function feeReceiptSvg(input: ReceiptInput) {
-  return fill(
+  const svg = fill(
     templates().receipt,
     moneyDocumentSlots({
       reference: input.receiptNo,
@@ -227,9 +251,12 @@ export function feeReceiptSvg(input: ReceiptInput) {
       method: input.method,
       referenceText: input.reference,
       receivedBy: input.receivedBy,
-      closingLabel: (count) => `Other invoices settled (${count})`,
+      closingLabel: (count) => input.kind === "CREDIT_NOTE" || input.correctionType
+        ? `Other corrected invoices (${count})`
+        : `Other invoices settled (${count})`,
     }),
   );
+  return markCreditNote(svg, input);
 }
 
 export type InvoiceInput = {
@@ -245,7 +272,23 @@ export type InvoiceInput = {
   paid: number;
   balance: number;
   receivedBy: string;
+  status?: string;
+  voidReason?: string | null;
 };
+
+/** A void invoice keeps the supplied layout but carries an unmistakable VOID mark. */
+function markVoidInvoice(svg: string, input: Pick<InvoiceInput, "status" | "voidReason">) {
+  if (input.status !== "VOID") return svg;
+  const marked = svg
+    .replace("FEE PAYMENT RECEIPT", "INVOICE — VOID")
+    .replace("RECEIPT NO.", "INVOICE NO.")
+    .replace("Computer-generated receipt", "Computer-generated void invoice");
+  const reason = input.voidReason ? ` — ${escapeXml(input.voidReason)}` : "";
+  return marked.replace(
+    "</svg>",
+    `<g aria-label="Void invoice" pointer-events="none"><text x="280" y="438" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="bold" fill="#B3261E" fill-opacity="0.12" transform="rotate(-18 280 438)" letter-spacing="8">VOID</text><title>Void invoice${reason}</title></g></svg>`,
+  );
+}
 
 /**
  * The invoice — the same receipt artwork, filled from ONE invoice record.
@@ -256,7 +299,7 @@ export type InvoiceInput = {
  * its outstanding balance. The band text stays as designed.
  */
 export function feeInvoiceSvg(input: InvoiceInput) {
-  return fill(
+  const svg = fill(
     templates().receipt,
     moneyDocumentSlots({
       reference: input.invoiceNo,
@@ -275,6 +318,7 @@ export function feeInvoiceSvg(input: InvoiceInput) {
       closingLabel: (count) => `Other charges (${count})`,
     }),
   );
+  return markVoidInvoice(svg, input);
 }
 
 /* -------------------------------------------------------------- the statement */
@@ -285,6 +329,19 @@ export type FeeTx = {
   description: string;
   charged: number | null;
   paid: number | null;
+};
+
+/** Server-side metadata for history links and filtering; the artwork uses only FeeTx. */
+export type StatementTransaction = FeeTx & {
+  id: string;
+  chargedCents: number | null;
+  paidCents: number | null;
+  occurredAt: Date;
+  sortAt: number;
+  order: number;
+  correction: boolean;
+  documentNo: string | null;
+  documentKind: "INVOICE" | "RECEIPT" | "CREDIT_NOTE" | null;
 };
 
 export type StatementInput = {
@@ -323,14 +380,17 @@ export function statementChunks(transactions: FeeTx[]) {
 export function feeStatementPages(input: StatementInput) {
   const { student } = input;
 
-  const totalCharged = input.transactions.reduce((sum, tx) => sum + (tx.charged ?? 0), 0);
-  const totalPaid = input.transactions.reduce((sum, tx) => sum + (tx.paid ?? 0), 0);
-  const balance = totalCharged - totalPaid;
+  const totalChargedCents = sumAmountCents(input.transactions.map((tx) => ({ amount: tx.charged ?? 0 })));
+  const totalPaidCents = sumAmountCents(input.transactions.map((tx) => ({ amount: tx.paid ?? 0 })));
+  const balanceCents = totalChargedCents - totalPaidCents;
+  const totalCharged = totalChargedCents / 100;
+  const totalPaid = totalPaidCents / 100;
+  const balance = balanceCents / 100;
 
   const chunks = statementChunks(input.transactions);
   const pages = chunks.length;
 
-  let running = 0;
+  let runningCents = 0;
 
   return chunks.map((chunk, pageIndex) => {
     const isFirst = pageIndex === 0;
@@ -369,13 +429,13 @@ export function feeStatementPages(input: StatementInput) {
         continue;
       }
 
-      running += (tx.charged ?? 0) - (tx.paid ?? 0);
+      runningCents += (tx.charged === null ? 0 : toCents(tx.charged)) - (tx.paid === null ? 0 : toCents(tx.paid));
       slots[`tx${i}_date`] = fit(tx.date, 12);
       slots[`tx${i}_ref`] = fit(tx.ref, 16);
       slots[`tx${i}_desc`] = fit(tx.description, 40);
       slots[`tx${i}_charged`] = tx.charged === null ? "" : kes(tx.charged);
       slots[`tx${i}_paid`] = tx.paid === null ? "" : kes(tx.paid);
-      slots[`tx${i}_balance`] = kes(running);
+      slots[`tx${i}_balance`] = kes(runningCents / 100);
     }
 
     return fill(isFirst ? templates().statementFirst : templates().statementNext, slots);

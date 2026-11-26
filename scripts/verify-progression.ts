@@ -81,96 +81,211 @@ async function main() {
 }
 
 /**
- * A student billed only for their first period, then advanced by the sync, should end up with
- * exactly one extra invoice — the period they have just entered. Re-running must add nothing.
+ * A dedicated fixture proves that advancing a student raises only the newly reached bills.
+ * The sync is scoped to a campus created here, so it can never advance a real enrolment.
  */
 async function checkBilling() {
   const { prisma } = await import("@/lib/prisma");
-  const { generateFeeSchedule, activePlanFor } = await import("@/lib/fees/schedule");
+  const { generateFeeSchedule } = await import("@/lib/fees/schedule");
   const { nextInvoiceNumbers } = await import("@/lib/actions/college/_shared");
   const { syncProgression } = await import("@/lib/academics/progression-sync");
 
-  const planRow = await prisma.programFeePlan.findFirst({ where: { isActive: true } });
-  if (!planRow) {
-    console.log("  skip no active fee plan in this database");
-    return;
-  }
-
-  const enrollment = await prisma.enrollment.findFirst({
-    where: { status: "ACTIVE", programId: planRow.programId },
-    include: { period: true },
-  });
-  if (!enrollment) {
-    console.log("  skip no enrolled student on the billed programme");
-    return;
-  }
-
-  const plan = await activePlanFor(enrollment.programId);
-  const total = plan?.periods.length ?? 0;
-  const originalInvoices = await prisma.invoice.findMany({
-    where: { enrollmentId: enrollment.id },
+  const tag = `progbill-${Date.now()}`;
+  const campus = await prisma.campus.create({
+    data: { code: tag, name: `${tag} campus`, place: "Test", takesApplicants: false },
     select: { id: true },
   });
+  const createdPeriodIds: string[] = [];
+  let createdCadenceId: string | null = null;
+  let programId: string | null = null;
 
   try {
-    await prisma.invoice.deleteMany({ where: { enrollmentId: enrollment.id } });
+    const department = await prisma.department.create({ data: { name: `${tag} dept` }, select: { id: true } });
+    const body = await prisma.programBody.create({ data: { name: `${tag} body`, code: tag }, select: { id: true } });
+    const type = await prisma.programType.create({ data: { name: `${tag} type`, code: tag }, select: { id: true } });
+    const existingCadence = await prisma.feeCadence.findFirst({ where: { kind: "SEMESTER" }, select: { id: true } });
+    const cadence = existingCadence ?? await prisma.feeCadence.create({
+      data: { name: `${tag} cadence`, kind: "SEMESTER" },
+      select: { id: true },
+    });
+    if (!existingCadence) createdCadenceId = cadence.id;
 
-    const numbers = await nextInvoiceNumbers(total);
-    await prisma.$transaction(async (tx) => {
-      await generateFeeSchedule(tx, {
-        studentId: enrollment.studentId,
-        enrollmentId: enrollment.id,
-        campusId: enrollment.campusId,
-        programId: enrollment.programId,
-        startDate: enrollment.period.startsAt,
-        periodId: enrollment.period.id,
-        upTo: { yearIndex: 1, semesterNo: 1 },
-        numbers,
-      });
+    const program = await prisma.program.create({
+      data: {
+        code: tag,
+        name: `${tag} programme`,
+        departmentId: department.id,
+        bodyId: body.id,
+        typeId: type.id,
+        cadenceId: cadence.id,
+        durationMonths: 12,
+        structure: "SEMESTER",
+        minKcseGrade: "C",
+        campuses: { connect: { id: campus.id } },
+      },
+      select: { id: true },
+    });
+    programId = program.id;
+    const plan = await prisma.programFeePlan.create({
+      data: {
+        programId: program.id,
+        version: 1,
+        cadenceId: cadence.id,
+        durationMonths: 12,
+        totalAmount: "15000.00",
+        isActive: true,
+      },
+      select: { id: true },
+    });
+    await prisma.feeItem.createMany({
+      data: [1, 2, 3].map((semesterNo) => ({
+        programId: program.id,
+        planId: plan.id,
+        sequence: semesterNo,
+        label: `Year 1 · Semester ${semesterNo}`,
+        amount: "5000.00",
+        yearIndex: 1,
+        semesterNo,
+        dueOffsetDays: (semesterNo - 1) * 120,
+      })),
     });
 
+    // An ancient, official three-period calendar guarantees forward progression. Existing rows
+    // are read-only; only periods actually created by this run are eligible for cleanup.
+    const periods: { id: string; startsAt: Date }[] = [];
+    for (const [month, sequence] of [[1, 1], [5, 2], [9, 3]] as const) {
+      const existing = await prisma.academicPeriod.findUnique({
+        where: { year_month: { year: 1900, month } },
+        select: { id: true, startsAt: true },
+      });
+      if (existing) {
+        periods.push(existing);
+        continue;
+      }
+      const startsAt = new Date(Date.UTC(1900, month - 1, 5));
+      const created = await prisma.academicPeriod.create({
+        data: {
+          name: `${["January", "May", "September"][sequence - 1]} intake 1900`,
+          year: 1900,
+          month,
+          sequence,
+          startsAt,
+          endsAt: new Date(Date.UTC(1900, month + 3, 20)),
+          applicationDeadline: new Date(Date.UTC(1899, month - 2, 15)),
+        },
+        select: { id: true, startsAt: true },
+      });
+      createdPeriodIds.push(created.id);
+      periods.push(created);
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        email: `${tag}@example.test`,
+        fullName: `${tag} student`,
+        passwordHash: "not-a-real-hash",
+        role: "STUDENT",
+        status: "ACTIVE",
+        campusId: campus.id,
+      },
+      select: { id: true },
+    });
+    const student = await prisma.studentProfile.create({
+      data: { userId: user.id, admissionNo: `PB/${tag}`, campusId: campus.id },
+      select: { id: true },
+    });
+    const enrollment = await prisma.enrollment.create({
+      data: {
+        studentId: student.id,
+        programId: program.id,
+        campusId: campus.id,
+        periodId: periods[0].id,
+        yearIndex: 1,
+        semesterNo: 1,
+        status: "ACTIVE",
+      },
+      select: { id: true },
+    });
+
+    const initialNumbers = await nextInvoiceNumbers(1);
+    await prisma.$transaction(async (tx) => {
+      await generateFeeSchedule(tx, {
+        studentId: student.id,
+        enrollmentId: enrollment.id,
+        campusId: campus.id,
+        programId: program.id,
+        startDate: periods[0].startsAt,
+        periodId: periods[0].id,
+        upTo: { yearIndex: 1, semesterNo: 1 },
+        numbers: initialNumbers,
+      });
+    });
     const before = await prisma.invoice.count({ where: { enrollmentId: enrollment.id } });
     check("only the first period is billed to begin with", before === 1, `${before} invoices`);
 
-    await prisma.enrollment.update({
-      where: { id: enrollment.id },
-      data: { yearIndex: 1, semesterNo: 1 },
-    });
-    const synced = await syncProgression(enrollment.campusId);
+    const synced = await syncProgression(campus.id);
     const after = await prisma.invoice.count({ where: { enrollmentId: enrollment.id } });
-    const current = await prisma.enrollment.findUnique({
+    const current = await prisma.enrollment.findUniqueOrThrow({
       where: { id: enrollment.id },
       select: { yearIndex: true, semesterNo: true },
     });
-    // The student is billed for every period up to where they now are, and no further.
-    const expectedBills = plan!.periods.filter(
-      (period) =>
-        (period.yearIndex ?? 1) * 100 + (period.semesterNo ?? 1) <=
-        current!.yearIndex * 100 + current!.semesterNo,
-    ).length;
+    check(
+      "the fixture advances to the final period without touching another campus",
+      synced.checked === 1 && synced.advanced === 1 && current.yearIndex === 1 && current.semesterNo === 3,
+      `${synced.checked}/${synced.advanced} at Y${current.yearIndex}S${current.semesterNo}`,
+    );
     check(
       "every period up to the student's current one is billed, and no further",
-      after === expectedBills,
-      `${after} invoices, expected ${expectedBills} for Y${current!.yearIndex}S${current!.semesterNo}`,
+      after === 3 && synced.billed === 2,
+      `${after} invoices, billed ${synced.billed}`,
     );
-    check("bills were raised as the student advanced", synced.billed > 0, `billed ${synced.billed}`);
 
-    const resync = await syncProgression(enrollment.campusId);
+    const resync = await syncProgression(campus.id);
     const final = await prisma.invoice.count({ where: { enrollmentId: enrollment.id } });
     check("re-syncing bills nothing twice", final === after && resync.billed === 0, `${final} invoices, billed ${resync.billed}`);
   } finally {
-    // Leave the database as it was found.
-    await prisma.invoice.deleteMany({ where: { enrollmentId: enrollment.id } });
-    if (originalInvoices.length > 0) {
-      await prisma.enrollment.update({
-        where: { id: enrollment.id },
-        data: { yearIndex: 1, semesterNo: 1 },
-      });
+    // Restrictive financial foreign keys: allocations, receipt headers, lines, then invoices.
+    const invoices = await prisma.invoice.findMany({ where: { campusId: campus.id }, select: { id: true, studentId: true } });
+    const invoiceIds = invoices.map((invoice) => invoice.id);
+    const students = await prisma.studentProfile.findMany({ where: { campusId: campus.id }, select: { id: true } });
+    const studentIds = students.map((student) => student.id);
+    const receipts = await prisma.receipt.findMany({
+      where: { OR: [{ campusId: campus.id }, { studentId: { in: studentIds } }] },
+      select: { id: true },
+    });
+    const receiptIds = receipts.map((receipt) => receipt.id);
+    await prisma.payment.deleteMany({
+      where: { OR: [{ invoiceId: { in: invoiceIds } }, { studentId: { in: studentIds } }, { receiptId: { in: receiptIds } }] },
+    });
+    await prisma.receipt.deleteMany({ where: { id: { in: receiptIds } } });
+    await prisma.invoiceLine.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+    await prisma.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
+    await prisma.auditLog.deleteMany({ where: { campusId: campus.id } });
+    await prisma.studentUnit.deleteMany({ where: { enrollment: { campusId: campus.id } } });
+    await prisma.studentAttachment.deleteMany({ where: { enrollment: { campusId: campus.id } } });
+    await prisma.enrollment.deleteMany({ where: { campusId: campus.id } });
+    if (programId) {
+      await prisma.feeItem.deleteMany({ where: { programId } });
+      await prisma.programFeePlan.deleteMany({ where: { programId } });
+      await prisma.program.deleteMany({ where: { id: programId } });
     }
+    await prisma.studentProfile.deleteMany({ where: { campusId: campus.id } });
+    await prisma.user.deleteMany({ where: { campusId: campus.id } });
+    if (createdPeriodIds.length > 0) {
+      await prisma.academicPeriod.deleteMany({ where: { id: { in: createdPeriodIds } } });
+    }
+    await prisma.campus.deleteMany({ where: { id: campus.id } });
+    await prisma.department.deleteMany({ where: { name: `${tag} dept` } });
+    await prisma.programBody.deleteMany({ where: { code: tag } });
+    await prisma.programType.deleteMany({ where: { code: tag } });
+    if (createdCadenceId) await prisma.feeCadence.deleteMany({ where: { id: createdCadenceId } });
   }
 }
 
 main().catch((error) => {
   console.error(error);
   process.exit(1);
+}).finally(async () => {
+  const { prisma } = await import("@/lib/prisma");
+  await prisma.$disconnect();
 });

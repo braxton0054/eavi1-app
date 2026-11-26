@@ -8,27 +8,28 @@ import { pdfResponse } from "@/lib/statements/document";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** One saved receipt, scoped to the acting administrator's campus. */
+/** One receipt or credit note, authorized through its Receipt identity and campus. */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ receiptNo: string }> },
 ) {
   const scope = await requireCollegeAdmin();
   const { receiptNo } = await params;
-  const number = decodeURIComponent(receiptNo);
+  const numberNormalized = decodeURIComponent(receiptNo).trim().toUpperCase();
 
-  const row = await prisma.payment.findFirst({
+  const receipt = await prisma.receipt.findFirst({
     where: {
-      receiptNo: { equals: number, mode: "insensitive" },
-      ...(scope.campusId === null ? {} : { invoice: { campusId: scope.campusId } }),
+      numberNormalized,
+      ...(scope.campusId === null ? {} : { campusId: scope.campusId }),
     },
-    select: { receiptNo: true },
+    select: { number: true, kind: true },
   });
-  if (!row?.receiptNo) {
+  if (!receipt) {
     return NextResponse.json({ error: "No receipt with that number on this campus." }, { status: 404 });
   }
 
-  const document = await ensureDocument("RECEIPT", row.receiptNo);
+  const document = await ensureDocument("RECEIPT", receipt.number);
   if (!document) return NextResponse.json({ error: "Receipt not available." }, { status: 404 });
-  return pdfResponse(request, await documentPdf(document), `receipt-${row.receiptNo}`);
+  const file = receipt.kind === "CREDIT_NOTE" ? "credit-note" : "receipt";
+  return pdfResponse(request, await documentPdf(document), `${file}-${receipt.number}`);
 }

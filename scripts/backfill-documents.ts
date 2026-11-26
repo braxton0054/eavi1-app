@@ -15,7 +15,7 @@ async function main() {
     prisma.idCard.findMany({ select: { id: true } }),
     prisma.studentProfile.findMany({ select: { id: true } }),
     prisma.invoice.findMany({ select: { id: true } }),
-    prisma.payment.findMany({ where: { receiptNo: { not: null } }, select: { receiptNo: true } }),
+    prisma.receipt.findMany({ select: { number: true } }),
     prisma.programFeePlan.findMany({ where: { isActive: true }, select: { programId: true } }),
   ]);
 
@@ -23,7 +23,7 @@ async function main() {
     ...cards.map((row) => ({ kind: "ID_CARD" as const, scopeKey: row.id })),
     ...students.map((row) => ({ kind: "STUDENT_PROFILE" as const, scopeKey: row.id })),
     ...invoices.map((row) => ({ kind: "INVOICE" as const, scopeKey: row.id })),
-    ...[...new Set(receipts.map((row) => row.receiptNo!))].map((key) => ({
+    ...[...new Set(receipts.map((row) => row.number))].map((key) => ({
       kind: "RECEIPT" as const,
       scopeKey: key,
     })),

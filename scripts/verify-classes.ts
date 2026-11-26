@@ -16,38 +16,48 @@ import "dotenv/config";
 
 let failures = 0;
 
-/** Removes the fixture campus and the shared periods this run created, whatever happened above. */
+/** Removes only the fixture campus and the exact shared periods this run created. */
 async function cleanup(campusId: number, periodIds: string[] = []) {
   const { prisma } = await import("@/lib/prisma");
-  const enrollmentCampus = { enrollment: { campusId } };
-  const byPeriod = periodIds.length ? { periodId: { in: periodIds } } : null;
+
+  // A new campus cannot contain college data. Scope every fixture delete to that campus (or
+  // to its exact child ids), never to a shared period that may already belong to the college.
+  const fixtureInvoices = await prisma.invoice.findMany({
+    where: { campusId },
+    select: { id: true, studentId: true },
+  });
+  const invoiceIds = fixtureInvoices.map((invoice) => invoice.id);
+  const fixtureStudents = await prisma.studentProfile.findMany({
+    where: { campusId },
+    select: { id: true },
+  });
+  const studentIds = fixtureStudents.map((student) => student.id);
+  const fixtureReceipts = await prisma.receipt.findMany({
+    where: { OR: [{ campusId }, { studentId: { in: studentIds } }] },
+    select: { id: true },
+  });
+  const receiptIds = fixtureReceipts.map((receipt) => receipt.id);
+
+  // Restrictive financial foreign keys: allocations, receipt headers, lines, then invoices.
+  await prisma.payment.deleteMany({
+    where: { OR: [{ invoiceId: { in: invoiceIds } }, { studentId: { in: studentIds } }, { receiptId: { in: receiptIds } }] },
+  });
+  await prisma.receipt.deleteMany({ where: { id: { in: receiptIds } } });
+  await prisma.invoiceLine.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+  await prisma.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
+  await prisma.auditLog.deleteMany({ where: { campusId } });
 
   await prisma.classMembership.deleteMany({ where: { campusId } });
-  await prisma.classMembership.deleteMany({ where: enrollmentCampus });
-  if (byPeriod) {
-    await prisma.classMembership.deleteMany({ where: { enrollment: { periodId: { in: periodIds } } } });
-  }
-  await prisma.invoice.deleteMany({ where: { campusId } });
-  if (byPeriod) await prisma.invoice.deleteMany({ where: byPeriod });
-  await prisma.studentUnit.deleteMany({ where: enrollmentCampus });
-  if (byPeriod) {
-    await prisma.studentUnit.deleteMany({ where: { enrollment: { periodId: { in: periodIds } } } });
-  }
+  await prisma.studentUnit.deleteMany({ where: { enrollment: { campusId } } });
   await prisma.enrollment.deleteMany({ where: { campusId } });
-  if (byPeriod) await prisma.enrollment.deleteMany({ where: byPeriod });
   await prisma.studentProfile.deleteMany({ where: { campusId } });
   await prisma.user.deleteMany({ where: { campusId } });
-  if (byPeriod) {
-    await prisma.feeItem.deleteMany({ where: byPeriod });
-    await prisma.exam.deleteMany({ where: byPeriod });
-    await prisma.timetableSlot.deleteMany({ where: byPeriod });
-    await prisma.calendarEvent.deleteMany({ where: byPeriod });
-  }
   await prisma.academicClass.deleteMany({ where: { campusId } });
-  if (byPeriod) await prisma.academicClass.deleteMany({ where: byPeriod });
-  if (byPeriod) await prisma.academicPeriod.deleteMany({ where: { id: { in: periodIds } } });
-  await prisma.$executeRawUnsafe(`DELETE FROM "_ProgramCampuses" WHERE "A" = ${campusId}`).catch(() => {});
-  await prisma.campus.delete({ where: { id: campusId } }).catch(() => {});
+  await prisma.$executeRaw`DELETE FROM "_ProgramCampuses" WHERE "A" = ${campusId}`;
+  if (periodIds.length > 0) {
+    await prisma.academicPeriod.deleteMany({ where: { id: { in: periodIds } } });
+  }
+  await prisma.campus.deleteMany({ where: { id: campusId } });
 }
 
 function check(name: string, ok: boolean, detail = "") {

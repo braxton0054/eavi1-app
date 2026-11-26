@@ -12,10 +12,63 @@ import { generatedPeriods, type Structure } from "@/lib/academics/structure";
 import { planningSemesters } from "@/lib/academics/planning";
 import { OFFICIAL_INTAKES } from "@/lib/academics/classes";
 import { syncProgression } from "@/lib/academics/progression-sync";
+import { invoicePosition } from "@/lib/fees/ledger";
+import { sumAmountCents } from "@/lib/fees/money";
 
 export type ListQuery = { q?: string; status?: string; page?: number };
 
 const money = (value: unknown) => Number(String(value ?? 0)) || 0;
+
+type AmountRow = { amount: unknown };
+type LedgerInvoice = { status: string; lines: AmountRow[]; payments: AmountRow[] };
+type FinancialInvoiceStatus = "OPEN" | "PARTIAL" | "PAID" | "CREDIT" | "VOID";
+
+function financialInvoice(invoice: LedgerInvoice) {
+  const position = invoicePosition(invoice.lines, invoice.payments);
+  const status: FinancialInvoiceStatus =
+    invoice.status === "VOID"
+      ? "VOID"
+      : position.balanceCents < 0
+        ? "CREDIT"
+        : invoice.lines.length > 0 && position.balanceCents === 0
+          ? "PAID"
+          : position.paidCents > 0 && position.paidCents < position.billedCents
+            ? "PARTIAL"
+            : "OPEN";
+
+  return {
+    ...position,
+    billed: position.billedCents / 100,
+    paid: position.paidCents / 100,
+    balance: position.balanceCents / 100,
+    outstanding: position.outstandingCents / 100,
+    credit: position.creditCents / 100,
+    status,
+  };
+}
+
+function ledgerSummary(invoices: LedgerInvoice[]) {
+  const positions = invoices.map(financialInvoice);
+  const billedCents = positions.reduce((sum, row) => sum + row.billedCents, 0);
+  const paidCents = positions.reduce((sum, row) => sum + row.paidCents, 0);
+  const balanceCents = billedCents - paidCents;
+  const outstandingCents = positions.reduce((sum, row) => sum + row.outstandingCents, 0);
+  const creditCents = positions.reduce((sum, row) => sum + row.creditCents, 0);
+
+  return {
+    positions,
+    billedCents,
+    paidCents,
+    balanceCents,
+    outstandingCents,
+    creditCents,
+    billed: billedCents / 100,
+    collected: paidCents / 100,
+    balance: balanceCents / 100,
+    outstanding: outstandingCents / 100,
+    credit: creditCents / 100,
+  };
+}
 
 const contains = (semester: string) => ({ contains: semester, mode: "insensitive" as const });
 
@@ -89,19 +142,20 @@ async function overviewFor(campusId: number | null) {
   const where = campusWhere(campusId);
   const now = new Date();
 
-  const [students, activeEnrollments, applicationsOpen, tutors, cardsPending, lineTotals, paymentTotals] =
+  const [students, activeEnrollments, applicationsOpen, tutors, cardsPending, invoices] =
     await Promise.all([
       prisma.studentProfile.count({ where }),
       prisma.enrollment.count({ where: { ...where, status: "ACTIVE" } }),
       prisma.application.count({ where: { ...where, status: { in: ["SUBMITTED", "REVIEWING"] } } }),
       prisma.tutorProfile.count({ where }),
       prisma.idCard.count({ where: { ...where, status: { in: ["PENDING", "PRINTING"] } } }),
-      prisma.invoiceLine.aggregate({ _sum: { amount: true }, where: { invoice: where } }),
-      prisma.payment.aggregate({ _sum: { amount: true }, where: { invoice: where } }),
+      prisma.invoice.findMany({
+        where: { ...where, status: { not: "VOID" } },
+        select: { status: true, lines: { select: { amount: true } }, payments: { select: { amount: true } } },
+      }),
     ]);
 
-  const billed = money(lineTotals._sum.amount);
-  const collected = money(paymentTotals._sum.amount);
+  const fees = ledgerSummary(invoices);
 
   const deadlines = await prisma.academicPeriod.findMany({
     where: {
@@ -147,7 +201,18 @@ async function overviewFor(campusId: number | null) {
   });
 
   return {
-    stats: { students, activeEnrollments, applicationsOpen, tutors, cardsPending, billed, collected, outstanding: billed - collected },
+    stats: {
+      students,
+      activeEnrollments,
+      applicationsOpen,
+      tutors,
+      cardsPending,
+      billed: fees.billed,
+      collected: fees.collected,
+      balance: fees.balance,
+      outstanding: fees.outstanding,
+      credit: fees.credit,
+    },
     deadlines,
     events,
     exams,
@@ -193,11 +258,11 @@ export async function getCollegeOverview() {
       prisma.tutorProfile.groupBy({ by: ["campusId"], _count: { _all: true } }),
       Promise.all(
         campuses.map(async (campus) => {
-          const [lines, paid] = await Promise.all([
-            prisma.invoiceLine.aggregate({ _sum: { amount: true }, where: { invoice: { campusId: campus.id } } }),
-            prisma.payment.aggregate({ _sum: { amount: true }, where: { invoice: { campusId: campus.id } } }),
-          ]);
-          return { billed: money(lines._sum.amount), collected: money(paid._sum.amount) };
+          const invoices = await prisma.invoice.findMany({
+            where: { campusId: campus.id, status: { not: "VOID" } },
+            select: { status: true, lines: { select: { amount: true } }, payments: { select: { amount: true } } },
+          });
+          return ledgerSummary(invoices);
         }),
       ),
       prisma.application.findMany({
@@ -241,21 +306,26 @@ export async function getCollegeOverview() {
       tutors: of(tutorCounts, campus.id),
       billed: fees.billed,
       collected: fees.collected,
-      outstanding: fees.billed - fees.collected,
+      balance: fees.balance,
+      outstanding: fees.outstanding,
+      credit: fees.credit,
     };
   });
 
   const totals = byCampus.reduce(
-    (sum, campus) => ({
+    (sum, campus, index) => ({
       students: sum.students + campus.students,
       applicationsOpen: sum.applicationsOpen + campus.applicationsOpen,
       activeEnrollments: sum.activeEnrollments + campus.activeEnrollments,
       tutors: sum.tutors + campus.tutors,
-      billed: sum.billed + campus.billed,
-      collected: sum.collected + campus.collected,
+      billedCents: sum.billedCents + feeRows[index].billedCents,
+      paidCents: sum.paidCents + feeRows[index].paidCents,
+      outstandingCents: sum.outstandingCents + feeRows[index].outstandingCents,
+      creditCents: sum.creditCents + feeRows[index].creditCents,
     }),
-    { students: 0, applicationsOpen: 0, activeEnrollments: 0, tutors: 0, billed: 0, collected: 0 },
+    { students: 0, applicationsOpen: 0, activeEnrollments: 0, tutors: 0, billedCents: 0, paidCents: 0, outstandingCents: 0, creditCents: 0 },
   );
+  const balanceCents = totals.billedCents - totals.paidCents;
 
   const nextStart = (index: number) => buckets[index + 1]?.start ?? new Date(8_640_000_000_000_000);
   const applicationsByMonth = buckets.map((bucket, index) => ({
@@ -274,7 +344,24 @@ export async function getCollegeOverview() {
     return [{ label: `${programme.name} (${programme.code})`, value: row._count._all }];
   });
 
-  return { scope, byCampus, totals, applicationsByMonth, enrollmentsByProgramme, recentApplications };
+  return {
+    scope,
+    byCampus,
+    totals: {
+      students: totals.students,
+      applicationsOpen: totals.applicationsOpen,
+      activeEnrollments: totals.activeEnrollments,
+      tutors: totals.tutors,
+      billed: totals.billedCents / 100,
+      collected: totals.paidCents / 100,
+      balance: balanceCents / 100,
+      outstanding: totals.outstandingCents / 100,
+      credit: totals.creditCents / 100,
+    },
+    applicationsByMonth,
+    enrollmentsByProgramme,
+    recentApplications,
+  };
 }
 
 /* ------------------------------------------------------------------ students */
@@ -331,7 +418,7 @@ function studentInclude() {
   } as const;
 }
 
-/** Billed minus paid, per student. */
+/** Signed billed-minus-paid balance in exact cents, per student. */
 async function feeBalances(studentIds: string[]) {
   const invoices = await prisma.invoice.findMany({
     where: { studentId: { in: studentIds }, status: { not: "VOID" } },
@@ -344,11 +431,10 @@ async function feeBalances(studentIds: string[]) {
 
   const totals = new Map<string, number>();
   for (const invoice of invoices) {
-    const billed = invoice.lines.reduce((sum, line) => sum + money(line.amount), 0);
-    const paid = invoice.payments.reduce((sum, payment) => sum + money(payment.amount), 0);
-    totals.set(invoice.studentId, (totals.get(invoice.studentId) ?? 0) + billed - paid);
+    const { balanceCents } = invoicePosition(invoice.lines, invoice.payments);
+    totals.set(invoice.studentId, (totals.get(invoice.studentId) ?? 0) + balanceCents);
   }
-  return totals;
+  return new Map([...totals].map(([studentId, cents]) => [studentId, cents / 100]));
 }
 
 export async function getStudent(id: string) {
@@ -1113,53 +1199,59 @@ export async function getAccounts(query: ListQuery) {
   const page = clampPage(query.page);
   const status = pick(INVOICEABLE, query.status);
   const semester = trimmed(query.q);
+  const campus = campusWhere(scope.campusId);
 
   const where: Prisma.InvoiceWhereInput = {
     AND: [
-      campusWhere(scope.campusId),
-      status ? { status } : { status: { not: "VOID" } },
-      semester ? { OR: [{ number: contains(semester) }, throughStudent(semester ? query.q : undefined)] } : {},
+      campus,
+      semester ? { OR: [{ number: contains(semester) }, throughStudent(query.q)] } : {},
     ],
   };
 
-  const [rows, total, summaryLines, summaryPayments] = await Promise.all([
+  const [listedInvoices, summaryInvoices] = await Promise.all([
     prisma.invoice.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pagination.window,
-      take: pagination.window,
       include: {
         student: { select: { id: true, admissionNo: true, user: { select: { fullName: true } } } },
         period: { select: { name: true } },
         lines: true,
-        payments: { orderBy: { paidAt: "desc" } },
+        payments: {
+          orderBy: { paidAt: "desc" },
+          include: { receipt: { select: { status: true, kind: true } } },
+        },
       },
     }),
-    prisma.invoice.count({ where }),
-    prisma.invoiceLine.aggregate({ _sum: { amount: true }, where: { invoice: campusWhere(scope.campusId) } }),
-    prisma.payment.aggregate({ _sum: { amount: true }, where: { invoice: campusWhere(scope.campusId) } }),
+    prisma.invoice.findMany({
+      where: { ...campus, status: { not: "VOID" } },
+      select: { status: true, lines: { select: { amount: true } }, payments: { select: { amount: true } } },
+    }),
   ]);
 
-  const decorated = rows.map((invoice) => {
-    const billed = invoice.lines.reduce((sum, line) => sum + money(line.amount), 0);
-    const paid = invoice.payments.reduce((sum, payment) => sum + money(payment.amount), 0);
-    return { ...invoice, billed, paid, balance: billed - paid };
-  });
+  const decorated = listedInvoices.map((invoice) => ({ ...invoice, ...financialInvoice(invoice) }));
+  const filtered = status
+    ? decorated.filter((invoice) => invoice.status === status)
+    : decorated.filter((invoice) => invoice.status !== "VOID");
+  const total = filtered.length;
+  const rows = filtered.slice((page - 1) * pagination.window, page * pagination.window);
+  const summary = ledgerSummary(summaryInvoices);
 
   return {
     page,
     total,
-    rows: decorated,
+    rows,
     summary: {
-      billed: money(summaryLines._sum.amount),
-      collected: money(summaryPayments._sum.amount),
-      outstanding: money(summaryLines._sum.amount) - money(summaryPayments._sum.amount),
-      paidCount: decorated.filter((invoice) => invoice.status === "PAID").length,
+      billed: summary.billed,
+      collected: summary.collected,
+      balance: summary.balance,
+      outstanding: summary.outstanding,
+      credit: summary.credit,
+      paidCount: summary.positions.filter((invoice) => invoice.status === "PAID").length,
     },
   };
 }
 
-const INVOICEABLE = { OPEN: "", PARTIAL: "", PAID: "", VOID: "" };
+const INVOICEABLE = { OPEN: "", PARTIAL: "", PAID: "", CREDIT: "", VOID: "" };
 
 /**
  * The finance desk's view of the generated fee schedules: what they expect, what has been
@@ -1182,6 +1274,7 @@ export async function getFinanceOverview() {
         ],
       },
       select: {
+        status: true,
         programId: true,
         periodYear: true,
         periodSemester: true,
@@ -1195,41 +1288,46 @@ export async function getFinanceOverview() {
 
   const programById = new Map(programs.map((program) => [program.id, program]));
 
-  const rows = invoices.map((invoice) => {
-    const expected = invoice.lines.reduce((sum, line) => sum + money(line.amount), 0);
-    const collected = invoice.payments.reduce((sum, payment) => sum + money(payment.amount), 0);
-    return {
-      programId: invoice.programId,
-      program: invoice.programId ? programById.get(invoice.programId) ?? null : null,
-      year: invoice.periodYear,
-      semester: invoice.periodSemester,
-      dueAt: invoice.dueAt,
-      expected,
-      collected,
-      balance: expected - collected,
-    };
-  });
+  const rows = invoices.map((invoice) => ({
+    ...financialInvoice(invoice),
+    programId: invoice.programId,
+    program: invoice.programId ? programById.get(invoice.programId) ?? null : null,
+    year: invoice.periodYear,
+    semester: invoice.periodSemester,
+    dueAt: invoice.dueAt,
+  }));
 
   const total = (pick: (row: (typeof rows)[number]) => number) => rows.reduce((sum, row) => sum + pick(row), 0);
+  const overdue = rows.filter((row) => row.outstandingCents > 0 && row.dueAt !== null && row.dueAt < today);
 
-  const overdue = rows.filter((row) => row.balance > 0.005 && row.dueAt !== null && row.dueAt < today);
-
-  const byProgram = new Map<string, { name: string; expected: number; collected: number; outstanding: number }>();
+  type FinanceGroup = {
+    name: string;
+    expectedCents: number;
+    collectedCents: number;
+    balanceCents: number;
+    outstandingCents: number;
+    creditCents: number;
+  };
+  const byProgram = new Map<string, FinanceGroup>();
   for (const row of rows) {
     const key = row.programId ?? "unknown";
     const entry = byProgram.get(key) ?? {
       name: row.program ? `${row.program.name} (${row.program.code})` : "Unassigned",
-      expected: 0,
-      collected: 0,
-      outstanding: 0,
+      expectedCents: 0,
+      collectedCents: 0,
+      balanceCents: 0,
+      outstandingCents: 0,
+      creditCents: 0,
     };
-    entry.expected += row.expected;
-    entry.collected += row.collected;
-    entry.outstanding += Math.max(0, row.balance);
+    entry.expectedCents += row.billedCents;
+    entry.collectedCents += row.paidCents;
+    entry.balanceCents += row.balanceCents;
+    entry.outstandingCents += row.outstandingCents;
+    entry.creditCents += row.creditCents;
     byProgram.set(key, entry);
   }
 
-  const byPeriod = new Map<string, { name: string; expected: number; collected: number; outstanding: number }>();
+  const byPeriod = new Map<string, FinanceGroup>();
   for (const row of rows) {
     const name =
       row.year === null
@@ -1237,23 +1335,49 @@ export async function getFinanceOverview() {
         : row.semester === null
           ? `Year ${row.year}`
           : `Year ${row.year} · Semester ${row.semester}`;
-    const entry = byPeriod.get(name) ?? { name, expected: 0, collected: 0, outstanding: 0 };
-    entry.expected += row.expected;
-    entry.collected += row.collected;
-    entry.outstanding += Math.max(0, row.balance);
+    const entry = byPeriod.get(name) ?? {
+      name,
+      expectedCents: 0,
+      collectedCents: 0,
+      balanceCents: 0,
+      outstandingCents: 0,
+      creditCents: 0,
+    };
+    entry.expectedCents += row.billedCents;
+    entry.collectedCents += row.paidCents;
+    entry.balanceCents += row.balanceCents;
+    entry.outstandingCents += row.outstandingCents;
+    entry.creditCents += row.creditCents;
     byPeriod.set(name, entry);
   }
 
+  const displayGroup = (group: FinanceGroup) => ({
+    name: group.name,
+    expected: group.expectedCents / 100,
+    collected: group.collectedCents / 100,
+    balance: group.balanceCents / 100,
+    outstanding: group.outstandingCents / 100,
+    credit: group.creditCents / 100,
+  });
+  const expectedCents = total((row) => row.billedCents);
+  const collectedCents = total((row) => row.paidCents);
+
   return {
     totals: {
-      expected: total((row) => row.expected),
-      collected: total((row) => row.collected),
-      outstanding: total((row) => Math.max(0, row.balance)),
-      overdue: overdue.reduce((sum, row) => sum + row.balance, 0),
+      expected: expectedCents / 100,
+      collected: collectedCents / 100,
+      balance: (expectedCents - collectedCents) / 100,
+      outstanding: total((row) => row.outstandingCents) / 100,
+      credit: total((row) => row.creditCents) / 100,
+      overdue: overdue.reduce((sum, row) => sum + row.outstandingCents, 0) / 100,
       overdueCount: overdue.length,
     },
-    byProgram: [...byProgram.values()].sort((a, b) => b.expected - a.expected),
-    byPeriod: [...byPeriod.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    byProgram: [...byProgram.values()]
+      .sort((a, b) => b.expectedCents - a.expectedCents)
+      .map(displayGroup),
+    byPeriod: [...byPeriod.values()]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(displayGroup),
   };
 }
 
@@ -1317,14 +1441,12 @@ export async function getReports() {
   const scope = await requireCollegeAdmin();
   const where = campusWhere(scope.campusId);
 
-  const [applicationGroups, programGroups, lineTotals, paymentTotals, debts, exams, cardGroups] =
+  const [applicationGroups, programGroups, invoices, exams, cardGroups] =
     await Promise.all([
       prisma.application.groupBy({ by: ["status"], _count: { _all: true }, where }),
       prisma.enrollment.groupBy({ by: ["programId"], _count: { _all: true }, where: { ...where, status: "ACTIVE" } }),
-      prisma.invoiceLine.aggregate({ _sum: { amount: true }, where: { invoice: where } }),
-      prisma.payment.aggregate({ _sum: { amount: true }, where: { invoice: where } }),
       prisma.invoice.findMany({
-        where: { ...where, status: { not: "PAID" } },
+        where: { ...where, status: { not: "VOID" } },
         include: {
           student: { select: { id: true, admissionNo: true, user: { select: { fullName: true } } } },
           lines: { select: { amount: true } },
@@ -1347,8 +1469,18 @@ export async function getReports() {
     include: { user: { select: { fullName: true } }, timetableSlots: { select: { startAt: true, endAt: true } } },
   });
 
-  const billed = money(lineTotals._sum.amount);
-  const collected = money(paymentTotals._sum.amount);
+  const billedCents = sumAmountCents(invoices.flatMap((invoice) => invoice.lines));
+  const collectedCents = sumAmountCents(invoices.flatMap((invoice) => invoice.payments));
+  const outstandingCents = invoices.reduce(
+    (sum, invoice) => sum + invoicePosition(invoice.lines, invoice.payments).outstandingCents,
+    0,
+  );
+  const creditCents = invoices.reduce(
+    (sum, invoice) => sum + invoicePosition(invoice.lines, invoice.payments).creditCents,
+    0,
+  );
+  const billed = billedCents / 100;
+  const collected = collectedCents / 100;
 
   return {
     scope,
@@ -1363,8 +1495,14 @@ export async function getReports() {
         };
       })
       .sort((a, b) => b.count - a.count),
-    fees: { billed, collected, outstanding: billed - collected },
-    debts: debtRows(debts).filter((row) => row.balance > 0).sort((a, b) => b.balance - a.balance).slice(0, 8),
+    fees: {
+      billed,
+      collected,
+      balance: (billedCents - collectedCents) / 100,
+      outstanding: outstandingCents / 100,
+      credit: creditCents / 100,
+    },
+    debts: debtRows(invoices).sort((a, b) => b.balance - a.balance).slice(0, 8),
     results: exams.map((exam) => {
       const scored = exam.grades.filter((grade) => grade.score !== null);
       const totalScore = scored.reduce(
@@ -1411,39 +1549,38 @@ export async function getAnnouncements() {
 
 /* -------------------------------------------------------------- option lists */
 
-type AmountRow = { amount: unknown };
-
-function sumAmounts(rows: AmountRow[]) {
-  return rows.reduce((total, row) => total + money(row.amount), 0);
-}
-
 type DebtInvoice = {
   student: { id: string; admissionNo: string; user: { fullName: string } };
   lines: AmountRow[];
   payments: AmountRow[];
 };
 
-/** One row per student, merging all their unpaid invoices. */
+/** One row per student, merging the positive balance of every nonvoid invoice. */
 function debtRows(invoices: DebtInvoice[]) {
-  const map = new Map<string, { student: string; admissionNo: string; balance: number; invoices: number }>();
+  const map = new Map<string, { student: string; admissionNo: string; balanceCents: number; invoices: number }>();
 
   for (const invoice of invoices) {
-    const balance = sumAmounts(invoice.lines) - sumAmounts(invoice.payments);
+    const { outstandingCents } = invoicePosition(invoice.lines, invoice.payments);
+    if (outstandingCents <= 0) continue;
     const existing = map.get(invoice.student.id);
     map.set(
       invoice.student.id,
       existing
-        ? { ...existing, balance: existing.balance + balance, invoices: existing.invoices + 1 }
+        ? {
+            ...existing,
+            balanceCents: existing.balanceCents + outstandingCents,
+            invoices: existing.invoices + 1,
+          }
         : {
             student: invoice.student.user.fullName,
             admissionNo: invoice.student.admissionNo,
-            balance,
+            balanceCents: outstandingCents,
             invoices: 1,
           },
     );
   }
 
-  return Array.from(map.values());
+  return Array.from(map.values()).map((row) => ({ ...row, balance: row.balanceCents / 100 }));
 }
 
 export async function getProgramOptions(campusId: number | null) {

@@ -3,6 +3,7 @@
 import { EnrollmentStatus, Role, Status } from "@/generated/prisma/enums";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { reserveAdmissionNumber } from "@/lib/fees/references";
 import { touchDocument, touchStudent } from "@/lib/documents/service";
 import { createIssuedCard } from "@/lib/cards/issue";
 import { requireCollegeAdmin } from "@/lib/session";
@@ -112,6 +113,7 @@ export async function createStudent(formData: FormData) {
     let createdCardId: string | null = null;
 
     await prisma.$transaction(async (tx) => {
+      await reserveAdmissionNumber(issuedAdmissionNo, tx);
       const user = await unique(fieldLabel("email"), () =>
         tx.user.create({
           data: {

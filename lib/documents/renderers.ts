@@ -86,6 +86,8 @@ async function paymentDocument(s: Snapshot, invoice: boolean): Promise<RenderedD
     items,
     receivedBy: String(s.receivedBy ?? "Accounts Office"),
   };
+  const creditNote = !invoice && s.kind === "CREDIT_NOTE";
+  const voidInvoice = invoice && s.status === "VOID";
   const svg = invoice
     ? feeInvoiceSvg({
         ...base,
@@ -94,6 +96,8 @@ async function paymentDocument(s: Snapshot, invoice: boolean): Promise<RenderedD
         total: Number(s.total),
         paid: Number(s.paid),
         balance: Number(s.balance),
+        status: String(s.status ?? ""),
+        voidReason: (s.voidReason as string | null) ?? null,
       })
     : feeReceiptSvg({
         ...base,
@@ -103,19 +107,22 @@ async function paymentDocument(s: Snapshot, invoice: boolean): Promise<RenderedD
         totalFees: Number(s.totalFees),
         paidToDate: Number(s.paidToDate),
         balance: Number(s.balance),
-        method: String(s.method),
+        method: s.method === null || s.method === undefined ? "—" : String(s.method),
         reference: (s.reference as string | null) ?? null,
+        kind: creditNote ? "CREDIT_NOTE" : "RECEIPT",
+        correctionType: (s.correctionType as "REVERSAL" | "REFUND" | "CREDIT_NOTE" | null) ?? null,
       });
   const filled = student.verifyUrl ? await withQr(svg, student.verifyUrl, RECEIPT_QR_BOX) : svg;
   const reference = String(invoice ? s.invoiceNo : s.receiptNo);
+  const label = invoice ? (voidInvoice ? "void invoice" : "invoice") : creditNote ? "credit note" : "receipt";
   const pdf = await documentPdf([filled], {
     paper: "a5",
-    title: `EAVI ${invoice ? "invoice" : "receipt"} — ${reference}`,
+    title: `EAVI ${label} — ${reference}`,
   });
   return {
     svg: filled,
     pdf,
-    fileName: `${invoice ? "Invoice" : "Receipt"}-${reference.replace(/[^A-Za-z0-9]+/g, "-")}.pdf`,
+    fileName: `${invoice ? (voidInvoice ? "Void-Invoice" : "Invoice") : creditNote ? "Credit-Note" : "Receipt"}-${reference.replace(/[^A-Za-z0-9]+/g, "-")}.pdf`,
   };
 }
 

@@ -333,6 +333,19 @@
     background: var(--primary-hover, var(--eavi-fill-hover));
   }
 
+  .primary:active:not(:disabled),
+  .confirm:active:not(:disabled),
+  .secondary:active:not(:disabled),
+  .result:active:not(:disabled),
+  .allocation:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .primary:active:not(:disabled),
+  .confirm:active:not(:disabled) {
+    background: var(--eavi-fill-hover, var(--primary-hover));
+  }
+
   .secondary {
     border: 1px solid var(--border);
     background: var(--surface);
@@ -345,8 +358,14 @@
 
   .primary:disabled,
   .confirm:disabled,
-  .secondary:disabled {
+  .secondary:disabled,
+  .result:disabled {
     opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .primary[aria-busy="true"],
+  .confirm[aria-busy="true"] {
     cursor: progress;
   }
 
@@ -381,5 +400,19 @@
     font-size: var(--text-lg);
     font-weight: var(--weight-semibold);
     color: var(--eavi-secondary-text);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spin {
+      animation: none;
+    }
+
+    .primary,
+    .confirm,
+    .secondary,
+    .result,
+    .allocation {
+      transition: none;
+    }
   }
 }

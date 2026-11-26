@@ -351,6 +351,7 @@ export const labels = {
     OPEN: "Unpaid",
     PARTIAL: "Part paid",
     PAID: "Paid",
+    CREDIT: "Credit due",
     VOID: "Void",
   },
   paymentMethod: {
@@ -358,6 +359,22 @@ export const labels = {
     CASH: "Cash",
     BANK: "Bank transfer",
     CHEQUE: "Cheque",
+  },
+  paymentEntryType: {
+    PAYMENT: "Payment",
+    REVERSAL: "Reversal",
+    REFUND: "Refund",
+  },
+  receiptStatus: {
+    ISSUED: "Issued",
+    REVERSED: "Reversed",
+    REFUNDED: "Refunded",
+  },
+  invoiceLineKind: {
+    CHARGE: "Charge",
+    CREDIT_NOTE: "Credit note",
+    VOID: "Void",
+    VOID_REVERSAL: "Void reversal",
   },
   /** The delivery structure a programme is planned around. Never "term". */
   programStructure: {
@@ -396,6 +413,7 @@ export const labels = {
     PENDING: "Pending",
     PARTIAL: "Part paid",
     PAID: "Paid",
+    CREDIT: "Credit due",
     OVERDUE: "Overdue",
     VOID: "Void",
   },
@@ -1746,6 +1764,7 @@ export const pages = {
       billed: "Billed",
       collected: "Collected",
       outstanding: "Outstanding",
+      credit: "Credit due",
       paidCount: "Invoices settled",
     },
     invoiceColumns: [
@@ -1771,8 +1790,13 @@ export const pages = {
       lines: "Line items",
       payments: "Payments",
       details: "Details",
+      actions: "Actions",
       addLine: "Add an item",
+      creditNote: "Issue credit note",
+      correctPayment: "Reverse or refund receipt",
       void: "Void",
+      restore: "Restore invoice",
+      creditDue: "Credit due",
       noLines: "No items on this invoice yet.",
       noPayments: "Nothing received yet.",
       /* The invoice and the receipt are one printed design, filled from one record each;
@@ -1819,7 +1843,7 @@ export const pages = {
       student: {
         button: "Record a student payment",
         title: "Payment against a fee schedule",
-        hint: "The money is placed on the oldest unpaid period first, then the next, so one receipt can settle several periods.",
+        hint: "The selected invoice is paid first, then the oldest remaining unpaid invoice. One receipt can settle several periods.",
         fields: [
           { name: "studentId", label: "Student", type: "select", required: true, optionKey: "students" },
           { name: "amount", label: "Amount received (KES)", type: "number", required: true, step: "0.01" },
@@ -1837,6 +1861,7 @@ export const pages = {
       expected: "Expected fees",
       collected: "Collected",
       outstanding: "Outstanding",
+      credit: "Credit due",
       overdue: "Overdue",
       overdueCount: (count: number) => `${count} overdue ${count === 1 ? "period" : "periods"}`,
       byProgram: "Revenue by programme",
@@ -1857,6 +1882,23 @@ export const pages = {
       empty: "No fee schedules have been generated yet.",
     },
     void: { button: "Void invoice", done: "Invoice voided." },
+    corrections: {
+      reason: { name: "reason", label: "Reason", type: "textarea", required: true } satisfies Field,
+      effectiveAt: { name: "effectiveAt", label: "Effective date", type: "date", required: true } satisfies Field,
+      reference: { name: "reference", label: "Refund reference or proof", type: "text", hint: "Required for a refund; optional for a reversal." } satisfies Field,
+      creditAmount: { name: "amount", label: "Credit amount (KES)", type: "number", required: true, step: "0.01" } satisfies Field,
+      correctionKind: {
+        name: "kind", label: "Correction type", type: "select", required: true,
+        options: [
+          { value: "REVERSAL", label: "Reverse receipt" },
+          { value: "REFUND", label: "Refund receipt" },
+        ],
+      } satisfies Field,
+      reverseHint: "The original receipt stays unchanged. A linked credit note records the correction.",
+      refundHint: "Enter the refund reference or proof. The original receipt stays unchanged.",
+      creditHint: "Reduces the billed total. Any excess over payments becomes a visible student credit.",
+      voidHint: "Only invoices with no net money received can be voided. Reverse or refund payments first.",
+    },
   },
 
   cards: {

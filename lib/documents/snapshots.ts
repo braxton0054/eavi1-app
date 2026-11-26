@@ -80,9 +80,9 @@ export async function loadInvoice(invoiceId: string): Promise<Snapshot | null> {
   return { ...document, receivedBy: "EAVI Accounts Office" };
 }
 
-/** All payment rows under one receipt number. */
+/** One Receipt identity, including a credit note when its CRN number is requested. */
 export async function loadReceipt(receiptNo: string): Promise<Snapshot | null> {
-  const document = await getReceiptDocument(receiptNo, null);
+  const document = await getReceiptDocument(receiptNo.trim().toUpperCase(), null);
   if (!document) return null;
   return { ...document, receivedBy: "EAVI Accounts Office" };
 }

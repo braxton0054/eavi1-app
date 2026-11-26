@@ -14,8 +14,9 @@ import { StudentPrintDocument, type PrintFact } from "@/components/dashboard/stu
 import { EmptyState, PageHeader, Panel, StatTile } from "@/components/dashboard/panel";
 import { ShimmerButton } from "@/components/magicui/shimmer-button";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
-import { formatDate, money } from "@/lib/format";
+import { formatDate, moneyExact } from "@/lib/format";
 import type { Column, Field } from "@/lib/content/dashboard";
+import { invoicePosition } from "@/lib/fees/ledger";
 
 const copy = pages.students;
 
@@ -38,9 +39,12 @@ const feeTone: Record<string, ChipTone> = {
   PENDING: "warning",
   PARTIAL: "info",
   PAID: "success",
+  CREDIT: "info",
   OVERDUE: "danger",
   VOID: "neutral",
 };
+
+type FeeStatus = "PENDING" | "PARTIAL" | "PAID" | "CREDIT" | "OVERDUE" | "VOID";
 
 const unitTone: Record<string, ChipTone> = {
   NOT_STARTED: "neutral",
@@ -60,10 +64,6 @@ const attachmentTone: Record<string, ChipTone> = {
   FAILED: "danger",
   DEFERRED: "neutral",
 };
-
-/** Prisma hands back Decimal objects for money; only Number(String(v)) is safe here. */
-const sum = (rows: { amount: unknown }[]) =>
-  rows.reduce((total, row) => total + (Number(String(row.amount)) || 0), 0);
 
 /** Picks the columns a profile panel needs, in the order the panel lists them. */
 function ordered(columns: readonly Column[], keys: readonly string[]): Column[] {
@@ -174,30 +174,38 @@ export default async function StudentProfilePage({
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // A fee period's status is derived, never stored: what is owed comes from the lines, what
-  // was paid from the payments, and "overdue" simply means the due date has gone by.
+  // A fee period's status is derived from exact minor units, never from its stored status alone.
   const feeRows = student.invoices.map((invoice) => {
-    const billed = sum(invoice.lines);
-    const paid = sum(invoice.payments);
-    const balance = billed - paid;
+    const position = invoicePosition(invoice.lines, invoice.payments);
     const overdue =
       invoice.status !== "VOID" &&
-      balance > 0.005 &&
+      position.outstandingCents > 0 &&
       invoice.dueAt !== null &&
       new Date(invoice.dueAt) < today;
 
-    const status: keyof typeof labels.periodStatus =
+    const status: FeeStatus =
       invoice.status === "VOID"
         ? "VOID"
-        : balance <= 0.005
-          ? "PAID"
-          : overdue
-            ? "OVERDUE"
-            : paid > 0.005
-              ? "PARTIAL"
-              : "PENDING";
+        : position.balanceCents < 0
+          ? "CREDIT"
+          : position.outstandingCents === 0 && invoice.lines.length > 0
+            ? "PAID"
+            : overdue
+              ? "OVERDUE"
+              : position.paidCents > 0 && position.paidCents < position.billedCents
+                ? "PARTIAL"
+                : "PENDING";
 
-    return { invoice, billed, paid, balance, status };
+    return {
+      invoice,
+      ...position,
+      billed: position.billedCents / 100,
+      paid: position.paidCents / 100,
+      balance: position.balanceCents / 100,
+      outstanding: position.outstandingCents / 100,
+      credit: position.creditCents / 100,
+      status,
+    };
   });
 
   /*
@@ -223,13 +231,18 @@ export default async function StudentProfilePage({
       row.status !== "VOID" &&
       isReached(row.invoice.feePeriod?.yearIndex ?? null, row.invoice.feePeriod?.semesterNo ?? null),
   );
-  const billed = payable.reduce((total, row) => total + row.billed, 0);
-  const collected = payable.reduce((total, row) => total + row.paid, 0);
-  const outstanding = Math.max(0, billed - collected);
+  const billedCents = payable.reduce((total, row) => total + row.billedCents, 0);
+  const collectedCents = payable.reduce((total, row) => total + row.paidCents, 0);
+  const outstandingCents = payable.reduce((total, row) => total + row.outstandingCents, 0);
+  const creditCents = payable.reduce((total, row) => total + row.creditCents, 0);
+  const billed = billedCents / 100;
+  const collected = collectedCents / 100;
+  const outstanding = outstandingCents / 100;
+  const credit = creditCents / 100;
   const settled = payable.filter((row) => row.status === "PAID").length;
 
   const unpaid = payable
-    .filter((row) => row.balance > 0.005)
+    .filter((row) => row.outstandingCents > 0)
     .sort(
       (a, b) =>
         (a.invoice.dueAt?.getTime() ?? Number.MAX_SAFE_INTEGER) -
@@ -237,7 +250,8 @@ export default async function StudentProfilePage({
     );
   const nextDue = unpaid[0] ?? null;
   const overdueRows = unpaid.filter((row) => row.status === "OVERDUE");
-  const overdueAmount = overdueRows.reduce((total, row) => total + row.balance, 0);
+  const overdueCents = overdueRows.reduce((total, row) => total + row.outstandingCents, 0);
+  const overdueAmount = overdueCents / 100;
 
   const current =
     [...payable]
@@ -262,16 +276,16 @@ export default async function StudentProfilePage({
       period: periodLabel(row.invoice),
       calendar: row.invoice.period?.name ?? common.notSet,
       dueAt: formatDate(row.invoice.dueAt),
-      amount: money(row.billed),
-      paid: money(row.paid),
+      amount: moneyExact(row.billed),
+      paid: moneyExact(row.paid),
       balance: (
-        <span className={row.balance > 0.005 ? "text-eavi-destructive" : undefined}>
-          {money(row.balance)}
+        <span className={row.outstandingCents > 0 ? "text-eavi-destructive" : undefined}>
+          {moneyExact(row.balance)}
         </span>
       ),
       status: (
         <StatusChip tone={feeTone[row.status] ?? "neutral"}>
-          {labels.periodStatus[row.status]}
+          {labels.periodStatus[row.status as keyof typeof labels.periodStatus] ?? row.status}
         </StatusChip>
       ),
     },
@@ -298,7 +312,7 @@ export default async function StudentProfilePage({
       period,
       method: labels.paymentMethod[payment.method],
       reference: payment.reference ?? common.notSet,
-      amount: money(payment.amount),
+      amount: moneyExact(payment.amount),
     },
   }));
 
@@ -461,10 +475,10 @@ export default async function StudentProfilePage({
       cell(formatDate(enrollment.enrolledAt)),
     ]),
     totals: {
-      billed: money(billed),
-      paid: money(collected),
-      outstanding: money(outstanding),
-      nextDue: nextDue ? money(nextDue.balance) : feeCopy.settled,
+      billed: moneyExact(billed),
+      paid: moneyExact(collected),
+      outstanding: moneyExact(outstanding),
+      nextDue: nextDue ? moneyExact(nextDue.outstanding) : feeCopy.settled,
     },
     settledLine: printCopy.settledLine(
       settled,
@@ -482,13 +496,13 @@ export default async function StudentProfilePage({
         period: periodLabel(row.invoice),
         invoice: row.invoice.number,
         due: formatDate(row.invoice.dueAt),
-        amount: money(row.billed),
-        paid: money(row.paid),
-        balance: money(row.balance),
-        status: labels.periodStatus[row.status],
-        owed: row.balance > 0.005,
+        amount: moneyExact(row.billed),
+        paid: moneyExact(row.paid),
+        balance: moneyExact(row.balance),
+        status: labels.periodStatus[row.status as keyof typeof labels.periodStatus] ?? row.status,
+        owed: row.outstandingCents > 0,
       })),
-    overdueTotal: overdueRows.length > 0 ? money(overdueAmount) : null,
+    overdueTotal: overdueRows.length > 0 ? moneyExact(overdueAmount) : null,
     // Oldest first here too, so receipts read in the order they were written.
     payments: [...payments]
       .sort((a, b) => a.payment.paidAt.getTime() - b.payment.paidAt.getTime())
@@ -499,7 +513,7 @@ export default async function StudentProfilePage({
         appliedTo: period,
         method: labels.paymentMethod[payment.method],
         reference: payment.reference ?? common.notSet,
-        amount: money(payment.amount),
+        amount: moneyExact(payment.amount),
       })),
     units: units.map((unit) => [
       cell(`${unit.programUnit.unit.code} · ${unit.programUnit.unit.name}`),
@@ -679,17 +693,18 @@ export default async function StudentProfilePage({
       </Panel>
 
       <section aria-label={feeCopy.overview} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label={feeCopy.totalFees} value={money(billed)} icon="accounts" tone="neutral" />
-        <StatTile label={feeCopy.paid} value={money(collected)} icon="accounts" tone="money" />
+        <StatTile label={feeCopy.totalFees} value={moneyExact(billed)} icon="accounts" tone="neutral" />
+        <StatTile label={feeCopy.paid} value={moneyExact(collected)} icon="accounts" tone="money" />
         <StatTile
           label={feeCopy.outstanding}
-          value={money(outstanding)}
+          value={moneyExact(outstanding)}
           icon="accounts"
           tone="attention"
+          hint={credit > 0 ? `Credit due: ${moneyExact(credit)}` : undefined}
         />
         <StatTile
           label={feeCopy.nextDue}
-          value={nextDue ? money(nextDue.balance) : feeCopy.settled}
+          value={nextDue ? moneyExact(nextDue.outstanding) : feeCopy.settled}
           icon="calendar"
           tone="neutral"
         />
@@ -721,7 +736,7 @@ export default async function StudentProfilePage({
                   The overdue line stays here so the eye lands on the debt it belongs to. */}
               {overdueRows.length > 0 ? (
                 <p className="text-sm text-eavi-destructive">
-                  {feeCopy.overdue}: {money(overdueAmount)} —{" "}
+                  {feeCopy.overdue}: {moneyExact(overdueAmount)} —{" "}
                   <a href="/dashboard/accounts" className="underline underline-offset-4">
                     record the payment there
                   </a>

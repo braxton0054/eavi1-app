@@ -2,26 +2,24 @@ import Link from "next/link";
 
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
-import { money, formatDate } from "@/lib/format";
+import { moneyExact, formatDate } from "@/lib/format";
+import { sumAmountCents } from "@/lib/fees/money";
+import {
+  STATEMENT_INVOICE_SELECT,
+  STATEMENT_PAYMENT_SELECT,
+  statementTransactions,
+} from "@/lib/dal/fee-documents";
 import { EmptyState, PageHeader, Panel } from "@/components/dashboard/panel";
-import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
+import { StatusChip } from "@/components/dashboard/status-chip";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { getStudentOptions } from "@/lib/dal/college";
 import type { Column } from "@/lib/content/dashboard";
 
 /**
- * A student's complete payment history, from their admission to today: every charge and
- * every payment in chronological order, the running balance included, and the whole
- * mini-statement one click away. Every figure is read from the ledger's own rows —
- * nothing here is a maintained summary that can drift.
+ * A student's complete financial history: every invoice line (including void contras) and
+ * every signed payment, reversal or refund, in chronological order. The printable statement
+ * uses the same shared transaction builder, so the screen and PDF cannot tell different stories.
  */
-
-const tone: Record<string, ChipTone> = {
-  OPEN: "warning",
-  PARTIAL: "info",
-  PAID: "success",
-  VOID: "neutral",
-};
 
 const columns: Column[] = [
   { key: "date", label: "Date" },
@@ -31,6 +29,29 @@ const columns: Column[] = [
   { key: "paid", label: "Paid" },
   { key: "balance", label: "Balance" },
 ];
+
+type HistoryRow = {
+  id: string;
+  date: string;
+  ref: string;
+  description: string;
+  charged: number | null;
+  paid: number | null;
+  balance: number;
+  occurredAt: Date;
+  documentNo: string | null;
+  documentKind: "INVOICE" | "RECEIPT" | "CREDIT_NOTE" | null;
+};
+
+function historyDocumentHref(row: HistoryRow) {
+  if (!row.documentNo) return null;
+  const number = encodeURIComponent(row.documentNo);
+  if (row.documentKind === "INVOICE") return `/dashboard/accounts/invoice/${number}`;
+  if (row.documentKind === "RECEIPT" || row.documentKind === "CREDIT_NOTE") {
+    return `/dashboard/accounts/receipt/${number}`;
+  }
+  return null;
+}
 
 export default async function PaymentHistoryPage({
   searchParams,
@@ -66,89 +87,76 @@ export default async function PaymentHistoryPage({
       })
     : null;
 
-  let rows: Array<{
-    id: string;
-    date: string;
-    ref: string;
-    description: string;
-    charged: number | null;
-    paid: number | null;
-    balance: number;
-  }> = [];
-  let billed = 0;
-  let paid = 0;
+  let rows: HistoryRow[] = [];
+  let billedCents = 0;
+  let paidCents = 0;
 
   if (picked) {
     const [invoices, payments] = await Promise.all([
       prisma.invoice.findMany({
-        where: { studentId: picked.id, status: { not: "VOID" } },
-        orderBy: [{ periodYear: "asc" }, { periodSemester: "asc" }, { dueAt: "asc" }],
-        select: { number: true, dueAt: true, periodYear: true, periodSemester: true, lines: { select: { amount: true } } },
+        where: {
+          studentId: picked.id,
+          ...(scope.campusId === null ? {} : { campusId: scope.campusId }),
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: STATEMENT_INVOICE_SELECT,
       }),
       prisma.payment.findMany({
-        where: { studentId: picked.id },
-        orderBy: { paidAt: "asc" },
-        select: { receiptNo: true, reference: true, method: true, paidAt: true, amount: true },
+        where: {
+          studentId: picked.id,
+          ...(scope.campusId === null ? {} : { invoice: { campusId: scope.campusId } }),
+        },
+        orderBy: [{ paidAt: "asc" }, { id: "asc" }],
+        select: STATEMENT_PAYMENT_SELECT,
       }),
     ]);
 
-    type Entry = { at: number; date: string; ref: string; description: string; charged: number | null; paid: number | null };
-    const entries: Entry[] = [
-      ...invoices.map((invoice) => ({
-        at: (invoice.dueAt ?? new Date(0)).getTime(),
-        date: formatDate(invoice.dueAt ?? new Date(0)),
-        ref: invoice.number,
-        description:
-          invoice.periodYear && invoice.periodSemester
-            ? `Fees — Year ${invoice.periodYear}, Semester ${invoice.periodSemester}`
-            : "Fees",
-        charged: invoice.lines.reduce((sum, line) => sum + Number(line.amount.toString()), 0),
-        paid: null,
-      })),
-      ...payments.map((payment) => ({
-        at: payment.paidAt.getTime(),
-        date: formatDate(payment.paidAt),
-        ref: payment.receiptNo ?? payment.reference ?? "—",
-        description: `Payment${payment.method ? ` · ${payment.method}` : ""}`,
-        charged: null,
-        paid: Number(payment.amount.toString()),
-      })),
-    ].sort((a, b) => a.at - b.at);
+    const transactions = statementTransactions(invoices, payments);
+    billedCents = sumAmountCents(transactions.map((tx) => ({ amount: tx.charged ?? 0 })));
+    paidCents = sumAmountCents(transactions.map((tx) => ({ amount: tx.paid ?? 0 })));
 
-    billed = entries.reduce((sum, e) => sum + (e.charged ?? 0), 0);
-    paid = entries.reduce((sum, e) => sum + (e.paid ?? 0), 0);
-
-    let running = 0;
-    rows = entries.map((e) => {
-      running += (e.charged ?? 0) - (e.paid ?? 0);
-      return { id: `${e.ref}-${e.at}`, date: e.date, ref: e.ref, description: e.description, charged: e.charged, paid: e.paid, balance: running };
+    let runningCents = 0;
+    rows = transactions.map((tx) => {
+      runningCents += (tx.chargedCents ?? 0) - (tx.paidCents ?? 0);
+      return {
+        id: tx.id,
+        date: tx.date,
+        ref: tx.ref,
+        description: tx.description,
+        charged: tx.charged,
+        paid: tx.paid,
+        balance: runningCents / 100,
+        occurredAt: tx.occurredAt,
+        documentNo: tx.documentNo,
+        documentKind: tx.documentKind,
+      };
     });
 
-    // The year filter, when one is chosen: the rows of that academic year only.
-    if (year) {
-      rows = rows.filter((row) => row.date.includes(year));
-    }
+    // Filtering never restarts the running balance: a year view still shows the account
+    // position after each transaction. Summary cards above remain whole-account totals.
+    if (year) rows = rows.filter((row) => String(row.occurredAt.getFullYear()) === year);
   }
 
+  const balanceCents = billedCents - paidCents;
+  const creditDue = balanceCents < 0;
   const tableRows = rows.map((row) => ({
     id: row.id,
+    href: historyDocumentHref(row),
     values: {
       date: row.date,
       ref: row.ref,
       description: row.description,
-      charged: row.charged === null ? "" : money(row.charged),
-      paid: row.paid === null ? "" : money(row.paid),
-      balance: money(row.balance),
+      charged: row.charged === null ? "" : moneyExact(row.charged),
+      paid: row.paid === null ? "" : moneyExact(row.paid),
+      balance: moneyExact(row.balance),
     },
   }));
-
-  const statementNo = picked ? `FS-${picked.admissionNo.replace(/[^A-Za-z0-9]+/g, "").toUpperCase()}` : "";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Payment history"
-        description="Every charge and every payment on a student's ledger, from admission to today."
+        description="Every invoice line, void correction, payment, reversal and refund on a student's account."
       />
 
       <Panel title="Choose a student">
@@ -164,7 +172,7 @@ export default async function PaymentHistoryPage({
           </div>
           <button
             type="submit"
-            className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-5 text-sm font-medium text-eavi-on-bg hover:bg-eavi-muted"
+            className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-5 text-sm font-medium text-eavi-on-bg hover:bg-eavi-muted active:bg-eavi-muted"
           >
             Show history
           </button>
@@ -174,7 +182,7 @@ export default async function PaymentHistoryPage({
       {!picked ? (
         <EmptyState
           title="Pick a student"
-          body="Their complete financial history — every charge, every payment, the running balance and the mini-statement — shows here."
+          body="Their complete financial history — every invoice line, signed payment and correction, the running balance and the mini-statement — shows here."
           icon="accounts"
         />
       ) : (
@@ -195,27 +203,39 @@ export default async function PaymentHistoryPage({
             </a>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Panel title="">
+          <div className="grid gap-4 sm:grid-cols-3" role="group" aria-label="Whole-account totals">
+            <Panel>
               <p className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-eavi-muted-text">Total charged</p>
-              <p className="px-4 pb-4 text-2xl font-semibold tabular-nums">{money(billed)}</p>
+              <p className="px-4 pb-4 text-2xl font-semibold tabular-nums">{moneyExact(billedCents / 100)}</p>
             </Panel>
-            <Panel title="">
-              <p className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-eavi-muted-text">Total paid</p>
-              <p className="px-4 pb-4 text-2xl font-semibold tabular-nums">{money(paid)}</p>
+            <Panel>
+              <p className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-eavi-muted-text">Net paid</p>
+              <p className="px-4 pb-4 text-2xl font-semibold tabular-nums">{moneyExact(paidCents / 100)}</p>
             </Panel>
-            <Panel title="">
-              <p className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-eavi-muted-text">Outstanding</p>
-              <p className="px-4 pb-4 text-2xl font-semibold tabular-nums">{money(Math.max(0, billed - paid))}</p>
+            <Panel>
+              <p className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-eavi-muted-text">
+                {creditDue ? "Credit due" : "Outstanding"}
+              </p>
+              <p className="px-4 pb-2 text-2xl font-semibold tabular-nums">
+                {moneyExact(Math.abs(balanceCents) / 100)}
+              </p>
+              {creditDue ? (
+                <p className="px-4 pb-4 text-xs text-eavi-muted-text">This account has a negative balance.</p>
+              ) : null}
             </Panel>
           </div>
 
           <Panel title="Ledger">
             {tableRows.length === 0 ? (
-              <EmptyState title="Nothing recorded yet" body="Charges and payments appear here the moment they exist." icon="accounts" />
+              <EmptyState
+                title={year ? `No transactions in ${year}` : "Nothing recorded yet"}
+                body={year ? "Choose another year or show the complete account history." : "Invoice lines, payments and corrections appear here the moment they exist."}
+                icon="accounts"
+              />
             ) : (
               <div className="overflow-x-auto p-4">
                 <table className="w-full min-w-[40rem] border-collapse text-sm">
+                  <caption className="sr-only">Chronological fee history for {picked.user.fullName}</caption>
                   <thead>
                     <tr className="border-b border-eavi-border">
                       {columns.map((column) => (
@@ -233,7 +253,19 @@ export default async function PaymentHistoryPage({
                     {tableRows.map((row) => (
                       <tr key={row.id} className="border-b border-eavi-border">
                         <td className="px-3 py-2">{String(row.values.date)}</td>
-                        <td className="px-3 py-2">{String(row.values.ref)}</td>
+                        <td className="px-3 py-2">
+                          {row.href ? (
+                            <Link
+                              href={row.href}
+                              className="inline-flex min-h-11 items-center text-eavi-primary-text underline-offset-4 hover:underline"
+                              aria-label={`Open ${row.values.ref} document`}
+                            >
+                              {String(row.values.ref)}
+                            </Link>
+                          ) : (
+                            String(row.values.ref)
+                          )}
+                        </td>
                         <td className="px-3 py-2">{String(row.values.description)}</td>
                         <td className="px-3 py-2 tabular-nums">{String(row.values.charged)}</td>
                         <td className="px-3 py-2 tabular-nums">{String(row.values.paid)}</td>

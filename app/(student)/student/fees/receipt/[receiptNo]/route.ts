@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { getStudentFees } from "@/lib/dal/student-portal";
+import { prisma } from "@/lib/prisma";
+import { requireStudent } from "@/lib/session";
 import { documentPdf, ensureDocument } from "@/lib/documents/service";
 import { pdfResponse } from "@/lib/statements/document";
 
 /**
- * One saved receipt for the signed-in student. A number is resolved against this student's
- * own payments before the document is loaded — no id from the URL reaches the database
- * unscoped.
+ * One receipt or credit note for the signed-in student. Both the student and campus come
+ * from the session and must match the Receipt identity before its canonical number is opened.
  */
 
 export const runtime = "nodejs";
@@ -17,15 +17,20 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ receiptNo: string }> },
 ) {
+  const student = await requireStudent();
   const { receiptNo } = await params;
-  const wanted = decodeURIComponent(receiptNo).trim().toLowerCase();
-  const { payments } = await getStudentFees();
-  const row = payments.find((payment) => (payment.receiptNo ?? "").toLowerCase() === wanted);
-  if (!row?.receiptNo) {
+  const numberNormalized = decodeURIComponent(receiptNo).trim().toUpperCase();
+
+  const receipt = await prisma.receipt.findFirst({
+    where: { numberNormalized, studentId: student.studentId, campusId: student.campusId },
+    select: { number: true, kind: true },
+  });
+  if (!receipt) {
     return NextResponse.json({ error: "No receipt with that number on this account." }, { status: 404 });
   }
 
-  const document = await ensureDocument("RECEIPT", row.receiptNo);
+  const document = await ensureDocument("RECEIPT", receipt.number);
   if (!document) return NextResponse.json({ error: "Receipt not available." }, { status: 404 });
-  return pdfResponse(request, await documentPdf(document), `receipt-${row.receiptNo}`);
+  const file = receipt.kind === "CREDIT_NOTE" ? "credit-note" : "receipt";
+  return pdfResponse(request, await documentPdf(document), `${file}-${receipt.number}`);
 }

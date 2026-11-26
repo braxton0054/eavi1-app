@@ -1,55 +1,57 @@
 import { NextResponse } from "next/server";
 
-import { getStudentCard, getStudentFees, getStudentProfile } from "@/lib/dal/student-portal";
-import { feeDocStudent, statementTransactions } from "@/lib/dal/fee-documents";
+import { prisma } from "@/lib/prisma";
+import { requireStudent } from "@/lib/session";
+import {
+  FEE_DOCUMENT_STUDENT,
+  STATEMENT_INVOICE_SELECT,
+  STATEMENT_PAYMENT_SELECT,
+  feeDocStudentFromRow,
+  statementTransactions,
+} from "@/lib/dal/fee-documents";
 import { formatDate } from "@/lib/format";
 import { pdfResponse } from "@/lib/statements/document";
 import { statementPdf } from "@/lib/statements/issue";
 
 /**
- * The signed-in student's full fee statement.
- *
- * Built from the same invoices and payments the fees screen shows, on the college's own
- * A4 statement artwork, one page per screenful of transactions (23 rows, then 30). The
- * running balance and the totals come from the rows themselves, so the page cannot
- * disagree with the ledger it was read from.
- *
- * Nothing is stored: a statement is derived on demand, which is also why it can never be
- * an out-of-date copy of the account.
+ * The signed-in student's full fee statement. Invoices (including VOID), every invoice
+ * line, and every signed payment/correction are read directly in the student's scope and
+ * passed through the same builder the accounts office uses.
  */
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const [{ enrollment, invoices, payments }, { profile }, { card }] = await Promise.all([
-    getStudentFees(),
-    getStudentProfile(),
-    getStudentCard(),
+  const scope = await requireStudent();
+  const [student, invoices, payments] = await Promise.all([
+    prisma.studentProfile.findUnique({
+      where: { id: scope.studentId },
+      select: FEE_DOCUMENT_STUDENT,
+    }),
+    prisma.invoice.findMany({
+      where: { studentId: scope.studentId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: STATEMENT_INVOICE_SELECT,
+    }),
+    prisma.payment.findMany({
+      where: { studentId: scope.studentId },
+      orderBy: [{ paidAt: "asc" }, { id: "asc" }],
+      select: STATEMENT_PAYMENT_SELECT,
+    }),
   ]);
 
-  if (!enrollment) {
+  if (!student?.enrollments[0]) {
     return NextResponse.json({ error: "No enrolment on record." }, { status: 404 });
   }
 
-  const admissionNo = profile?.admissionNo ?? "student";
+  const admissionNo = student.admissionNo;
   const statementNo = `FS-${admissionNo.replace(/[^A-Za-z0-9]+/g, "").toUpperCase()}`;
-
   const file = await statementPdf({
     statementNo,
     generatedDate: formatDate(new Date()),
     preparedBy: "EAVI Accounts Office",
-    student: feeDocStudent({
-      fullName: profile?.user.fullName ?? "—",
-      admissionNo,
-      programName: enrollment.program.name,
-      intakeName: enrollment.period?.name ?? null,
-      campusName: profile?.campus.name ?? "—",
-      phone: profile?.user.phone ?? null,
-      enrolledAt: enrollment.enrolledAt,
-      card: card ? { serial: card.serial, verifyToken: card.verifyToken } : null,
-      fallbackCode: statementNo,
-    }),
+    student: feeDocStudentFromRow(student, statementNo),
     transactions: statementTransactions(invoices, payments),
   });
 

@@ -1,16 +1,18 @@
+import type { Prisma } from "@/generated/prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import { formatDate, toNumber } from "@/lib/format";
 import { site } from "@/lib/content/home";
 import { verifyUrl } from "@/lib/cards/qr";
-import type { FeeDocLine, FeeDocStudent, FeeTx } from "@/lib/statements/fee-docs";
+import { invoicePosition, sumAmounts } from "@/lib/fees/ledger";
+import { toCents } from "@/lib/fees/money";
+import type { FeeDocLine, FeeDocStudent, StatementTransaction } from "@/lib/statements/fee-docs";
 
 /**
- * Reads one fee document's records: a receipt number's payment rows, or one invoice.
- *
- * The documents themselves are built from these rows on demand (`lib/statements/fee-docs.ts`),
- * so there is nothing to keep in sync and no copy of a bill to go stale. Every read is
- * scoped to the campus of the person asking; `campusId: null` means the whole college, and
- * only a super admin holds that scope.
+ * Reads fee documents from their own identities. Receipts are Receipt records, never a
+ * collection of legacy payment rows that happen to share a number. Every read is scoped to
+ * the campus of the person asking; `campusId: null` means the whole college, and only a
+ * super admin holds that scope.
  */
 
 /** The student block every fee document prints, shaped once here rather than per caller. */
@@ -92,77 +94,129 @@ export function feeDocStudentFromRow(row: StudentRow, fallbackCode: string) {
 }
 
 const scopeFor = (campusId: number | null) => (campusId === null ? {} : { campusId });
+const normalizeReceiptNumber = (receiptNo: string) => receiptNo.trim().toUpperCase();
 
-const receiptRowsFor = (receiptNo: string, campusId: number | null) =>
-  prisma.payment.findMany({
-    where: {
-      receiptNo: { equals: receiptNo, mode: "insensitive" },
-      invoice: scopeFor(campusId),
-    },
-    orderBy: { paidAt: "asc" },
+type DocumentInvoice = {
+  number: string;
+  periodYear: number | null;
+  periodSemester: number | null;
+};
+
+const invoicePeriod = (invoice: DocumentInvoice) =>
+  invoice.periodYear && invoice.periodSemester
+    ? ` — Year ${invoice.periodYear}, Sem ${invoice.periodSemester}`
+    : "";
+
+/**
+ * One receipt or credit note, ready to fill the receipt design.
+ *
+ * The receipt's amount and three ledger balances are issuance snapshots. They are deliberately
+ * not recomputed from today's invoices or payments. An original RECEIPT also omits its mutable
+ * correction status/reason, so reversing it later cannot change the document that was issued.
+ */
+export async function getReceiptDocument(receiptNo: string, campusId: number | null) {
+  const receipt = await prisma.receipt.findFirst({
+    where: { numberNormalized: normalizeReceiptNumber(receiptNo), ...scopeFor(campusId) },
     select: {
-      id: true,
+      number: true,
+      kind: true,
       amount: true,
       method: true,
       reference: true,
-      receiptNo: true,
       paidAt: true,
-      invoice: { select: { number: true, periodYear: true, periodSemester: true } },
+      reason: true,
+      totalFees: true,
+      paidToDate: true,
+      balance: true,
       student: { select: FEE_DOCUMENT_STUDENT },
+      sourceInvoice: {
+        select: { number: true, periodYear: true, periodSemester: true },
+      },
+      payments: {
+        orderBy: [{ paidAt: "asc" }, { id: "asc" }],
+        select: {
+          amount: true,
+          entryType: true,
+          reason: true,
+          reversesPaymentId: true,
+          reversesPayment: { select: { receipt: { select: { number: true } } } },
+          invoice: { select: { number: true, periodYear: true, periodSemester: true } },
+        },
+      },
     },
   });
 
-/** The ledger totals the receipt prints: everything billed on the student, everything paid. */
-async function ledgerFor(studentId: string) {
-  const invoices = await prisma.invoice.findMany({
-    where: { studentId, status: { not: "VOID" } },
-    select: { lines: { select: { amount: true } }, payments: { select: { amount: true } } },
+  if (!receipt) return null;
+
+  const correctionPayment = receipt.payments.find((payment) => payment.entryType !== "PAYMENT");
+  const correctionType: "REVERSAL" | "REFUND" | "CREDIT_NOTE" | null =
+    receipt.kind === "CREDIT_NOTE"
+      ? correctionPayment?.entryType === "REFUND"
+        ? "REFUND"
+        : correctionPayment?.entryType === "REVERSAL"
+          ? "REVERSAL"
+          : "CREDIT_NOTE"
+      : null;
+  const originalReceiptNo = receipt.kind === "CREDIT_NOTE"
+    ? [...new Set(
+        receipt.payments
+          .map((payment) => payment.reversesPayment?.receipt.number)
+          .filter((number): number is string => Boolean(number)),
+      )].join(", ") || null
+    : null;
+
+  const items: FeeDocLine[] = receipt.payments.map((payment) => {
+    const invoice = `Invoice ${payment.invoice.number}${invoicePeriod(payment.invoice)}`;
+    const corrected = payment.entryType !== "PAYMENT";
+    const action = payment.entryType === "REFUND" ? "Refund" : "Reversal";
+    const original = payment.reversesPayment?.receipt.number;
+    const description = corrected
+      ? `${action}${original ? ` of ${original}` : ""} — ${invoice}`
+      : invoice;
+    return {
+      description: `${description}${corrected && payment.reason ? ` — ${payment.reason}` : ""}`,
+      amount: toNumber(payment.amount),
+    };
   });
 
-  const totalFees = invoices.reduce(
-    (sum, invoice) => sum + invoice.lines.reduce((lineSum, line) => lineSum + toNumber(line.amount), 0),
-    0,
-  );
-  const paidToDate = invoices.reduce(
-    (sum, invoice) => sum + invoice.payments.reduce((paySum, payment) => paySum + toNumber(payment.amount), 0),
-    0,
-  );
-
-  return { totalFees, paidToDate, balance: totalFees - paidToDate };
-}
-
-/**
- * One receipt, ready to fill the receipt design.
- *
- * A receipt number can settle several invoices — the ledger pays the oldest unpaid period
- * first — so every payment row carrying the number belongs to the same document.
- */
-export async function getReceiptDocument(receiptNo: string, campusId: number | null) {
-  const rows = await receiptRowsFor(receiptNo, campusId);
-  if (rows.length === 0) return null;
-
-  const [first] = rows;
-  const amountPaid = rows.reduce((sum, row) => sum + toNumber(row.amount), 0);
-  const totals = await ledgerFor(first.student.id);
-
-  const items: FeeDocLine[] = rows.map((row) => ({
-    description:
-      `Invoice ${row.invoice.number}` +
-      (row.invoice.periodYear && row.invoice.periodSemester
-        ? ` — Year ${row.invoice.periodYear}, Sem ${row.invoice.periodSemester}`
-        : ""),
-    amount: toNumber(row.amount),
-  }));
+  // An invoice credit note has no payment allocations; its source invoice supplies the
+  // settlement description. The fallback keeps a malformed/legacy receipt printable without
+  // ever borrowing rows from another receipt number.
+  if (items.length === 0) {
+    items.push({
+      description:
+        (receipt.sourceInvoice
+          ? `Credit note against Invoice ${receipt.sourceInvoice.number}${invoicePeriod(receipt.sourceInvoice)}`
+          : receipt.kind === "CREDIT_NOTE"
+            ? "Credit note"
+            : "Fee payment") +
+        (receipt.kind === "CREDIT_NOTE" && receipt.reason ? ` — ${receipt.reason}` : ""),
+      amount: toNumber(receipt.amount),
+    });
+  }
 
   return {
-    receiptNo: first.receiptNo ?? receiptNo,
-    receiptDate: formatDate(first.paidAt),
-    student: feeDocStudentFromRow(first.student, first.receiptNo ?? receiptNo),
+    receiptNo: receipt.number,
+    receiptDate: formatDate(receipt.paidAt),
+    student: feeDocStudentFromRow(receipt.student, receipt.number),
     items,
-    amountPaid,
-    totals,
-    method: first.method,
-    reference: first.reference,
+    amountPaid: toNumber(receipt.amount),
+    totalFees: toNumber(receipt.totalFees),
+    paidToDate: toNumber(receipt.paidToDate),
+    balance: toNumber(receipt.balance),
+    method: receipt.method ?? "—",
+    reference: receipt.reference,
+    kind: receipt.kind,
+    correctionType,
+    originalReceiptNo,
+    reason: receipt.kind === "CREDIT_NOTE" ? receipt.reason : null,
+    sourceInvoice: receipt.sourceInvoice
+      ? {
+          number: receipt.sourceInvoice.number,
+          periodYear: receipt.sourceInvoice.periodYear,
+          periodSemester: receipt.sourceInvoice.periodSemester,
+        }
+      : null,
   };
 }
 
@@ -176,9 +230,13 @@ export async function getInvoiceDocument(invoiceNo: string, campusId: number | n
       status: true,
       dueAt: true,
       createdAt: true,
+      voidReason: true,
       periodYear: true,
       periodSemester: true,
-      lines: { select: { label: true, amount: true }, orderBy: { id: "asc" } },
+      lines: {
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { label: true, amount: true, kind: true, reference: true, reason: true },
+      },
       payments: { select: { amount: true } },
       student: { select: FEE_DOCUMENT_STUDENT },
     },
@@ -186,67 +244,194 @@ export async function getInvoiceDocument(invoiceNo: string, campusId: number | n
 
   if (!invoice) return null;
 
-  const total = invoice.lines.reduce((sum, line) => sum + toNumber(line.amount), 0);
-  const paid = invoice.payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0);
+  const position = invoicePosition(invoice.lines, invoice.payments);
+  const documentStatus = invoice.status === "VOID"
+    ? "VOID"
+    : position.balanceCents < 0
+      ? "CREDIT"
+      : invoice.lines.length > 0 && position.balanceCents === 0
+        ? "PAID"
+        : position.paidCents > 0 && position.paidCents < position.billedCents
+          ? "PARTIAL"
+          : "OPEN";
 
   return {
     invoiceNo: invoice.number,
     invoiceDate: formatDate(invoice.dueAt ?? invoice.createdAt),
     student: feeDocStudentFromRow(invoice.student, invoice.number),
-    items: invoice.lines.map((line) => ({ description: line.label, amount: toNumber(line.amount) })),
-    total,
-    paid,
-    balance: total - paid,
-    status: invoice.status,
+    items: invoice.lines.map((line) => ({
+      description:
+        `${line.label}${line.reference ? ` (${line.reference})` : ""}` +
+        (line.reason ? ` — ${line.reason}` : ""),
+      amount: toNumber(line.amount),
+    })),
+    total: sumAmounts(invoice.lines),
+    paid: position.paidCents / 100,
+    balance: position.balanceCents / 100,
+    status: documentStatus,
+    voidReason: documentStatus === "VOID" ? invoice.voidReason : null,
   };
 }
 
+/** The complete line-level ledger shared by printable statements and the history screen. */
+export const STATEMENT_INVOICE_SELECT = {
+  id: true,
+  number: true,
+  status: true,
+  dueAt: true,
+  createdAt: true,
+  periodYear: true,
+  periodSemester: true,
+  lines: {
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: {
+      id: true,
+      label: true,
+      amount: true,
+      kind: true,
+      reference: true,
+      reason: true,
+      createdAt: true,
+    },
+  },
+} satisfies Prisma.InvoiceSelect;
+
+export const STATEMENT_PAYMENT_SELECT = {
+  id: true,
+  invoiceId: true,
+  amount: true,
+  paidAt: true,
+  reference: true,
+  method: true,
+  receiptNo: true,
+  entryType: true,
+  reversesPaymentId: true,
+  reason: true,
+  receipt: { select: { number: true, kind: true } },
+  reversesPayment: { select: { receipt: { select: { number: true } } } },
+} satisfies Prisma.PaymentSelect;
+
+export type StatementInvoice = {
+  id: string;
+  number: string;
+  status: string;
+  dueAt: Date | null;
+  createdAt: Date;
+  periodYear: number | null;
+  periodSemester: number | null;
+  lines: Array<{
+    id: string;
+    label: string;
+    amount: unknown;
+    kind: string;
+    reference: string | null;
+    reason: string | null;
+    createdAt: Date;
+  }>;
+};
+
+export type StatementPayment = {
+  id: string;
+  invoiceId: string;
+  amount: unknown;
+  paidAt: Date;
+  reference: string | null;
+  method: string;
+  receiptNo: string | null;
+  entryType: string;
+  reversesPaymentId: string | null;
+  reason: string | null;
+  receipt: { number: string; kind: string } | null;
+  reversesPayment: { receipt: { number: string } } | null;
+};
+
+const withReason = (description: string, reason: string | null) =>
+  reason ? `${description} — ${reason}` : description;
+
 /**
- * The transactions behind a fee statement: bills are charges, payments are credits, in
- * the order the account met them. Both sides are formatted for print here, so the builder
- * never has to know about dates or money formatting.
+ * Every invoice line and every signed payment is a separate dated entry. In particular,
+ * VOID invoices keep their original charges and their negative void contra, and reversals
+ * and refunds stay visible as their own negative payment entries.
  */
 export function statementTransactions(
-  invoices: Array<{
-    number: string;
-    amount: number;
-    dueAt: Date | null;
-    createdAt: Date;
-    periodYear: number | null;
-    periodSemester: number | null;
-  }>,
-  payments: Array<{
-    amount: number | string | { toString(): string };
-    paidAt: Date;
-    reference: string | null;
-    receiptNo: string | null;
-    method: string;
-  }>,
-): FeeTx[] {
-  const rows: Array<FeeTx & { sortAt: number }> = [
-    ...invoices.map((invoice) => ({
-      date: formatDate(invoice.dueAt ?? invoice.createdAt),
-      ref: invoice.number,
-      description:
-        invoice.periodYear && invoice.periodSemester
-          ? `Fees — Year ${invoice.periodYear}, Semester ${invoice.periodSemester}`
-          : "Fees",
-      charged: invoice.amount,
-      paid: null,
-      sortAt: (invoice.dueAt ?? invoice.createdAt).getTime(),
-    })),
-    ...payments.map((payment) => ({
-      date: formatDate(payment.paidAt),
-      ref: payment.receiptNo ?? payment.reference ?? "—",
-      description: `Payment · ${payment.method}`,
-      charged: null,
-      paid: toNumber(payment.amount),
-      // A payment lands on the day it was made, after the bill it settles.
-      sortAt: payment.paidAt.getTime() + 1,
-    })),
-  ];
+  invoices: StatementInvoice[],
+  payments: StatementPayment[],
+): StatementTransaction[] {
+  const rows: StatementTransaction[] = [];
 
-  return rows
-    .sort((a, b) => a.sortAt - b.sortAt)
-    .map(({ sortAt: _sortAt, ...tx }) => tx);
+  for (const invoice of invoices) {
+    const period = invoice.periodYear && invoice.periodSemester
+      ? `Year ${invoice.periodYear}, Semester ${invoice.periodSemester}`
+      : null;
+
+    for (const line of invoice.lines) {
+      const kind = line.kind;
+      const prefix = kind === "CHARGE" ? line.label : `${line.label} · Invoice ${invoice.number}`;
+      const periodText = kind === "CHARGE" && period ? ` · ${period}` : "";
+      const voidText = invoice.status === "VOID" ? " · VOID invoice" : "";
+      const description = withReason(`${prefix}${periodText}${voidText}`, line.reason);
+      const occurredAt = line.createdAt ?? invoice.createdAt;
+      const chargedCents = toCents(line.amount);
+      const isCreditNote = kind === "CREDIT_NOTE" && Boolean(line.reference);
+
+      rows.push({
+        id: `invoice-line-${line.id}`,
+        date: formatDate(occurredAt),
+        ref: line.reference ?? invoice.number,
+        description,
+        charged: chargedCents / 100,
+        paid: null,
+        chargedCents,
+        paidCents: null,
+        occurredAt,
+        // On the same timestamp a bill is read before the payment that settles it.
+        sortAt: occurredAt.getTime(),
+        order: 0,
+        correction: kind !== "CHARGE" || invoice.status === "VOID",
+        documentNo: isCreditNote ? line.reference : invoice.number,
+        documentKind: isCreditNote ? "CREDIT_NOTE" : "INVOICE",
+      });
+    }
+  }
+
+  for (const payment of payments) {
+    const occurredAt = payment.paidAt;
+    const entryType = payment.entryType;
+    const correction = entryType !== "PAYMENT";
+    const action = entryType === "REFUND" ? "Refund" : entryType === "REVERSAL" ? "Reversal" : "Payment";
+    const originalReceiptNo = payment.reversesPayment?.receipt.number;
+    const receiptNo = payment.receipt?.number ?? payment.receiptNo;
+    const paidCents = toCents(payment.amount);
+    const reference = payment.reference && payment.reference !== receiptNo ? `Ref ${payment.reference}` : null;
+    const description = withReason(
+      [
+        action,
+        payment.method || null,
+        correction && originalReceiptNo ? `of ${originalReceiptNo}` : null,
+        reference,
+      ].filter(Boolean).join(" · "),
+      payment.reason,
+    );
+
+    rows.push({
+      id: `payment-${payment.id}`,
+      date: formatDate(occurredAt),
+      ref: receiptNo ?? payment.reference ?? "—",
+      description,
+      charged: null,
+      paid: paidCents / 100,
+      chargedCents: null,
+      paidCents,
+      occurredAt,
+      sortAt: occurredAt.getTime() + 1,
+      order: 1,
+      correction: correction || payment.receipt?.kind === "CREDIT_NOTE",
+      documentNo: receiptNo,
+      documentKind: payment.receipt?.kind === "CREDIT_NOTE" ? "CREDIT_NOTE" : "RECEIPT",
+    });
+  }
+
+  return rows.sort((a, b) =>
+    a.sortAt - b.sortAt || a.order - b.order || a.id.localeCompare(b.id),
+  );
 }

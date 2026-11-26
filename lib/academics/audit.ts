@@ -7,6 +7,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 
 export type AuditEntry = {
   campusId?: number | null;
@@ -14,26 +15,35 @@ export type AuditEntry = {
   actorEmail?: string | null;
   /** Dotted name so the log can be filtered by area, e.g. "class.merge". */
   action: string;
-  entityType: "class" | "enrollment" | "student" | "card" | "application" | "user";
+  entityType: "class" | "enrollment" | "student" | "card" | "application" | "user" | "invoice" | "payment" | "receipt" | "credit_note";
   entityId: string;
   detail?: Record<string, unknown>;
 };
 
 /** Accepts the transaction client so an audit row lands in the same commit as its change. */
-type Client = { auditLog: { create: (args: { data: Record<string, unknown> }) => Promise<unknown> } };
+type Client = Pick<Prisma.TransactionClient, "auditLog">;
 
-export async function recordAudit(entry: AuditEntry, client: Client = prisma as unknown as Client) {
-  await client.auditLog.create({
-    data: {
-      campusId: entry.campusId ?? null,
-      actorId: entry.actorId ?? null,
-      actorEmail: entry.actorEmail ?? null,
-      action: entry.action,
-      entityType: entry.entityType,
-      entityId: entry.entityId,
-      detail: entry.detail ? JSON.stringify(entry.detail) : null,
-    },
-  });
+type AuditData = {
+  campusId: number | null;
+  actorId: string | null;
+  actorEmail: string | null;
+  action: string;
+  entityType: AuditEntry["entityType"];
+  entityId: string;
+  detail: string | null;
+};
+
+export async function recordAudit(entry: AuditEntry, client: Client = prisma) {
+  const data: AuditData = {
+    campusId: entry.campusId ?? null,
+    actorId: entry.actorId ?? null,
+    actorEmail: entry.actorEmail ?? null,
+    action: entry.action,
+    entityType: entry.entityType,
+    entityId: entry.entityId,
+    detail: entry.detail ? JSON.stringify(entry.detail) : null,
+  };
+  await client.auditLog.create({ data });
 }
 
 /** Reads the trail for one record, newest first. */

@@ -11,6 +11,8 @@
 import "../load-env";
 import { prisma } from "../lib/prisma";
 import { hashPassword } from "../lib/auth";
+import { studentLedgerPosition } from "../lib/fees/ledger";
+import { fromCents, toCents } from "../lib/fees/money";
 
 const arg = (name: string) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -183,7 +185,7 @@ async function main() {
           version: 1,
           cadenceId: shared.cadence.id,
           durationMonths: p.months,
-          totalAmount: total,
+          totalAmount: fromCents(toCents(total)),
         },
       });
       await prisma.feeItem.create({
@@ -191,7 +193,7 @@ async function main() {
           programId: program.id,
           planId: plan.id,
           label: "Registration",
-          amount: REGISTRATION_FEE,
+          amount: fromCents(toCents(REGISTRATION_FEE)),
           sequence: 0,
         },
       });
@@ -203,7 +205,7 @@ async function main() {
             programId: program.id,
             planId: plan.id,
             label: `Semester ${i + 1} tuition`,
-            amount: per,
+            amount: fromCents(toCents(per)),
             sequence: i + 1,
           },
         });
@@ -412,28 +414,67 @@ async function main() {
               periodSemester: index,
               dueAt,
               status: "OPEN",
-              lines: { create: [{ label: item.label, amount: item.amount }] },
+              lines: { create: [{ label: item.label, amount: fromCents(toCents(item.amount)) }] },
             },
           });
 
           // Most students have paid the older bills; recent ones are often unpaid.
           const roll = random();
-          const due = Number(item.amount);
-          const paidAmount = index === 0 ? due : roll > 0.45 ? due : roll > 0.2 ? Math.round(due * 0.5) : 0;
-          if (paidAmount > 0) {
-            await prisma.payment.create({
-              data: {
-                invoiceId: invoice.id,
-                studentId: student.id,
-                amount: paidAmount,
-                method: pick(["MPESA", "BANK", "CASH"] as const, i),
-                reference: `RCP${campus.code}${String(created).padStart(5, "0")}${index}`,
-                paidAt: addDays(dueAt, -Math.floor(random() * 10)),
-              },
-            });
-            await prisma.invoice.update({
-              where: { id: invoice.id },
-              data: { status: paidAmount >= Number(item.amount) ? "PAID" : "PARTIAL" },
+          const dueCents = toCents(item.amount);
+          const paidCents = index === 0
+            ? dueCents
+            : roll > 0.45
+              ? dueCents
+              : roll > 0.2
+                ? Math.round(dueCents * 0.5)
+                : 0;
+          if (paidCents > 0) {
+            const method = pick(["MPESA", "BANK", "CASH"] as const, i);
+            const paidAt = addDays(dueAt, -Math.floor(random() * 10));
+            const receiptNo = `RCP/SEED/${campus.code}/${year}/${String(i + 1).padStart(4, "0")}-${index + 1}`;
+            const reference = `${receiptNo}/${method}`;
+
+            await prisma.$transaction(async (tx) => {
+              const before = await studentLedgerPosition(tx, student.id, campus.id);
+              const receipt = await tx.receipt.create({
+                data: {
+                  number: receiptNo,
+                  numberNormalized: receiptNo.toUpperCase(),
+                  kind: "RECEIPT",
+                  studentId: student.id,
+                  campusId: campus.id,
+                  amount: fromCents(paidCents),
+                  method,
+                  reference,
+                  providerReferenceNormalized: method === "MPESA"
+                    ? reference.toUpperCase().replace(/[^A-Z0-9]/g, "")
+                    : null,
+                  paidAt,
+                  status: "ISSUED",
+                  idempotencyKey: `seed:${admissionNo}:${index + 1}`,
+                  totalFees: fromCents(before.billedCents),
+                  paidToDate: fromCents(before.paidCents + paidCents),
+                  balance: fromCents(before.balanceCents - paidCents),
+                },
+                select: { id: true, number: true },
+              });
+              await tx.payment.create({
+                data: {
+                  receiptId: receipt.id,
+                  receiptNo: receipt.number,
+                  invoiceId: invoice.id,
+                  studentId: student.id,
+                  amount: fromCents(paidCents),
+                  method,
+                  reference,
+                  paidAt,
+                  entryType: "PAYMENT",
+                },
+              });
+              await tx.invoice.update({
+                where: { id: invoice.id },
+                data: { status: paidCents >= dueCents ? "PAID" : "PARTIAL" },
+              });
             });
           }
         }

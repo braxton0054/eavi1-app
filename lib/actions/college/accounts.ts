@@ -1,11 +1,13 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { InvoiceStatus, PaymentMethod } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { touchInvoice, touchReceipt } from "@/lib/documents/service";
 import { requireCollegeAdmin } from "@/lib/session";
-import { fieldErrors, labels, pages } from "@/lib/content/dashboard";
-import { money } from "@/lib/format";
+import { fieldErrors, pages } from "@/lib/content/dashboard";
+import { moneyExact } from "@/lib/format";
 import {
   FieldError,
   dateField,
@@ -13,11 +15,9 @@ import {
   hiddenId,
   nextInvoiceNumber,
   nextInvoiceNumbers,
-  nextReceiptNumber,
   onSave,
   refresh,
   requiredDate,
-  requiredNumber,
   requiredText,
   text,
   periodFromForm,
@@ -25,45 +25,86 @@ import {
 } from "@/lib/actions/college/_shared";
 import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
 import { recomputeInvoice } from "@/lib/fees/ledger";
-import { allocateStudentPayment } from "@/lib/fees/payment";
+import { parsePaymentAmount, fromCents } from "@/lib/fees/money";
+import { FinanceError, recordReceipt } from "@/lib/fees/receipts";
+import { correctReceipt, creditInvoice, unvoidInvoice, voidInvoiceWithReason } from "@/lib/fees/corrections";
+import { recordAudit } from "@/lib/academics/audit";
 import { notifyUser } from "@/lib/notifications/service";
 
 const METHODS = Object.keys(PaymentMethod) as (keyof typeof PaymentMethod)[];
 
-/** Labels are read back out of the field descriptors, never retyped here. */
 const fieldLabel = (name: string) =>
   pages.accounts.create.fields.find((field) => field.name === name)?.label ??
   pages.accounts.create.lineFields.find((field) => field.name === name)?.label ??
   pages.accounts.payment.fields.find((field) => field.name === name)?.label ??
   name;
 
-/** The number is the only thing the database keeps unique on an invoice. */
 const invoiceLabel =
   pages.accounts.invoiceColumns.find((column) => column.key === "number")?.label ?? "number";
 
-/** The table, the overview counters and the student profile all read this. */
 const AFFECTED = ["/dashboard/accounts", "/dashboard", "/dashboard/students"];
 
-/** The status of one invoice is recomputed from its own rows after every write. */
-const recompute = (invoiceId: string) => recomputeInvoice(prisma, invoiceId);
+function amountFromForm(formData: FormData): number {
+  const raw = requiredText(formData, "amount", fieldLabel("amount"));
+  try {
+    return parsePaymentAmount(raw);
+  } catch {
+    throw new FieldError("Enter a valid amount with no more than two decimal places.");
+  }
+}
 
-/** One receipt can settle several invoices; every affected saved document is marked stale. */
+function idempotencyKey(formData: FormData): string {
+  return text(formData, "idempotencyKey") ?? randomUUID();
+}
+
+async function bestEffort(work: () => Promise<unknown>) {
+  try {
+    await work();
+  } catch (error) {
+    console.error("[accounts] post-commit work failed:", error);
+  }
+}
+
+/** One receipt, one student, one campus; every affected saved document is marked stale. */
 async function touchReceiptDocuments(receiptNo: string) {
-  const rows = await prisma.payment.findMany({
-    where: { receiptNo: { equals: receiptNo, mode: "insensitive" } },
-    select: { invoiceId: true },
+  const normalized = receiptNo.toUpperCase();
+  const receipt = await prisma.receipt.findUnique({
+    where: { numberNormalized: normalized },
+    select: { payments: { select: { invoiceId: true } }, sourceInvoiceId: true },
   });
+  const invoiceIds = receipt
+    ? [...new Set([...receipt.payments.map((row) => row.invoiceId), ...(receipt.sourceInvoiceId ? [receipt.sourceInvoiceId] : [])])]
+    : (
+        await prisma.payment.findMany({
+          where: { receiptNo: { equals: receiptNo, mode: "insensitive" } },
+          select: { invoiceId: true },
+        })
+      ).map((row) => row.invoiceId);
   await Promise.all([
-    ...[...new Set(rows.map((row) => row.invoiceId))].map((id) => touchInvoice(id)),
+    ...[...new Set(invoiceIds)].map((id) => touchInvoice(id)),
     touchReceipt(receiptNo),
   ]);
 }
 
-/** Proves a form-supplied invoice id sits on the admin's campus and returns its owner. */
+async function notifyReceipt(studentId: string, receiptNo: string, amount: number) {
+  const owner = await prisma.studentProfile.findUnique({
+    where: { id: studentId },
+    select: { userId: true },
+  });
+  if (!owner) return;
+  await notifyUser(owner.userId, {
+    title: "Fee payment received",
+    body: `${moneyExact(amount)} received — receipt ${receiptNo}.`,
+    notificationType: "fee",
+    targetUrl: "/student/fees",
+    dedupeKey: `fee:receipt:${receiptNo}`,
+  });
+}
+
 async function campusInvoice(campusId: number | null, invoiceId: string) {
   const invoice = await prisma.invoice.findFirst({
     where: { id: invoiceId, ...(campusId === null ? {} : { campusId }) },
-    select: { id: true, status: true, studentId: true },
+    select: { id: true, status: true, studentId: true, campusId: true },
   });
   if (!invoice) throw new FieldError(fieldErrors.notOnCampus);
   return invoice;
@@ -73,12 +114,10 @@ export async function createInvoice(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/accounts", AFFECTED, async () => {
-    // A bill has to sit in exactly one campus, so a college-wide admin raises none here.
     const campusId = scope.campusId;
     if (campusId === null) throw new FieldError(fieldErrors.notOnCampus);
 
     const studentId = requiredText(formData, "studentId", fieldLabel("studentId"));
-    // The bill is dated against the shared calendar; the invoice itself stays on this campus.
     const periodId = await periodFromForm(formData, "periodId");
     const dueAt = dateField(formData, "dueAt");
     const note = text(formData, "note");
@@ -89,28 +128,21 @@ export async function createInvoice(formData: FormData) {
     });
     if (!student) throw new FieldError(fieldErrors.notOnCampus);
 
-    // The programme is whatever the student is actually studying, not a value off the form.
     const enrollment = await prisma.enrollment.findFirst({
       where: { studentId, campusId, status: "ACTIVE" },
       orderBy: { enrolledAt: "desc" },
       select: { programId: true },
     });
-
     const feeItems = enrollment
       ? await prisma.feeItem.findMany({
-          where: {
-            programId: enrollment.programId,
-            isOptional: false,
-            periodId,
-          },
+          where: { programId: enrollment.programId, isOptional: false, periodId },
           orderBy: { label: "asc" },
           select: { label: true, amount: true },
         })
       : [];
 
     const number = await nextInvoiceNumber();
-
-    await prisma.$transaction(async (tx) => {
+    const invoiceId = await prisma.$transaction(async (tx) => {
       const invoice = await unique(invoiceLabel, () =>
         tx.invoice.create({
           data: {
@@ -126,17 +158,27 @@ export async function createInvoice(formData: FormData) {
           select: { id: true },
         }),
       );
-
       if (feeItems.length > 0) {
         await tx.invoiceLine.createMany({
           data: feeItems.map((item) => ({
             invoiceId: invoice.id,
             label: item.label,
-            amount: Number(String(item.amount)),
+            amount: String(item.amount),
           })),
         });
       }
+      await recordAudit({
+        campusId,
+        actorId: scope.userId,
+        actorEmail: scope.email,
+        action: "invoice.create",
+        entityType: "invoice",
+        entityId: invoice.id,
+        detail: { number, studentId },
+      }, tx);
+      return invoice.id;
     });
+    await bestEffort(() => touchInvoice(invoiceId));
   });
 }
 
@@ -146,16 +188,29 @@ export async function addInvoiceLine(formData: FormData) {
   return onSave("/dashboard/accounts", AFFECTED, async () => {
     const invoiceId = hiddenId(formData, "invoiceId", invoiceLabel);
     const lineLabel = requiredText(formData, "label", fieldLabel("label"));
-    const amount = requiredNumber(formData, "amount", fieldLabel("amount"));
-    if (amount < 0) throw new FieldError(fieldErrors.number(fieldLabel("amount")));
-
+    const amountCents = amountFromForm(formData);
     const invoice = await campusInvoice(scope.campusId, invoiceId);
+    if (invoice.status === InvoiceStatus.VOID) throw new FieldError("A void invoice cannot take new charges.");
 
-    await prisma.invoiceLine.create({
-      data: { invoiceId: invoice.id, label: lineLabel, amount },
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${invoice.studentId}, 0))`;
+      const locked = await tx.invoice.findUniqueOrThrow({ where: { id: invoice.id }, select: { status: true } });
+      if (locked.status === InvoiceStatus.VOID) throw new FieldError("A void invoice cannot take new charges.");
+      await tx.invoiceLine.create({
+        data: { invoiceId: invoice.id, label: lineLabel, amount: fromCents(amountCents), createdById: scope.userId, createdByEmail: scope.email },
+      });
+      await recomputeInvoice(tx, invoice.id);
+      await recordAudit({
+        campusId: invoice.campusId,
+        actorId: scope.userId,
+        actorEmail: scope.email,
+        action: "invoice.line_add",
+        entityType: "invoice",
+        entityId: invoice.id,
+        detail: { label: lineLabel, amountCents },
+      }, tx);
     });
-
-    await recompute(invoice.id);
+    await bestEffort(() => touchInvoice(invoice.id));
   });
 }
 
@@ -165,243 +220,110 @@ export async function recordPayment(formData: FormData) {
   return onSave("/dashboard/accounts", AFFECTED, async () => {
     const invoiceId = requiredText(formData, "invoiceId", fieldLabel("invoiceId"));
     const invoice = await campusInvoice(scope.campusId, invoiceId);
-
-    // Only an unsettled bill can take money; the wording names the status that refused it.
-    if (invoice.status !== InvoiceStatus.OPEN && invoice.status !== InvoiceStatus.PARTIAL) {
-      throw new FieldError(fieldErrors.choice(labels.invoiceStatus[invoice.status]));
-    }
-
-    const amount = requiredNumber(formData, "amount", fieldLabel("amount"));
-    if (amount <= 0) throw new FieldError(fieldErrors.number(fieldLabel("amount")));
-
+    const amountCents = amountFromForm(formData);
     const method = enumField(formData, "method", METHODS, fieldLabel("method"));
     const reference = text(formData, "reference");
     const paidAt = requiredDate(formData, "paidAt", fieldLabel("paidAt"));
 
-    // The payer is whoever owns the bill, taken from the invoice row rather than the form.
-    const payment = await prisma.payment.create({
-      data: { invoiceId: invoice.id, studentId: invoice.studentId, amount, method, reference, paidAt },
-    });
-
-    await recompute(invoice.id);
-
-    // The invoice is a saved document: this payment changes its figures, so its artwork is
-    // refreshed in the background. Nothing is rendered in this request.
-    await touchInvoice(invoice.id);
-
-    // The student's portal hears the money is in, and what (if anything) is still owed —
-    // the balance is read back after the recompute, so the notice cannot drift from the ledger.
-    const owner = await prisma.studentProfile.findUnique({
-      where: { id: invoice.studentId },
-      select: { userId: true },
-    });
-    if (owner) {
-      const fresh = await prisma.invoice.findUnique({
-        where: { id: invoice.id },
-        select: {
-          number: true,
-          lines: { select: { amount: true } },
-          payments: { select: { amount: true } },
-        },
-      });
-      if (fresh) {
-        const remaining =
-          fresh.lines.reduce((sum, line) => sum + Number(line.amount.toString()), 0) -
-          fresh.payments.reduce((sum, row) => sum + Number(row.amount.toString()), 0);
-        await notifyUser(owner.userId, {
-          title: "Fee payment received",
-          body:
-            `${money(amount)} recorded on invoice ${fresh.number}.` +
-            (remaining > 0 ? ` Balance due: ${money(remaining)}.` : " Fully settled."),
-          notificationType: "fee",
-          targetUrl: "/student/fees",
-          dedupeKey: `fee:payment:${payment.id}`,
-        });
-      }
-    }
+    const result = await prisma.$transaction((tx) =>
+      recordReceipt(tx, {
+        studentId: invoice.studentId,
+        campusId: invoice.campusId,
+        amountCents,
+        method,
+        reference,
+        paidAt,
+        actor: { id: scope.userId, email: scope.email },
+        idempotencyKey: idempotencyKey(formData),
+        allocation: "SINGLE",
+        invoiceId: invoice.id,
+      }),
+    );
+    await bestEffort(() => touchReceiptDocuments(result.receiptNo));
+    await bestEffort(() => notifyReceipt(invoice.studentId, result.receiptNo, result.amountCents / 100));
   });
 }
 
-/**
- * One receipt, spread across a student's unpaid periods oldest-due first.
- *
- * The money is not parked in a new account: each period it settles gets a real payment row
- * with the same receipt number, and each invoice's status is recomputed the same way a
- * single-invoice payment is. That keeps the accounts module the single source of truth.
- */
 export async function recordStudentPayment(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   return onSave("/dashboard/accounts", AFFECTED, async () => {
     const studentId = requiredText(formData, "studentId", fieldLabel("studentId"));
-    const amount = requiredNumber(formData, "amount", fieldLabel("amount"));
-    if (amount <= 0) throw new FieldError(fieldErrors.number(fieldLabel("amount")));
-
+    const amountCents = amountFromForm(formData);
     const method = enumField(formData, "method", METHODS, fieldLabel("method"));
     const reference = text(formData, "reference");
     const paidAt = requiredDate(formData, "paidAt", fieldLabel("paidAt"));
-
     const student = await prisma.studentProfile.findFirst({
       where: { id: studentId, ...(scope.campusId === null ? {} : { campusId: scope.campusId }) },
-      select: { id: true },
+      select: { id: true, campusId: true },
     });
     if (!student) throw new FieldError(fieldErrors.notOnCampus);
 
-    const receiptNo = await nextReceiptNumber();
-
-    await prisma.$transaction(async (tx) => {
-      const outcome = await allocateStudentPayment(tx, {
+    const result = await prisma.$transaction((tx) =>
+      recordReceipt(tx, {
         studentId: student.id,
-        amount,
+        campusId: student.campusId,
+        amountCents,
         method,
         reference,
         paidAt,
-        receiptNo,
-      });
-
-      if (!outcome.ok) {
-        throw outcome.reason === "overpay"
-          ? new FieldError(pages.accounts.payment.student.overpay(money(outcome.outstanding)))
-          : new FieldError(pages.accounts.payment.student.nothingOwed);
-      }
-    });
-
-    await touchReceiptDocuments(receiptNo);
-
-    // One notice per receipt, never one per invoice the receipt settled: the office
-    // records a receipt, the student hears about the receipt.
-    const owner = await prisma.studentProfile.findUnique({
-      where: { id: student.id },
-      select: { userId: true },
-    });
-    if (owner) {
-      await notifyUser(owner.userId, {
-        title: "Fee payment received",
-        body: `${money(amount)} received — receipt ${receiptNo}.`,
-        notificationType: "fee",
-        targetUrl: "/student/fees",
-        dedupeKey: `fee:receipt:${receiptNo}`,
-      });
-    }
+        actor: { id: scope.userId, email: scope.email },
+        idempotencyKey: idempotencyKey(formData),
+        allocation: "STUDENT",
+      }),
+    );
+    await bestEffort(() => touchReceiptDocuments(result.receiptNo));
+    await bestEffort(() => notifyReceipt(student.id, result.receiptNo, result.amountCents / 100));
   });
 }
 
-/**
- * The payment wizard's own entry: the same ledger writes as `recordStudentPayment`,
- * but it RETURNS the receipt instead of redirecting, so the guided flow can show the
- * receipt number and the document links without losing the page, and a refusal shows
- * next to the step instead of bouncing the administrator. A retried submit is refused
- * by the wizard's one-shot state, and the receipt's uniqueness is the ledger's.
- */
+/** The wizard and every other payment screen use the same receipt service and allocation policy. */
 export async function recordWizardPayment(formData: FormData) {
   const scope = await requireCollegeAdmin();
 
   try {
     const studentId = requiredText(formData, "studentId", fieldLabel("studentId"));
-    const amount = requiredNumber(formData, "amount", fieldLabel("amount"));
-    if (amount <= 0) throw new FieldError(fieldErrors.number(fieldLabel("amount")));
-
+    const invoiceId = requiredText(formData, "invoiceId", fieldLabel("invoiceId"));
+    const amountCents = amountFromForm(formData);
     const method = enumField(formData, "method", METHODS, fieldLabel("method"));
     const reference = text(formData, "reference");
     const paidAt = requiredDate(formData, "paidAt", fieldLabel("paidAt"));
-
     const student = await prisma.studentProfile.findFirst({
       where: { id: studentId, ...(scope.campusId === null ? {} : { campusId: scope.campusId }) },
-      select: { id: true },
+      select: { id: true, campusId: true },
     });
     if (!student) throw new FieldError(fieldErrors.notOnCampus);
 
-    const receiptNo = await nextReceiptNumber();
+    const result = await prisma.$transaction((tx) =>
+      recordReceipt(tx, {
+        studentId: student.id,
+        campusId: student.campusId,
+        amountCents,
+        method,
+        reference,
+        paidAt,
+        actor: { id: scope.userId, email: scope.email },
+        idempotencyKey: idempotencyKey(formData),
+        allocation: "STUDENT",
+        invoiceId,
+        expectedAllocationFingerprint: text(formData, "expectedAllocationFingerprint") ?? undefined,
+      }),
+    );
 
-    // The allocation: the SELECTED semester's invoice is paid first; anything beyond its
-    // outstanding cascades to the student's next unpaid semesters, oldest first — the
-    // way the college has always counted money, now without a clerk doing the arithmetic.
-    // The whole payment rides ONE receipt number, however many invoices it settles, and
-    // the entire allocation lands in one transaction: a failure leaves no part-paid mess.
-    const result = await prisma.$transaction(async (tx) => {
-      const open = await tx.invoice.findMany({
-        where: { studentId: student.id, status: { in: ["OPEN", "PARTIAL"] } },
-        orderBy: [{ periodYear: "asc" }, { periodSemester: "asc" }, { dueAt: "asc" }],
-        select: { id: true },
-      });
-      const lead = String(formData.get("invoiceId") ?? "");
-      const ordered = [
-        ...open.filter((inv) => inv.id === lead),
-        ...open.filter((inv) => inv.id !== lead),
-      ];
-      if (ordered.length === 0) throw new FieldError(pages.accounts.payment.student.nothingOwed);
-
-      let remaining = amount;
-      const applied: Array<{ invoice: string; amount: number }> = [];
-      for (const invoice of ordered) {
-        if (remaining <= 0) break;
-        const fresh = await tx.invoice.findUnique({
-          where: { id: invoice.id },
-          select: { number: true, lines: { select: { amount: true } }, payments: { select: { amount: true } } },
-        });
-        if (!fresh) continue;
-        const outstanding =
-          fresh.lines.reduce((sum, line) => sum + Number(line.amount.toString()), 0) -
-          fresh.payments.reduce((sum, row) => sum + Number(row.amount.toString()), 0);
-        if (outstanding <= 0) continue;
-
-        const appliedNow = Math.min(remaining, outstanding);
-        await tx.payment.create({
-          data: {
-            invoiceId: invoice.id,
-            studentId: student.id,
-            amount: appliedNow,
-            method,
-            reference,
-            paidAt,
-            receiptNo,
-          },
-        });
-        await recomputeInvoice(tx, invoice.id);
-        remaining -= appliedNow;
-        applied.push({ invoice: fresh.number, amount: appliedNow });
-      }
-
-      // Money beyond the ENTIRE ledger is refused: an overpayment needs the office's
-      // decision, not a silent credit. The transaction rolls the whole allocation back.
-      if (remaining > 0) {
-        throw new FieldError(pages.accounts.payment.student.overpay(money(remaining)));
-      }
-      return applied;
+    await bestEffort(() => touchReceiptDocuments(result.receiptNo));
+    await bestEffort(() => notifyReceipt(student.id, result.receiptNo, result.amountCents / 100));
+    await bestEffort(async () => {
+      for (const path of AFFECTED) refresh(path);
     });
-
-    const appliedRows = result;
-    await touchReceiptDocuments(receiptNo);
-
-    const owner = await prisma.studentProfile.findUnique({
-      where: { id: student.id },
-      select: { userId: true },
-    });
-    if (owner) {
-      await notifyUser(owner.userId, {
-        title: "Fee payment received",
-        body: `${money(amount)} received — receipt ${receiptNo}.`,
-        notificationType: "fee",
-        targetUrl: "/student/fees",
-        dedupeKey: `fee:receipt:${receiptNo}`,
-      });
-    }
-
-    for (const path of AFFECTED) refresh(path);
-    return { ok: true as const, receiptNo, applied: appliedRows };
+    return { ok: true as const, receiptNo: result.receiptNo, applied: result.allocations };
   } catch (error) {
-    if (error instanceof FieldError) {
+    if (error instanceof FieldError || error instanceof FinanceError) {
       return { ok: false as const, error: error.message };
     }
     throw error;
   }
 }
 
-/**
- * Bills a student who was enrolled before their programme's fee structure was published.
- * Reads the same generator enrolment uses, so a backfilled schedule is identical and the
- * unique key still refuses a second run.
- */
 export async function generateEnrollmentFees(formData: FormData) {
   const scope = await requireCollegeAdmin();
   const enrollmentId = hiddenId(formData, "enrollmentId", fieldLabel("studentId"));
@@ -422,13 +344,10 @@ export async function generateEnrollmentFees(formData: FormData) {
   }
 
   const studentPath = `/dashboard/students/${enrollment.studentId}`;
-
   return onSave(studentPath, [...AFFECTED, studentPath], async () => {
     const plan = await activePlanFor(enrollment.programId);
     if (!plan) throw new FieldError(pages.students.profile.fees.noPlan);
-
     const numbers = await nextInvoiceNumbers(plan.periods.length);
-
     await prisma.$transaction(async (tx) => {
       await generateFeeSchedule(tx, {
         studentId: enrollment.studentId,
@@ -439,26 +358,116 @@ export async function generateEnrollmentFees(formData: FormData) {
         numbers,
       });
     });
-
-    const invoices = await prisma.invoice.findMany({
-      where: { enrollmentId: enrollment.id },
-      select: { id: true },
-    });
-    await Promise.all(invoices.map((invoice) => touchInvoice(invoice.id)));
+    const invoices = await prisma.invoice.findMany({ where: { enrollmentId: enrollment.id }, select: { id: true } });
+    await bestEffort(() => Promise.all(invoices.map((invoice) => touchInvoice(invoice.id))));
   });
 }
 
 export async function voidInvoice(formData: FormData) {
   const scope = await requireCollegeAdmin();
-
   return onSave("/dashboard/accounts", AFFECTED, async () => {
     const invoiceId = hiddenId(formData, "invoiceId", invoiceLabel);
+    const reason = requiredText(formData, "reason", "Reason");
     const invoice = await campusInvoice(scope.campusId, invoiceId);
+    try {
+      await prisma.$transaction((tx) =>
+        voidInvoiceWithReason(tx, {
+          invoiceId: invoice.id,
+          reason,
+          actor: { id: scope.userId, email: scope.email },
+        }),
+      );
+    } catch (error) {
+      if (error instanceof FinanceError) throw new FieldError(error.message);
+      throw error;
+    }
+    await bestEffort(() => touchInvoice(invoice.id));
+  });
+}
 
-    await prisma.invoice.update({
-      where: { id: invoice.id },
-      data: { status: InvoiceStatus.VOID },
+export async function restoreInvoice(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+  return onSave("/dashboard/accounts", AFFECTED, async () => {
+    const invoiceId = hiddenId(formData, "invoiceId", invoiceLabel);
+    const reason = requiredText(formData, "reason", "Reason");
+    const invoice = await campusInvoice(scope.campusId, invoiceId);
+    try {
+      await prisma.$transaction((tx) =>
+        unvoidInvoice(tx, {
+          invoiceId: invoice.id,
+          reason,
+          actor: { id: scope.userId, email: scope.email },
+        }),
+      );
+    } catch (error) {
+      if (error instanceof FinanceError) throw new FieldError(error.message);
+      throw error;
+    }
+    await bestEffort(() => touchInvoice(invoice.id));
+  });
+}
+
+export async function correctPayment(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+  return onSave("/dashboard/accounts", AFFECTED, async () => {
+    const paymentId = hiddenId(formData, "paymentId", "Payment");
+    const kind = enumField(formData, "kind", ["REVERSAL", "REFUND"] as const, "Correction type");
+    const reason = requiredText(formData, "reason", "Reason");
+    const effectiveAt = requiredDate(formData, "effectiveAt", "Effective date");
+    const reference = text(formData, "reference");
+    const payment = await prisma.payment.findFirst({
+      where: { id: paymentId, ...(scope.campusId === null ? {} : { invoice: { campusId: scope.campusId } }) },
+      select: { receiptId: true },
     });
-    await touchInvoice(invoice.id);
+    if (!payment) throw new FieldError(fieldErrors.notOnCampus);
+
+    let creditNoteNo = "";
+    try {
+      const result = await prisma.$transaction((tx) =>
+        correctReceipt(tx, {
+          receiptId: payment.receiptId,
+          kind,
+          reason,
+          effectiveAt,
+          reference,
+          actor: { id: scope.userId, email: scope.email },
+          idempotencyKey: idempotencyKey(formData),
+        }),
+      );
+      creditNoteNo = result.creditNoteNo;
+    } catch (error) {
+      if (error instanceof FinanceError) throw new FieldError(error.message);
+      throw error;
+    }
+    await bestEffort(() => touchReceiptDocuments(creditNoteNo));
+  });
+}
+
+export async function issueCreditNote(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+  return onSave("/dashboard/accounts", AFFECTED, async () => {
+    const invoiceId = hiddenId(formData, "invoiceId", invoiceLabel);
+    const amountCents = amountFromForm(formData);
+    const reason = requiredText(formData, "reason", "Reason");
+    const effectiveAt = requiredDate(formData, "effectiveAt", "Effective date");
+    const invoice = await campusInvoice(scope.campusId, invoiceId);
+    let creditNoteNo = "";
+    try {
+      const result = await prisma.$transaction((tx) =>
+        creditInvoice(tx, {
+          invoiceId: invoice.id,
+          amountCents,
+          reason,
+          effectiveAt,
+          actor: { id: scope.userId, email: scope.email },
+          idempotencyKey: idempotencyKey(formData),
+        }),
+      );
+      creditNoteNo = result.creditNoteNo;
+    } catch (error) {
+      if (error instanceof FinanceError) throw new FieldError(error.message);
+      throw error;
+    }
+    await bestEffort(() => touchReceiptDocuments(creditNoteNo));
   });
 }

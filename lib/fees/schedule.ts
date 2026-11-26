@@ -8,14 +8,13 @@
 
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { toCents } from "@/lib/fees/money";
 import {
   resolvePeriods,
   type CalendarPeriod,
   type FeeKind,
   type PeriodDraft,
 } from "@/lib/fees/periods";
-
-const money = (value: unknown) => Number(String(value ?? 0)) || 0;
 
 export type ActivePlan = {
   id: string;
@@ -106,12 +105,13 @@ export async function generateFeeSchedule(
     return { planId: null, version: null, created: 0, total: 0, skipped: 0 };
   }
 
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${input.studentId}, 0))`;
   const calendar = await calendarFor(tx);
   const semestersPerYear = new Set(calendar.map((row) => row.sequence)).size || undefined;
 
   const drafts: PeriodDraft[] = plan.periods.map((period) => ({
     label: period.label,
-    amount: String(money(period.amount)),
+    amount: String(period.amount),
     yearIndex: period.yearIndex,
     semesterNo: period.semesterNo,
     dueOffsetDays: period.dueOffsetDays ?? 0,
@@ -178,7 +178,7 @@ export async function generateFeeSchedule(
         status: "OPEN",
         note: `Fees v${plan.version} · ${period.periodLabel}`,
         lines: {
-          create: [{ label: period.periodLabel, amount: money(period.amount) }],
+          create: [{ label: period.periodLabel, amount: String(period.amount) }],
         },
       },
     });
@@ -189,7 +189,7 @@ export async function generateFeeSchedule(
     planId: plan.id,
     version: plan.version,
     created,
-    total: money(plan.totalAmount),
+    total: toCents(plan.totalAmount) / 100,
     skipped,
   };
 }

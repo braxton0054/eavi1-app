@@ -5,6 +5,7 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
+import { sumAmounts } from "@/lib/fees/ledger";
 
 const copy = studentPortal.fees;
 
@@ -18,11 +19,13 @@ const invoiceTone: Record<string, ChipTone> = {
   PAID: "success",
   PARTIAL: "warning",
   OPEN: "danger",
+  CREDIT: "info",
   VOID: "neutral",
 };
 
 export default async function StudentFeesPage() {
   const { enrollment, invoices, payments, totals } = await getStudentFees();
+  const creditDue = totals.balance < 0;
 
   return (
     <div className="space-y-6">
@@ -40,8 +43,8 @@ export default async function StudentFeesPage() {
             <MetricCard label={copy.total} value={kwacha(totals.billed)} icon="accounts" />
             <MetricCard label={copy.paid} value={kwacha(totals.paid)} icon="accounts" />
             <MetricCard
-              label={copy.balance}
-              value={kwacha(totals.balance)}
+              label={creditDue ? "Credit due" : copy.balance}
+              value={kwacha(creditDue ? Math.abs(totals.balance) : totals.balance)}
               icon="accounts"
               tone={totals.balance > 0 ? "attention" : "money"}
             />
@@ -130,7 +133,7 @@ export default async function StudentFeesPage() {
                       ) : null}
                     </div>
                     <span className="shrink-0 font-medium text-eavi-on-bg tabular-nums">
-                      {kwacha(Number(payment.amount.toString()))}
+                      {kwacha(sumAmounts([payment]))}
                     </span>
                   </li>
                 ))}

@@ -29,9 +29,12 @@ export async function receiptPdf(input: Omit<ReceiptInput, "student"> & { studen
     ? await withQr(svg, input.student.verifyUrl, RECEIPT_QR_BOX)
     : svg;
 
+  const correction = input.kind === "CREDIT_NOTE" || Boolean(input.correctionType);
   return documentPdf([withCode], {
     paper: "a5",
-    title: `EAVI fee receipt — ${input.receiptNo}`,
+    title: correction
+      ? `EAVI credit note — ${input.receiptNo}`
+      : `EAVI fee receipt — ${input.receiptNo}`,
   });
 }
 
@@ -44,7 +47,9 @@ export async function invoicePdf(input: Omit<InvoiceInput, "student"> & { studen
 
   return documentPdf([withCode], {
     paper: "a5",
-    title: `EAVI fee invoice — ${input.invoiceNo}`,
+    title: input.status === "VOID"
+      ? `EAVI void invoice — ${input.invoiceNo}`
+      : `EAVI fee invoice — ${input.invoiceNo}`,
   });
 }
 

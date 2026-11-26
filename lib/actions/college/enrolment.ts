@@ -27,6 +27,7 @@ import {
   unique,
 } from "@/lib/actions/college/_shared";
 import { activePlanFor, generateFeeSchedule } from "@/lib/fees/schedule";
+import { reserveAdmissionNumber } from "@/lib/fees/references";
 import { normaliseClassName } from "@/lib/academics/classes";
 import { resolveClassForName } from "@/lib/academics/class-reuse";
 import { recordAudit } from "@/lib/academics/audit";
@@ -248,6 +249,7 @@ export async function enrolStudent(formData: FormData) {
     const secondarySchoolDocUrl = await maybeUpload(formData.get("secondarySchoolDoc"), "school-docs", folder);
 
     await prisma.$transaction(async (tx) => {
+      await reserveAdmissionNumber(issuedAdmissionNo, tx);
       const user = await unique("Email", () =>
         tx.user.create({
           data: {
