@@ -1,8 +1,8 @@
 ## The admission letter
 
-**Generated automatically on submission.** There is no office approval step: the applicant fills in
-the public form, hits submit, and downloads the letter immediately. That letter is what they bring
-to enrolment as proof they applied.
+**Issued only after office review.** Public submission creates an application record, not an official
+letter. An authenticated admissions officer must verify the applicant's contact and KCSE grade, then
+approve the application and issue the stamped letter from the dashboard.
 
 A four-page A4 document, generated from an application. Nothing is stored as a file: the letter is
 rebuilt each time, so a reprint always matches the terms it was issued on.
@@ -42,22 +42,19 @@ whose fee page is subtly wrong; a clear refusal is better.
 
 ### The wording is not "you have been admitted"
 
-Because nobody reviews the form before the letter is generated, the letter must not claim that
-anybody admitted the applicant. Anyone can submit the public form with any name — a document saying
-"we are pleased to offer you admission", downloadable without a check, would be both untrue and
-trivial to forge.
+The letter remains an acknowledgement of application, not an offer of admission. Office review and
+contact verification establish who submitted it; the wording still avoids claiming a place that the
+college has not separately confirmed.
 
 So it is headed **ACKNOWLEDGEMENT OF APPLICATION** and states plainly: *"This is a record that your
 application was received. It is not an offer of a place."* It proves the application exists and ties
 it to a reference the office can confirm — which is exactly what an enrolment counter needs.
 
-### Authority comes from the token, not a session
+### Public verification and private download are separate
 
-The applicant has no account, so the download is public. `OfferLetter.reference` is sequential
-(`APP/2026/0001`), so the **token** is what makes the letter theirs: `/letter/<reference>?t=<token>`.
-Honouring the reference alone would let anyone walk the range and download other people's letters,
-name and programme included. Verified: reference alone is refused, a wrong token is refused, and one
-applicant's token does not open another's letter.
+The QR carries `OfferLetter.verifyToken` and opens the read-only `/verify/<token>` page. It never
+authorizes a PDF download or programme change. Private downloads use a distinct, hashed, expiring
+capability; office staff download through the authenticated application route.
 
 A wrong reference and a wrong token return the same message on purpose — distinguishing them would
 confirm that a reference exists.
@@ -81,11 +78,11 @@ not "the back of a student card".
 Verified: `npm run verify:letters` — 16 checks, including that a letter page never tells the reader
 to scan a student card.
 
-### Re-issuing keeps the token
+### Re-issuing rotates capabilities
 
-`issueLetterForApplication` upserts. A second call never mints a second token, because the first was
-already handed to an applicant who may have printed it. `revokedAt` stops a download even with a
-correct token.
+`issueApprovedLetter` upserts one row per application. A new issuance rotates the public verification
+token and private download hash, records the officer, and clears an old revocation. Rejected, revoked,
+expired, and unverified applications cannot produce an official letter.
 
 ### Known limits
 

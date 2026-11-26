@@ -29,22 +29,12 @@ import { isEmail, normalizeKenyanPhone } from "@/lib/validation";
 
 type Errors = Partial<
   Record<
-    "fullName" | "email" | "phone" | "password" | "confirm" | "role" | "campusId",
+    "fullName" | "email" | "phone" | "password" | "confirm" | "campusId",
     string
   >
 >;
 
 type CampusOption = { id: number; code: string; name: string; place: string };
-
-const ROLES = [
-  { value: "STUDENT", label: "Student" },
-  { value: "TUTOR", label: "Tutor" },
-  { value: "CAMPUS_ADMIN", label: "Campus admin" },
-  { value: "SUPERADMIN", label: "Superadmin" },
-];
-
-/** Students and staff both hang off a campus; only the superadmin spans all three. */
-const CAMPUS_ROLES = ["STUDENT", "TUTOR", "CAMPUS_ADMIN"];
 
 const EMPTY: Errors = {};
 
@@ -56,7 +46,6 @@ export function RegisterForm() {
     password: "",
     confirm: "",
   });
-  const [role, setRole] = useState("STUDENT");
   const [campusId, setCampusId] = useState<number | null>(null);
   const [campuses, setCampuses] = useState<CampusOption[]>([]);
   const [errors, setErrors] = useState<Errors>(EMPTY);
@@ -85,8 +74,6 @@ export function RegisterForm() {
     };
   }, []);
 
-  const needsCampus = CAMPUS_ROLES.includes(role);
-
   function update(key: keyof typeof values) {
     return (event: React.ChangeEvent<HTMLInputElement>) => {
       setValues((current) => ({ ...current, [key]: event.target.value }));
@@ -99,7 +86,7 @@ export function RegisterForm() {
   function validateStep1(): boolean {
     const nextErrors: Errors = {};
 
-    if (needsCampus && campusId === null) {
+    if (campusId === null) {
       nextErrors.campusId = "Choose which campus you belong to.";
     }
 
@@ -161,7 +148,6 @@ export function RegisterForm() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           ...values,
-          role,
           campusId,
         }),
       });
@@ -207,7 +193,7 @@ export function RegisterForm() {
             {/* NAV-17/CMP-04: progress with labels, exposed to assistive tech. */}
             <div className="mb-4">
               <p aria-live="polite" className="text-xs font-medium text-eavi-muted-text">
-                Step {step} of 3 · {step === 1 ? "Account type" : step === 2 ? "Your details" : "Choose a password"}
+                Step {step} of 3 · {step === 1 ? "Your campus" : step === 2 ? "Your details" : "Choose a password"}
               </p>
               <div
                 role="progressbar"
@@ -225,67 +211,39 @@ export function RegisterForm() {
             </div>
 
             <div className={step === 1 ? "grid w-full items-center gap-4" : "hidden"}>
-              {/* FRM-02: the account type is the step's one decision, so all four options sit
-                  visible as radios instead of hidden behind a dropdown tap. */}
-              <fieldset className="flex flex-col space-y-1.5">
-                <legend className="text-sm font-medium">I am registering as</legend>
-                <div className="grid grid-cols-2 gap-2">
-                  {ROLES.map((option) => (
-                    <label
-                      key={option.value}
-                      className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-input bg-eavi-card px-3 text-sm font-medium text-eavi-on-bg transition-colors has-[:checked]:border-eavi-fill has-[:checked]:bg-eavi-primary-soft has-[:checked]:text-eavi-primary-text has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring"
-                    >
-                      <input
-                        type="radio"
-                        name="role"
-                        value={option.value}
-                        checked={role === option.value}
-                        onChange={() => {
-                          setRole(option.value);
-                          setErrors((current) => ({ ...current, campusId: undefined }));
-                        }}
-                        className="size-5 accent-eavi-fill"
-                      />
-                      {option.label}
-                    </label>
-                  ))}
-                </div>
-                {errors.role && (
-                  <p className="text-sm font-medium text-destructive">{errors.role}</p>
-                )}
-              </fieldset>
-
-              {needsCampus && (
-                <div className="flex flex-col space-y-1.5">
-                  <Label htmlFor="reg-campus">Campus</Label>
-                  <Select
-                    value={campusId === null ? undefined : String(campusId)}
-                    onValueChange={(next) => setCampusId(Number(next))}
-                  >
-                    <SelectTrigger id="reg-campus" className="w-full">
-                      <SelectValue placeholder="Choose a campus" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {campuses.length === 0 ? (
-                        <SelectItem value="__unavailable" disabled>
-                          Campus list unavailable
+              <div className="flex flex-col space-y-1.5">
+                <Label htmlFor="reg-campus">Campus</Label>
+                <Select
+                  value={campusId === null ? undefined : String(campusId)}
+                  onValueChange={(next) => setCampusId(Number(next))}
+                >
+                  <SelectTrigger id="reg-campus" className="w-full">
+                    <SelectValue placeholder="Choose a campus" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {campuses.length === 0 ? (
+                      <SelectItem value="__unavailable" disabled>
+                        Campus list unavailable
+                      </SelectItem>
+                    ) : (
+                      campuses.map((campus) => (
+                        <SelectItem key={campus.id} value={String(campus.id)}>
+                          {campus.name}
                         </SelectItem>
-                      ) : (
-                        campuses.map((campus) => (
-                          <SelectItem key={campus.id} value={String(campus.id)}>
-                            {campus.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {errors.campusId && (
-                    <p id="reg-campus-error" className="text-sm font-medium text-destructive">
-                      {errors.campusId}
-                    </p>
-                  )}
-                </div>
-              )}
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {errors.campusId ? (
+                  <p id="reg-campus-error" className="text-sm font-medium text-destructive">
+                    {errors.campusId}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Student accounts are created here. Staff accounts are issued by the college.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Step 2 stays mounted but hidden, so nothing the person typed is lost on Back. */}

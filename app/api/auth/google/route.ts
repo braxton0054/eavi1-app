@@ -3,6 +3,8 @@ import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { safeNextPath } from "@/lib/landing";
+import { enforceOAuthRateLimit } from "@/lib/security/auth-rate-limit";
+import { RateLimitExceededError, RateLimitUnavailableError } from "@/lib/security/rate-limit";
 import {
   OAUTH_STATE_COOKIE,
   OAUTH_STATE_TTL_SECONDS,
@@ -27,6 +29,14 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   const origin = publicOrigin(request);
+
+  try {
+    await enforceOAuthRateLimit(request);
+  } catch (error) {
+    const target = new URL("/login", origin);
+    target.searchParams.set("error", error instanceof RateLimitExceededError ? "throttled" : error instanceof RateLimitUnavailableError ? "unavailable" : "exchange");
+    return NextResponse.redirect(target);
+  }
 
   // A deployment with no Google client should say so rather than bounce through a broken page.
   if (!googleConfigured()) {

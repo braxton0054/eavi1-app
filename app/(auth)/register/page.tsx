@@ -4,7 +4,7 @@ import { RegisterForm } from "@/components/register-form";
 
 export const metadata: Metadata = {
   title: "Create an account — East Africa Vision Institute",
-  description: "Register for EAVI student and staff services in Eldoret.",
+  description: "Create an EAVI student account in Eldoret.",
   robots: { index: false, follow: false },
 };
 

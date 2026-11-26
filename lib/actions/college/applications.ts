@@ -2,6 +2,9 @@
 
 import { ApplicationStatus, EntryGrade } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
+import { issueApprovedLetter } from "@/lib/admissions/issue";
+import { meetsMinimum } from "@/lib/admissions/grade";
+import { recordAudit } from "@/lib/academics/audit";
 import { requireCollegeAdmin } from "@/lib/session";
 import { genderValues } from "@/lib/content/apply";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
@@ -105,5 +108,80 @@ export async function decideApplication(formData: FormData) {
     // The record is still an application either way. Nothing here opens a student account,
     // issues an admission number or writes an enrolment.
     await prisma.application.update({ where: { id: application.id }, data: decided });
+    if (decision === "REJECTED") {
+      await prisma.offerLetter.updateMany({
+        where: { applicationId: application.id, revokedAt: null },
+        data: { revokedAt: new Date(), revokeReason: "Application rejected by admissions" },
+      });
+    }
+  });
+}
+
+/** Office-only review gate for an official, stamped admission letter. */
+export async function approveAndIssueApplication(formData: FormData) {
+  const scope = await requireCollegeAdmin();
+  const applicationId = hiddenId(formData, "applicationId", applicationCopy.title);
+  const detail = `/dashboard/applications/${applicationId}`;
+
+  return onSave(detail, [...AFFECTED, detail], async () => {
+    if (formData.get("contactVerified") !== "yes") {
+      throw new FieldError("Confirm that you verified the applicant's phone or email.");
+    }
+    if (formData.get("gradeVerified") !== "yes") {
+      throw new FieldError("Confirm that you checked the applicant's KCSE grade.");
+    }
+    const method = text(formData, "verificationMethod");
+    if (method !== "COUNTER" && method !== "PHONE" && method !== "EMAIL") {
+      throw new FieldError("Record how the applicant's contact was verified.");
+    }
+
+    const application = await prisma.application.findFirst({
+      where: { id: applicationId, ...(scope.campusId === null ? {} : { campusId: scope.campusId }) },
+      include: {
+        program: { select: { minKcseGrade: true } },
+        studentProfile: { select: { id: true } },
+      },
+    });
+    if (!application) throw new FieldError(fieldErrors.notOnCampus);
+    if (application.studentProfile) throw new FieldError("This applicant is already enrolled.");
+    if (application.status !== "SUBMITTED" && application.status !== "REVIEWING") {
+      throw new FieldError("Only an application under review can be approved.");
+    }
+    if (!application.grade || !meetsMinimum(application.grade, application.program.minKcseGrade)) {
+      throw new FieldError("The recorded grade does not meet this programme's minimum.");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const reviewed = await tx.application.updateMany({
+        where: {
+          id: application.id,
+          status: { in: ["SUBMITTED", "REVIEWING"] },
+          studentProfile: null,
+        },
+        data: {
+          status: "APPROVED",
+          decidedById: scope.userId,
+          decidedAt: new Date(),
+          decisionNote: "Approved after contact and grade verification.",
+          contactVerifiedAt: new Date(),
+          contactVerificationMethod: method,
+        },
+      });
+      if (reviewed.count !== 1) throw new FieldError("The application changed while it was being reviewed.");
+      const letter = await issueApprovedLetter(tx, application.id, {
+        id: scope.userId,
+        email: scope.email,
+      });
+      if (!letter) throw new FieldError("The official letter could not be issued.");
+    });
+
+    await recordAudit({
+      actorId: scope.userId,
+      actorEmail: scope.email,
+      action: "application.approve_and_issue",
+      entityType: "application",
+      entityId: application.id,
+      detail: { verificationMethod: method },
+    });
   });
 }

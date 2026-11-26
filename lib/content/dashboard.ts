@@ -320,6 +320,7 @@ export const labels = {
   applicationStatus: {
     SUBMITTED: "Submitted",
     REVIEWING: "Under review",
+    APPROVED: "Approved",
     REJECTED: "Rejected",
     WITHDRAWN: "Withdrawn",
   },
@@ -2148,7 +2149,7 @@ export const pages = {
   staff: {
     title: "Staff approvals",
     heading: "Staff accounts",
-    description: "Tutors and college admins who registered themselves wait here until you approve them.",
+    description: "Office-provisioned staff accounts and their access status.",
     ownAccount: "You cannot change your own account here.",
     noRecord: "Teaching record missing",
     approve: "Approve",
@@ -2163,7 +2164,7 @@ export const pages = {
       { key: "status", label: "Account" },
       { key: "actions", label: "Action", interactive: true },
     ] satisfies Column[],
-    empty: { title: "No staff accounts", body: "Staff who register appear here." },
+    empty: { title: "No staff accounts", body: "Staff accounts created by the college appear here." },
   },
 
   profile: {

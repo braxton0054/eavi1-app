@@ -23,6 +23,7 @@ enum Status {
 enum ApplicationStatus {
   SUBMITTED
   REVIEWING
+  APPROVED
   REJECTED
   WITHDRAWN
 }
@@ -184,58 +185,58 @@ enum CardBatchStatus {
 }
 
 model Campus {
-  id              Int              @id @default(autoincrement())
-  code            String           @unique
-  name            String
-  place           String
-  phone           String?
+  id               Int              @id @default(autoincrement())
+  code             String           @unique
+  name             String
+  place            String
+  phone            String?
   /// An office such as the Town Office handles paperwork but teaches no course, so it is
   /// never handed an applicant. Only the campuses that teach take students.
-  takesApplicants Boolean          @default(true)
-  users           User[]
-  programs        Program[]        @relation("ProgramCampuses")
-  students        StudentProfile[]
-  tutors          TutorProfile[]
-  applications    Application[]
-  enrollments     Enrollment[]
-  calendarEvents  CalendarEvent[]
-  periods         AcademicPeriod[]
-  timetableSlots  TimetableSlot[]
-  exams           Exam[]
-  invoices        Invoice[]
-  announcements   Announcement[]
-  idCards         IdCard[]
-  cardTemplates   CardTemplate[]
-  reportingDates  ReportingDate[]
-  classes         AcademicClass[]
-  cardBatches     CardBatch[]
-  offerLetters    OfferLetter[]
-  tutorAssignments TutorProfile[] @relation("TutorCampuses")
+  takesApplicants  Boolean          @default(true)
+  users            User[]
+  programs         Program[]        @relation("ProgramCampuses")
+  students         StudentProfile[]
+  tutors           TutorProfile[]
+  applications     Application[]
+  enrollments      Enrollment[]
+  calendarEvents   CalendarEvent[]
+  periods          AcademicPeriod[]
+  timetableSlots   TimetableSlot[]
+  exams            Exam[]
+  invoices         Invoice[]
+  announcements    Announcement[]
+  idCards          IdCard[]
+  cardTemplates    CardTemplate[]
+  reportingDates   ReportingDate[]
+  classes          AcademicClass[]
+  cardBatches      CardBatch[]
+  offerLetters     OfferLetter[]
+  tutorAssignments TutorProfile[]   @relation("TutorCampuses")
 
   @@map("campuses")
 }
 
 model User {
-  id                  String               @id @default(uuid())
+  id                  String                  @id @default(uuid())
   /// Stored lowercased so the unique index is effectively case-insensitive.
-  email               String               @unique
+  email               String                  @unique
   fullName            String
   phone               String?
   /// The administrator's own picture, shown next to their name in the portal header.
   photoUrl            String?
   passwordHash        String
-  role                Role                 @default(STUDENT)
-  status              Status               @default(ACTIVE)
-  mustChangePassword  Boolean              @default(false)
+  role                Role                    @default(STUDENT)
+  status              Status                  @default(ACTIVE)
+  mustChangePassword  Boolean                 @default(false)
   /// Presence is opt-out: people can hide when they were last around.
-  showLastSeen        Boolean              @default(true)
+  showLastSeen        Boolean                 @default(true)
   /// Chat notification preferences, per person rather than per device.
-  hideMessageText     Boolean              @default(false)
-  chatSoundEnabled    Boolean              @default(true)
-  campus              Campus?              @relation(fields: [campusId], references: [id])
+  hideMessageText     Boolean                 @default(false)
+  chatSoundEnabled    Boolean                 @default(true)
+  campus              Campus?                 @relation(fields: [campusId], references: [id])
   campusId            Int?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
   sessions            Session[]
   /// Google (and, if ever needed, other providers) linked to this account. Kept in a table
   /// of its own rather than a `googleSub` column so a person can hold several identities,
@@ -244,15 +245,15 @@ model User {
   oauthAccounts       OAuthAccount[]
   student             StudentProfile?
   tutor               TutorProfile?
-  announcements       Announcement[]       @relation("AnnouncementAuthor")
-  decisions           Application[]        @relation("ApplicationDecider")
+  announcements       Announcement[]          @relation("AnnouncementAuthor")
+  decisions           Application[]           @relation("ApplicationDecider")
   conversationMembers ConversationMember[]
-  messages            Message[]            @relation("MessageSender")
+  messages            Message[]               @relation("MessageSender")
   receipts            MessageReceipt[]
-  blocksIssued        UserBlock[]          @relation("BlockIssuer")
-  blocksReceived      UserBlock[]          @relation("BlockTarget")
-  reports             MessageReport[]      @relation("ReportAuthor")
-  chatRestrictions    ChatRestriction[]    @relation("RestrictedUser")
+  blocksIssued        UserBlock[]             @relation("BlockIssuer")
+  blocksReceived      UserBlock[]             @relation("BlockTarget")
+  reports             MessageReport[]         @relation("ReportAuthor")
+  chatRestrictions    ChatRestriction[]       @relation("RestrictedUser")
   pushSubscriptions   PushSubscription[]
   notifications       Notification[]
   notificationPref    NotificationPreference?
@@ -478,30 +479,33 @@ model TutorProfile {
 /// A prospect's application. It stays an application until enrolment turns it into a
 /// student, which is a separate step; the reference is the number the applicant keeps.
 model Application {
-  id                    String            @id @default(uuid())
-  reference             String            @unique
-  fullName              String
+  id                        String            @id @default(uuid())
+  reference                 String            @unique
+  fullName                  String
   /// An applicant may leave this out; the office confirms one before admitting.
-  email                 String?
-  phone                 String
-  gender                Gender?
-  grade                 EntryGrade?
-  programId             String
-  program               Program           @relation(fields: [programId], references: [id])
-  campusId              Int
-  campus                Campus            @relation(fields: [campusId], references: [id])
-  status                ApplicationStatus @default(SUBMITTED)
-  previousQualification String?
-  notes                 String?
-  decisionNote          String?
-  decidedById           String?
-  decidedBy             User?             @relation("ApplicationDecider", fields: [decidedById], references: [id])
-  decidedAt             DateTime?
-  createdAt             DateTime          @default(now())
+  email                     String?
+  phone                     String
+  gender                    Gender?
+  grade                     EntryGrade?
+  programId                 String
+  program                   Program           @relation(fields: [programId], references: [id])
+  campusId                  Int
+  campus                    Campus            @relation(fields: [campusId], references: [id])
+  status                    ApplicationStatus @default(SUBMITTED)
+  previousQualification     String?
+  notes                     String?
+  decisionNote              String?
+  decidedById               String?
+  decidedBy                 User?             @relation("ApplicationDecider", fields: [decidedById], references: [id])
+  decidedAt                 DateTime?
+  /// Recorded by the office only after it has proven control of the phone or email.
+  contactVerifiedAt         DateTime?
+  contactVerificationMethod String?
+  createdAt                 DateTime          @default(now())
   /// The offer letter issued from this application, if any.
-  offerLetter           OfferLetter?
-  studentProfile        StudentProfile?
-  updatedAt             DateTime          @updatedAt
+  offerLetter               OfferLetter?
+  studentProfile            StudentProfile?
+  updatedAt                 DateTime          @updatedAt
 
   @@index([campusId, status])
   @@map("applications")
@@ -552,13 +556,13 @@ model AcademicPeriod {
   applicationDeadline DateTime
   status              AcademicPeriodStatus @default(PLANNED)
 
-  enrollments     Enrollment[]
-  classes         AcademicClass[]
-  calendarEvents  CalendarEvent[]
-  exams           Exam[]
-  timetableSlots  TimetableSlot[]
-  feeItems        FeeItem[]
-  invoices        Invoice[]
+  enrollments    Enrollment[]
+  classes        AcademicClass[]
+  calendarEvents CalendarEvent[]
+  exams          Exam[]
+  timetableSlots TimetableSlot[]
+  feeItems       FeeItem[]
+  invoices       Invoice[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -679,13 +683,13 @@ model Enrollment {
 
 /// A recurring weekly class. Times are "HH:mm" strings validated in the action layer.
 model TimetableSlot {
-  id              String        @id @default(uuid())
+  id              String          @id @default(uuid())
   campusId        Int
-  campus          Campus        @relation(fields: [campusId], references: [id])
+  campus          Campus          @relation(fields: [campusId], references: [id])
   programId       String
-  program         Program       @relation(fields: [programId], references: [id])
+  program         Program         @relation(fields: [programId], references: [id])
   tutorId         String?
-  tutor           TutorProfile? @relation(fields: [tutorId], references: [id])
+  tutor           TutorProfile?   @relation(fields: [tutorId], references: [id])
   periodId        String?
   period          AcademicPeriod? @relation(fields: [periodId], references: [id])
   day             Weekday
@@ -693,34 +697,34 @@ model TimetableSlot {
   endAt           String
   room            String?
   weekOffsetLabel String?
-  createdAt       DateTime      @default(now())
+  createdAt       DateTime        @default(now())
 
   @@index([campusId, day])
   @@map("timetable_slots")
 }
 
 model Exam {
-  id              String        @id @default(uuid())
+  id              String          @id @default(uuid())
   title           String
   programId       String
-  program         Program       @relation(fields: [programId], references: [id])
+  program         Program         @relation(fields: [programId], references: [id])
   campusId        Int
-  campus          Campus        @relation(fields: [campusId], references: [id])
+  campus          Campus          @relation(fields: [campusId], references: [id])
   periodId        String?
   period          AcademicPeriod? @relation(fields: [periodId], references: [id])
   invigilatorId   String?
-  invigilator     TutorProfile? @relation("ExamInvigilator", fields: [invigilatorId], references: [id])
+  invigilator     TutorProfile?   @relation("ExamInvigilator", fields: [invigilatorId], references: [id])
   date            DateTime
   startAt         String
-  durationMinutes Int           @default(120)
+  durationMinutes Int             @default(120)
   room            String?
   /// One sitting. A term normally carries a single CAT and a single end-of-term paper,
   /// but nothing stops it running two CATs or two end-of-term papers.
-  type            ExamType      @default(CAT)
-  status          ExamStatus    @default(DRAFT)
+  type            ExamType        @default(CAT)
+  status          ExamStatus      @default(DRAFT)
   grades          Grade[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@index([campusId, date])
   @@map("exams")
@@ -1045,7 +1049,7 @@ model IdCard {
   createdAt   DateTime       @default(now())
 
   @@index([campusId, status])
-  /*
+  /**
    * The newest live card per student is read on the students list (one lateral per row),
    * when a run looks up existing cards, and when a replacement retires the old ones. The
    * table only ever grows — one row per card ever issued — so the per-student lookup stays
@@ -1177,9 +1181,9 @@ model AuditLog {
 /// generating the cards again — the office prints a class, then a late joiner arrives, then
 /// the first batch is asked for again weeks later.
 model CardBatch {
-  id          String   @id @default(uuid())
+  id          String          @id @default(uuid())
   campusId    Int?
-  campus      Campus?  @relation(fields: [campusId], references: [id])
+  campus      Campus?         @relation(fields: [campusId], references: [id])
   /// What the run covered, for the history line: "Class KNEC-D/JAN/2026".
   targetLabel String
   cardCount   Int
@@ -1198,7 +1202,7 @@ model CardBatch {
   contentHash String?
   actorId     String?
   actorEmail  String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime        @default(now())
 
   @@index([campusId, createdAt])
   /// Both lookups are "the newest run with this fingerprint", so the index carries the
@@ -1421,33 +1425,36 @@ model ClassTutor {
 /// regenerated from this snapshot rather than stored, so reprinting a year later still shows the
 /// terms the applicant was actually offered — not today's fees.
 model OfferLetter {
-  id              String      @id @default(uuid())
+  id                     String      @id @default(uuid())
   /// The number printed on the letter and quoted by the applicant: EAVI/OL/2026/00042.
-  reference       String      @unique
+  reference              String      @unique
   /// The unguessable half of the public verification link behind the letter's QR.
-  verifyToken     String      @unique
-  applicationId   String
-  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  programId       String
-  campusId        Int
+  verifyToken            String      @unique
+  /// Separate, expiring bearer capability for the private PDF download.
+  downloadTokenHash      String?
+  downloadTokenExpiresAt DateTime?
+  applicationId          String
+  application            Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  programId              String
+  campusId               Int
   /// The applicant's name as printed, frozen so a later correction does not rewrite history.
-  printedName     String
+  printedName            String
   /// The fee structure and bursary PDFs in force when the letter was issued.
-  feeStructureUrl String?
-  bursaryFormUrl  String?
+  feeStructureUrl        String?
+  bursaryFormUrl         String?
   /// The requirements text as printed on page 3.
-  requirements    String?
+  requirements           String?
   /// How long the applicant has to accept. Printed on the letter and enforced by nothing but
   /// the office, because admissions run monthly and a late acceptance is a decision.
-  expiresAt       DateTime
-  issuedAt        DateTime    @default(now())
-  issuedById      String?
-  issuedByEmail   String?
+  expiresAt              DateTime
+  issuedAt               DateTime    @default(now())
+  issuedById             String?
+  issuedByEmail          String?
   /// Set when the office withdraws a letter it should not have sent.
-  revokedAt       DateTime?
-  revokeReason    String?
-  campus          Campus      @relation(fields: [campusId], references: [id])
-  program         Program     @relation(fields: [programId], references: [id])
+  revokedAt              DateTime?
+  revokeReason           String?
+  campus                 Campus      @relation(fields: [campusId], references: [id])
+  program                Program     @relation(fields: [programId], references: [id])
 
   @@unique([applicationId])
   @@index([campusId, issuedAt])
@@ -1481,24 +1488,24 @@ model PushSubscription {
 /// One notification for one person. Delivered by web push to their devices and shown
 /// in the portal's bell, both reading the same row.
 model Notification {
-  id              String   @id @default(uuid())
-  recipient       User     @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
-  recipientUserId String
-  title           String
-  body            String
+  id               String   @id @default(uuid())
+  recipient        User     @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  recipientUserId  String
+  title            String
+  body             String
   /// What kind of event it came from — announcement, fee, result, message — so
   /// preferences can mute a kind and the bell can group them.
   notificationType String
   /// Where the notification opens when clicked. Null opens the portal home.
-  targetUrl       String?
+  targetUrl        String?
   /// Extra context a screen may use; deliberately small — nothing that must not
   /// survive on a lock screen belongs in here.
-  data            Json?
-  isRead          Boolean  @default(false)
-  createdAt       DateTime @default(now())
+  data             Json?
+  isRead           Boolean  @default(false)
+  createdAt        DateTime @default(now())
   /// One notification per person per event: the sender names the event, and the unique
   /// index is what keeps a retried action from telling someone the same thing twice.
-  dedupeKey       String?
+  dedupeKey        String?
 
   @@unique([recipientUserId, dedupeKey])
   @@index([recipientUserId, createdAt])

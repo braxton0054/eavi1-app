@@ -48,7 +48,7 @@ export async function sendMessage(
     throw new ChatError("A message cannot be empty.", 400);
   }
 
-  limitMessages(user.id);
+  await limitMessages(user.id);
 
   /*
    * A clientMessageId makes the send idempotent: a retry after a dropped connection finds the

@@ -121,6 +121,7 @@ export async function createStudent(formData: FormData) {
             passwordHash,
             role: Role.STUDENT,
             status: Status.ACTIVE,
+            mustChangePassword: true,
             campusId,
           },
           select: { id: true },

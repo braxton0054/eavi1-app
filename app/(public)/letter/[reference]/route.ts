@@ -15,10 +15,9 @@ export const dynamic = "force-dynamic";
 /**
  * Downloads an applicant's admission letter in SVG or PDF format.
  *
- * Public on purpose: the applicant has just submitted the application form and has no account.
- * Authority comes from the unguessable verification token instead of a session — the reference
- * alone is sequential (`APP/2026/0001`), so honouring it by itself would let anyone walk the range
- * and download other applicants' letters.
+ * Public on purpose: an applicant has no portal account. Authority comes from a separate,
+ * expiring download capability — never from the public QR verification token. The reference
+ * alone is sequential (`APP/2026/0001`), so it is never sufficient.
  *
  * Supports:
  *   - `?format=svg` (default): Returns the standalone vector A4 SVG letter template styled with the

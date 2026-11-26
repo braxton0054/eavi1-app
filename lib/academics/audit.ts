@@ -14,7 +14,7 @@ export type AuditEntry = {
   actorEmail?: string | null;
   /** Dotted name so the log can be filtered by area, e.g. "class.merge". */
   action: string;
-  entityType: "class" | "enrollment" | "student" | "card";
+  entityType: "class" | "enrollment" | "student" | "card" | "application" | "user";
   entityId: string;
   detail?: Record<string, unknown>;
 };

@@ -1,10 +1,11 @@
 import type { Server, Socket } from "socket.io";
 
-import { SESSION_COOKIE } from "@/lib/auth";
+import { SESSION_COOKIE, resolveSessionRecord } from "@/lib/auth";
+import { registerSocketRevoker } from "@/lib/security/revocation";
 import {
   ChatError,
-  chatUserFromToken,
   canPost,
+  chatAccountActive,
   isStaff,
   membershipFor,
   type ChatUser,
@@ -34,6 +35,8 @@ type AuthedSocket = Socket & {
   data: {
     user: ChatUser;
     rooms: Set<string>;
+    sessionId: string;
+    sessionToken: string;
   };
 };
 
@@ -61,6 +64,11 @@ async function sharesPresence(userId: string): Promise<boolean> {
 }
 
 export function attachChat(io: Server) {
+  registerSocketRevoker(({ userId, sessionId }) => {
+    if (sessionId) io.in(`session:${sessionId}`).disconnectSockets(true);
+    if (userId) io.in(`user:${userId}`).disconnectSockets(true);
+  });
+
   /*
    * The handshake reads the portal's own session cookie. There is no second login and no token
    * in a query string to leak into a log.
@@ -68,10 +76,19 @@ export function attachChat(io: Server) {
   io.use(async (socket, next) => {
     try {
       const cookies = parseCookies(socket.handshake.headers.cookie);
-      const user = await chatUserFromToken(cookies[SESSION_COOKIE]);
-      if (!user) return next(new Error("Unauthorized"));
-      (socket as AuthedSocket).data.user = user;
+      const token = cookies[SESSION_COOKIE];
+      const session = token ? await resolveSessionRecord(token) : null;
+      if (
+        !session ||
+        session.expiresAt.getTime() < Date.now() ||
+        session.user.status !== "ACTIVE" ||
+        session.user.mustChangePassword ||
+        !(await chatAccountActive(session.user))
+      ) return next(new Error("Unauthorized"));
+      (socket as AuthedSocket).data.user = { id: session.user.id, role: session.user.role };
       (socket as AuthedSocket).data.rooms = new Set();
+      (socket as AuthedSocket).data.sessionId = session.id;
+      (socket as AuthedSocket).data.sessionToken = token!;
       next();
     } catch {
       next(new Error("Unauthorized"));
@@ -82,8 +99,31 @@ export function attachChat(io: Server) {
     const socket = raw as AuthedSocket;
     const { user } = socket.data;
 
-    // Every signed-in person has a room of their own, used to reach all their devices.
     socket.join(`user:${user.id}`);
+    socket.join(`session:${socket.data.sessionId}`);
+
+    // A connection is not a permanent authorization grant. Every inbound event rechecks
+    // the session and account, so disablement, logout, and forced password setup take effect.
+    socket.use(async (_packet, next) => {
+      try {
+        const session = await resolveSessionRecord(socket.data.sessionToken);
+        if (
+          !session ||
+          session.expiresAt.getTime() < Date.now() ||
+          session.user.status !== "ACTIVE" ||
+          session.user.mustChangePassword ||
+          !(await chatAccountActive(session.user))
+        ) {
+          socket.emit("auth:revoked");
+          socket.disconnect(true);
+          return;
+        }
+        next();
+      } catch {
+        socket.emit("auth:revoked");
+        socket.disconnect(true);
+      }
+    });
 
     socketConnected(user.id);
     const owned = socketsByUser.get(user.id) ?? new Set<string>();

@@ -1,6 +1,7 @@
 import { Role, Status } from "@/generated/prisma/enums";
 import { resolveSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { RateLimitUnavailableError } from "@/lib/security/rate-limit";
 
 /**
  * Who is chatting. Deliberately narrower than the session's user record: chat needs the id
@@ -34,10 +35,20 @@ export function isStaff(role: Role): boolean {
  * A disabled account is refused even with a token still in the database: switching someone
  * off must end their chat immediately, not in thirty days.
  */
+export async function chatAccountActive(user: { id: string; role: Role }): Promise<boolean> {
+  if (user.role !== Role.STUDENT) return true;
+  const enrollment = await prisma.enrollment.findFirst({
+    where: { student: { userId: user.id }, status: "ACTIVE" },
+    select: { id: true },
+  });
+  return enrollment !== null;
+}
+
 export async function chatUserFromToken(token: string | undefined | null): Promise<ChatUser | null> {
   if (!token) return null;
   const user = await resolveSession(token);
-  if (!user || user.status !== Status.ACTIVE) return null;
+  if (!user || user.status !== Status.ACTIVE || user.mustChangePassword) return null;
+  if (!(await chatAccountActive(user))) return null;
   return { id: user.id, role: user.role };
 }
 
@@ -55,6 +66,7 @@ export async function requireChatUser(): Promise<ChatUser> {
 
 /** Turns a thrown ChatError into a response; anything else becomes a 500. */
 export function chatErrorResponse(error: unknown): { message: string; status: number } {
+  if (error instanceof RateLimitUnavailableError) return { message: error.message, status: 503 };
   if (error instanceof ChatError) return { message: error.message, status: error.status };
   if (error instanceof Error && /too many|rate/i.test(error.message)) {
     return { message: error.message, status: 429 };

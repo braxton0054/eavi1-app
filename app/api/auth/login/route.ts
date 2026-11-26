@@ -2,34 +2,16 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { createSession, SESSION_COOKIE, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-const MAX_ATTEMPTS = 8;
-const WINDOW_MS = 15 * 60_000;
-
-// Best-effort throttle: it lives in this process, so it slows down guessing
-// without pretending to be a distributed rate limiter.
-const attempts = new Map<string, { count: number; resetAt: number }>();
+import {
+  enforceLoginRateLimit,
+  retryAfterOf,
+  unavailableSecurityControls,
+} from "@/lib/security/auth-rate-limit";
+import { clearRateLimit, RateLimitExceededError, RateLimitUnavailableError } from "@/lib/security/rate-limit";
 
 // Same shape as a real hash (16-byte salt, 64-byte key), so a wrong email costs
 // exactly what a wrong password costs.
 const DUMMY_HASH = `scrypt$32768$8$1$${Buffer.alloc(16).toString("base64")}$${Buffer.alloc(64).toString("base64")}`;
-
-function throttled(key: string): boolean {
-  const now = Date.now();
-  const entry = attempts.get(key);
-
-  if (!entry || entry.resetAt <= now) {
-    attempts.set(key, { count: 1, resetAt: now + WINDOW_MS });
-    return false;
-  }
-
-  entry.count += 1;
-  return entry.count > MAX_ATTEMPTS;
-}
-
-function cleared(key: string) {
-  attempts.delete(key);
-}
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -41,48 +23,42 @@ export async function POST(request: NextRequest) {
   const password = typeof body.password === "string" ? body.password : "";
   const remember = body.remember === true;
 
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const key = `${ip}|${email}`;
-  if (throttled(key)) {
-    return NextResponse.json(
-      { error: "Too many attempts. Wait a few minutes and try again." },
-      { status: 429 },
-    );
+  try {
+    await enforceLoginRateLimit(request, email);
+  } catch (error) {
+    if (error instanceof RateLimitUnavailableError) {
+      return NextResponse.json(unavailableSecurityControls(), { status: 503 });
+    }
+    if (error instanceof RateLimitExceededError) {
+      return NextResponse.json(
+        { error: "Too many attempts. Wait a few minutes and try again." },
+        { status: 429, headers: { "Retry-After": String(retryAfterOf(error)) } },
+      );
+    }
+    throw error;
   }
 
   const invalid = NextResponse.json(
     { error: "Incorrect email or password. Check them and try again." },
     { status: 401 },
   );
+  if (!email || !password || password.length > 200) return invalid;
 
   const user = await prisma.user.findUnique({ where: { email } });
-  const matches = await verifyPassword(
-    password,
-    user?.passwordHash ?? DUMMY_HASH,
-  );
+  const matches = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
 
-  if (!user || !matches) return invalid;
+  if (!user || !matches || user.status !== "ACTIVE") return invalid;
 
-  if (user.status !== "ACTIVE") {
-    return NextResponse.json(
-      {
-        error:
-          user.status === "PENDING"
-            ? "A superadmin still needs to approve this account."
-            : "This account has been disabled.",
-      },
-      { status: 403 },
-    );
-  }
+  await clearRateLimit("login-account", email).catch(() => undefined);
 
-  cleared(key);
-
-  const token = await createSession(user.id);
+  const expiresAt = new Date(Date.now() + (remember ? 30 : 0.5) * 86_400_000);
+  const token = await createSession(user.id, expiresAt);
   const response = NextResponse.json({
     id: user.id,
     fullName: user.fullName,
     role: user.role,
     campus: user.campusId,
+    mustChangePassword: user.mustChangePassword,
   });
 
   response.cookies.set(SESSION_COOKIE, token, {
@@ -90,7 +66,7 @@ export async function POST(request: NextRequest) {
     sameSite: "lax",
     path: "/",
     secure: process.env.NODE_ENV === "production",
-    maxAge: remember ? 60 * 60 * 24 * 30 : 60 * 60 * 12,
+    expires: expiresAt,
   });
 
   return response;

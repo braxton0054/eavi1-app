@@ -1,25 +1,27 @@
-/**
- * Where a signed-in account belongs.
- *
- * Lives on its own so the password form, which is a client component, and the Google
- * callback, which is a route handler, cannot drift: a student arriving by either route must
- * land on the same page. Both call this.
- */
+/** Where a signed-in account belongs. Shared by password and Google sign-in. */
+const CANONICAL_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000").replace(/\/$/, "");
+const ALLOWED_PREFIXES = ["/student", "/tutor", "/dashboard", "/portal", "/set-password"];
 
-/**
- * The ?next= value only wins when it is a plain in-app path, so neither sign-in route can
- * be turned into an open redirect.
- */
+/** Only canonical, same-origin portal paths survive the login round trip. */
+export function safeNextPath(nextPath: string | null | undefined): string | null {
+  if (!nextPath || !nextPath.startsWith("/") || nextPath.startsWith("//")) return null;
+  if (/[\\\u0000-\u001f\u007f]/.test(nextPath)) return null;
+  try {
+    const resolved = new URL(nextPath, CANONICAL_ORIGIN);
+    if (resolved.origin !== CANONICAL_ORIGIN) return null;
+    if (!ALLOWED_PREFIXES.some((prefix) => resolved.pathname === prefix || resolved.pathname.startsWith(`${prefix}/`))) {
+      return null;
+    }
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 export function landingFor(role: string, nextPath?: string | null): string {
-  const safe =
-    nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : null;
+  const safe = safeNextPath(nextPath);
   if (safe) return safe;
   if (role === "TUTOR") return "/tutor";
   if (role === "STUDENT") return "/student";
   return role === "SUPERADMIN" || role === "CAMPUS_ADMIN" ? "/dashboard" : "/unavailable";
-}
-
-/** Keeps the same rule for the `next` handed to Google, so it survives the round trip. */
-export function safeNextPath(nextPath: string | null | undefined): string | null {
-  return nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : null;
 }

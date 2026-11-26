@@ -28,6 +28,7 @@
     "verify:letters": "tsx scripts/verify-letters.ts",
     "verify:grades": "tsx scripts/verify-grades.ts",
     "verify:documents": "tsx scripts/verify-documents.ts",
+    "verify:security": "tsx scripts/verify-security.ts",
     "proof:documents": "tsx scripts/proof-documents.ts",
     "db:backfill": "tsx scripts/backfill-documents.ts"
   },

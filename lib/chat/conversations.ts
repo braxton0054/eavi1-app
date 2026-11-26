@@ -213,7 +213,7 @@ export async function openDirectConversation(viewer: ChatUser, otherUserId: stri
     return existing;
   }
 
-  limitNewDirectChats(viewer.id);
+  await limitNewDirectChats(viewer.id);
 
   try {
     return await prisma.conversation.create({

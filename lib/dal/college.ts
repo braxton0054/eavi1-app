@@ -457,6 +457,7 @@ export async function getApplications(query: ListQuery) {
 const APPLICABLE = {
   SUBMITTED: "",
   REVIEWING: "",
+  APPROVED: "",
   REJECTED: "",
   WITHDRAWN: "",
 };
@@ -477,6 +478,7 @@ export async function getApplication(id: string) {
       },
       campus: { select: { name: true } },
       decidedBy: { select: { fullName: true } },
+      offerLetter: { select: { verifyToken: true, issuedAt: true, revokedAt: true } },
     },
   });
   if (!row) throw new Error("not_found");

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { decideApplication } from "@/lib/actions/college/applications";
+import { approveAndIssueApplication, decideApplication } from "@/lib/actions/college/applications";
 import { getApplication } from "@/lib/dal/college";
 import { genderLabel } from "@/lib/content/apply";
 import { common, labels, pages } from "@/lib/content/dashboard";
@@ -17,6 +17,7 @@ const copy = pages.applications;
 const applicationTone: Record<string, ChipTone> = {
   SUBMITTED: "info",
   REVIEWING: "warning",
+  APPROVED: "success",
   REJECTED: "danger",
   WITHDRAWN: "neutral",
 };
@@ -175,6 +176,48 @@ export default async function ApplicationDetailPage({
           />
         </div>
       </Panel>
+
+      {application.status === "APPROVED" && application.offerLetter && !application.offerLetter.revokedAt ? (
+        <Panel title="Official admission letter" description={`Issued ${formatDate(application.offerLetter.issuedAt)}`}>
+          <div className="p-4">
+            <a
+              href={`/dashboard/applications/${application.id}/letter`}
+              className="inline-flex min-h-11 items-center rounded-lg bg-eavi-fill px-4 text-sm font-medium text-eavi-on-fill"
+            >
+              Download official letter (PDF)
+            </a>
+          </div>
+        </Panel>
+      ) : openToDecide ? (
+        <Panel
+          title="Approve and issue official letter"
+          description="Verify the applicant's contact and KCSE grade before creating the stamped letter."
+        >
+          <form action={approveAndIssueApplication} className="grid gap-4 p-4">
+            <input type="hidden" name="applicationId" value={application.id} />
+            <label className="flex min-h-11 items-center gap-3 text-sm">
+              <input type="checkbox" name="contactVerified" value="yes" className="size-5 accent-eavi-fill" required />
+              I verified that the applicant controls the supplied phone number or email.
+            </label>
+            <label className="flex min-h-11 items-center gap-3 text-sm">
+              <input type="checkbox" name="gradeVerified" value="yes" className="size-5 accent-eavi-fill" required />
+              I checked the applicant&apos;s KCSE grade against the programme minimum.
+            </label>
+            <label className="flex max-w-sm flex-col gap-1.5 text-sm">
+              <span className="font-medium">Verification method</span>
+              <select name="verificationMethod" required defaultValue="" className="h-11 rounded-lg border border-input bg-eavi-card px-3 text-sm">
+                <option value="" disabled>Choose how it was verified</option>
+                <option value="COUNTER">In person at the registry</option>
+                <option value="PHONE">Phone call</option>
+                <option value="EMAIL">Verified email exchange</option>
+              </select>
+            </label>
+            <ShimmerButton type="submit" className="w-fit">
+              Approve and issue official letter
+            </ShimmerButton>
+          </form>
+        </Panel>
+      ) : null}
 
       <div>
         <Link

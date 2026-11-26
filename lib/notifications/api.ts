@@ -15,6 +15,6 @@ export async function sessionUser(request: NextRequest) {
   if (!token) return null;
 
   const user = await resolveSession(token);
-  if (!user || user.status !== Status.ACTIVE) return null;
+  if (!user || user.status !== Status.ACTIVE || user.mustChangePassword) return null;
   return user;
 }

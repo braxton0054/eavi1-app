@@ -33,6 +33,14 @@ const signedInUser = cache(async () => {
   return resolveSession(token);
 });
 
+/** Every protected page and action passes through this gate. */
+async function readyUser(next: string) {
+  const user = await signedInUser();
+  if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
+  if (user.mustChangePassword) redirect("/set-password");
+  return user;
+}
+
 export async function getSignIn() {
   const user = await signedInUser();
   if (!user) return null;
@@ -52,8 +60,7 @@ export async function getSignIn() {
  * every query must use. Never take campusId from the client.
  */
 export async function requireCollegeAdmin(): Promise<AdminScope> {
-  const user = await signedInUser();
-  if (!user) redirect("/login?next=%2Fdashboard");
+  const user = await readyUser("/dashboard");
 
   if (!ADMIN_ROLES.includes(user.role as (typeof ADMIN_ROLES)[number])) {
     redirect("/unavailable");
@@ -109,9 +116,7 @@ export type PortalScope = {
 };
 
 export async function requirePortalUser(): Promise<PortalScope> {
-  const user = await signedInUser();
-  if (!user) redirect("/login?next=%2Fportal%2Fchat");
-  if (user.status !== "ACTIVE") redirect("/unavailable");
+  const user = await readyUser("/portal/chat");
 
   return {
     userId: user.id,
@@ -134,8 +139,7 @@ export function campusWhere(campusId: number | null) {
  * campuses and accounts are managed from here; campus staff never reach this screen.
  */
 export async function requireSuperAdmin(): Promise<AdminScope> {
-  const user = await signedInUser();
-  if (!user) redirect("/login?next=%2Fdashboard");
+  const user = await readyUser("/dashboard");
   if (user.role !== "SUPERADMIN") redirect("/unavailable");
 
   return {
@@ -168,8 +172,7 @@ export type TutorScope = {
  * A tutor without one could only be shown an empty screen, so that account is refused.
  */
 export async function requireTutor(): Promise<TutorScope> {
-  const user = await signedInUser();
-  if (!user) redirect("/login?next=%2Ftutor");
+  const user = await readyUser("/tutor");
 
   if (user.role !== "TUTOR") redirect("/unavailable");
 
@@ -215,16 +218,21 @@ export type StudentScope = {
  * rendering blank panels, so the screen they see is deliberate.
  */
 export async function requireStudent(): Promise<StudentScope> {
-  const user = await signedInUser();
-  if (!user) redirect("/login?next=%2Fstudent");
+  const user = await readyUser("/student");
 
   if (user.role !== "STUDENT") redirect("/unavailable");
 
   const profile = await prisma.studentProfile.findUnique({
     where: { userId: user.id },
-    include: { campus: { select: { name: true } } },
+    include: {
+      campus: { select: { name: true } },
+      enrollments: { take: 1, orderBy: { enrolledAt: "desc" }, select: { status: true } },
+    },
   });
   if (!profile) redirect("/unavailable?reason=notadmitted");
+  if (profile.enrollments[0]?.status === "SUSPENDED" || profile.enrollments[0]?.status === "WITHDRAWN") {
+    redirect("/unavailable?reason=notactive");
+  }
 
   return {
     userId: user.id,

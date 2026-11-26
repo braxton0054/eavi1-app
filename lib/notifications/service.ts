@@ -189,7 +189,7 @@ export async function deliverPushes(
 /** Every subscription these people own — phone and laptop alike. */
 async function deliverTo(userIds: string[], payload: PushPayload) {
   const subscriptions = await prisma.pushSubscription.findMany({
-    where: { userId: { in: userIds } },
+    where: { userId: { in: userIds }, user: { status: "ACTIVE", mustChangePassword: false } },
     select: { id: true, endpoint: true, p256dh: true, auth: true },
   });
   return deliverPushes(subscriptions, payload);

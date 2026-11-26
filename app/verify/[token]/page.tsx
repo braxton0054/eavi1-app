@@ -66,7 +66,7 @@ async function cardFor(token: string) {
           student: {
             select: {
               admissionNo: true,
-              user: { select: { fullName: true } },
+              user: { select: { fullName: true, status: true } },
               enrollments: {
                 where: { status: "ACTIVE" },
                 take: 1,
@@ -107,7 +107,7 @@ async function CardAnswer({ card }: { card: Card }) {
 
   // The portal and this public page share one lifecycle rule, so a pending card can never
   // be presented as active in one place and verified in the other.
-  const lifecycle = cardLifecycle(card, enrollment !== null, now);
+  const lifecycle = cardLifecycle(card, enrollment !== null && card.student.user.status === "ACTIVE", now);
   const state = lifecycle.key === "active"
     ? { tone: "valid" as const, head: verify.heading.valid, body: verify.validBody, ok: true }
     : lifecycle.key === "expired"

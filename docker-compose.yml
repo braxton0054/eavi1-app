@@ -85,6 +85,8 @@ services:
       # actually used, never the container's own localhost behind the proxy.
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
       REDIS_URL: redis://redis:6379
+      # The origin is loopback-only; Caddy is the sole proxy and overwrites forwarding data.
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
       # Object storage (Contabo S3-compatible). Declared with :- so a server
       # without these in .env still starts instead of failing interpolation.
       S3_ENDPOINT: ${S3_ENDPOINT:-}
@@ -100,7 +102,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     depends_on:
       migrate:
         condition: service_completed_successfully

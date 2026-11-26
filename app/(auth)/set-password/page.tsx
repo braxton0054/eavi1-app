@@ -37,6 +37,18 @@ const REASONS: Record<string, { title: string; body: string }> = {
     title: "The passwords do not match",
     body: "Type the same password in both fields.",
   },
+  long: {
+    title: "That password is too long",
+    body: "Use 200 characters or fewer.",
+  },
+  throttled: {
+    title: "Too many attempts",
+    body: "Wait a few minutes before trying again.",
+  },
+  unavailable: {
+    title: "We could not save your password",
+    body: "Your account may have changed. Sign in again, or contact the registry.",
+  },
 };
 
 /**
@@ -71,8 +83,8 @@ export default async function SetPasswordPage({
       <CardHeader>
         <CardTitle>Set a password</CardTitle>
         <CardDescription>
-          You signed in with Google. Your EAVI account still needs a password of its own —
-          set one now and you can use either way to sign in.
+          Your EAVI account still needs a password of its own. Set one now to finish securing
+          your account and continue to the portal.
         </CardDescription>
       </CardHeader>
 

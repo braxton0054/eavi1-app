@@ -51,6 +51,8 @@ export default async function StaffPage({
         ),
         actions: isSelf ? (
           <span className="text-xs text-eavi-muted-text">{copy.ownAccount}</span>
+        ) : account.status === "DISABLED" ? (
+          <span className="text-xs text-eavi-muted-text">Account disabled</span>
         ) : (
           <RowForm
             id={`staff-${account.id}-status`}

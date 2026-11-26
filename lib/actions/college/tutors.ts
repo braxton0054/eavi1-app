@@ -80,6 +80,7 @@ export async function createTutor(formData: FormData) {
             passwordHash,
             role: Role.TUTOR,
             status: Status.ACTIVE,
+            mustChangePassword: true,
             campusId,
           },
           select: { id: true },

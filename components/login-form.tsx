@@ -170,7 +170,7 @@ export function LoginForm({
 
       // The cookie is set by the route handler; refresh() so the server components
       // behind the portal guard see it before the first render of the landing screen.
-      router.replace(landingFor(data.role, nextPath));
+      router.replace(data.mustChangePassword ? "/set-password" : landingFor(data.role, nextPath));
       router.refresh();
     } catch {
       setFailure({

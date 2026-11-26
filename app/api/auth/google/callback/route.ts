@@ -5,6 +5,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createSession, SESSION_COOKIE } from "@/lib/auth";
 import { landingFor, safeNextPath } from "@/lib/landing";
 import { prisma } from "@/lib/prisma";
+import { enforceOAuthRateLimit } from "@/lib/security/auth-rate-limit";
+import { RateLimitExceededError, RateLimitUnavailableError } from "@/lib/security/rate-limit";
 import {
   OAUTH_STATE_COOKIE,
   callbackUrl,
@@ -50,6 +52,12 @@ export async function GET(request: NextRequest) {
     response.cookies.set(OAUTH_STATE_COOKIE, "", { maxAge: 0, path: "/" });
     return response;
   };
+
+  try {
+    await enforceOAuthRateLimit(request);
+  } catch (error) {
+    return refuse(error instanceof RateLimitExceededError ? "throttled" : error instanceof RateLimitUnavailableError ? "unavailable" : "exchange");
+  }
 
   if (!googleConfigured()) return refuse("unconfigured");
 
@@ -122,7 +130,8 @@ export async function GET(request: NextRequest) {
     return refuse(user.status === "PENDING" ? "pending" : "disabled");
   }
 
-  const token = await createSession(user.id);
+  const expiresAt = new Date(Date.now() + 12 * 60 * 60_000);
+  const token = await createSession(user.id, expiresAt);
 
   // A Google account has no portal password. If the college marked this account as still
   // needing one, the session exists but every other page stays shut until it is set.
@@ -136,7 +145,7 @@ export async function GET(request: NextRequest) {
     path: "/",
     secure: process.env.NODE_ENV === "production",
     // Matches the password form's default (a session, not "remember me").
-    maxAge: 60 * 60 * 12,
+    expires: expiresAt,
   });
   // The nonce has done its job.
   response.cookies.set(OAUTH_STATE_COOKIE, "", { maxAge: 0, path: "/" });

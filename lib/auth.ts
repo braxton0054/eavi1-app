@@ -1,6 +1,7 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 
 import { prisma } from "@/lib/prisma";
+import { revokeSessionSockets } from "@/lib/security/revocation";
 
 type ScryptParams = { N: number; r: number; p: number; maxmem: number };
 
@@ -76,27 +77,35 @@ function digestToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export async function createSession(userId: string): Promise<string> {
+export async function createSession(userId: string, expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 86_400_000)): Promise<string> {
   const token = randomBytes(32).toString("base64url");
 
   await prisma.session.create({
     data: {
       tokenHash: digestToken(token),
       userId,
-      expiresAt: new Date(Date.now() + SESSION_TTL_DAYS * 86_400_000),
+      expiresAt,
     },
   });
 
   return token;
 }
 
-export async function resolveSession(token: string) {
-  const session = await prisma.session.findUnique({
+export async function resolveSessionRecord(token: string) {
+  return prisma.session.findUnique({
     where: { tokenHash: digestToken(token) },
     include: { user: { include: { campus: true } } },
   });
+}
 
-  if (!session || session.expiresAt.getTime() < Date.now()) return null;
+export async function resolveSession(token: string) {
+  const session = await resolveSessionRecord(token);
+
+  if (
+    !session ||
+    session.expiresAt.getTime() < Date.now() ||
+    session.user.status !== "ACTIVE"
+  ) return null;
 
   // The guarded update means concurrent requests cannot push the timestamp backwards,
   // and a session active for an hour now costs one write a minute instead of one per click.
@@ -112,7 +121,9 @@ export async function resolveSession(token: string) {
 }
 
 export async function destroySession(token: string): Promise<void> {
+  const session = await resolveSessionRecord(token).catch(() => null);
   await prisma.session
     .deleteMany({ where: { tokenHash: digestToken(token) } })
     .catch(() => undefined);
+  if (session) revokeSessionSockets(session.id);
 }
