@@ -1,30 +1,43 @@
 import Link from "next/link";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  History,
+  Printer,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 
 import { moveCard } from "@/lib/actions/college/cards";
 import { getCards, getStudentOptions } from "@/lib/dal/college";
 import { getCardCandidates } from "@/lib/dal/cards";
 import { getClassOptions, getIntakeChoices } from "@/lib/dal/classes";
 import { CardGenerator } from "@/components/dashboard/card-generator";
-import { ensureDocument } from "@/lib/documents/service";
 import { savedCardFaces } from "@/lib/documents/renderers";
 import { syncCardTemplate } from "@/lib/cards/template-version";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
-import { RecordCard, RecordCardGrid, type RecordCardData } from "@/components/dashboard/record-card";
-import { prisma } from "@/lib/prisma";
+import { EmptyState, Notice } from "@/components/dashboard/panel";
+import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
+import { Paginator } from "@/components/dashboard/list-tools";
 import { RowForm } from "@/components/dashboard/record-form";
-import { ListFilters, Paginator, ResultCount } from "@/components/dashboard/list-tools";
-import { EmptyState, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
-import { StatusChip } from "@/components/dashboard/status-chip";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { site } from "@/lib/content/home";
 import { formatDate } from "@/lib/format";
-
+import { prisma } from "@/lib/prisma";
+import s from "./cards.module.css";
 
 const copy = pages.cards;
 
-
-/** The card face is a print layout, so it reuses the summary control from `RowForm`. */
-const detail =
-  "inline-flex min-h-11 cursor-pointer list-none items-center rounded-lg border border-eavi-border px-3 text-sm font-medium text-eavi-primary-text underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden";
+const tone: Record<string, ChipTone> = {
+  PENDING: "warning",
+  PRINTING: "warning",
+  ISSUED: "success",
+  LOST: "danger",
+  REPLACED: "neutral",
+};
 
 export default async function CardsPage({
   searchParams,
@@ -42,234 +55,286 @@ export default async function CardsPage({
   const { q, status, page, invalid, empty, tooMany, ready } = await searchParams;
   const scope = await requireCollegeAdmin();
 
-  // Opening the card register is where a changed template is noticed: it refreshes every
-  // saved card in the background, never through a button on this page.
   await syncCardTemplate().catch(() => null);
 
-  const [list, studentOptions, classChoices, intakeChoices] = await Promise.all([
+  const [list, studentOptions, classChoices, intakeChoices, statusGroups] = await Promise.all([
     getCards({ q, status, page: Number(page) || 1 }),
     getStudentOptions(scope.campusId),
     getClassOptions(scope.campusId),
     getIntakeChoices(),
+    prisma.idCard.groupBy({
+      by: ["status"],
+      where: scope.campusId === null ? {} : { campusId: scope.campusId },
+      _count: { _all: true },
+    }),
   ]);
 
-  // The picker shows who each choice would print before anything is generated. Every
-  // target's list is resolved here so changing the picker needs no round trip.
   const targets = [
-    ...studentOptions.map((o) => ({ kind: "student", id: o.value })),
-    ...classChoices.map((o) => ({ kind: "class", id: o.value })),
-    ...intakeChoices.map((o) => ({ kind: "intake", id: o.id })),
+    ...studentOptions.map((option) => ({ kind: "student", id: option.value })),
+    ...classChoices.map((option) => ({ kind: "class", id: option.value })),
+    ...intakeChoices.map((option) => ({ kind: "intake", id: option.id })),
   ];
   const resolved = await Promise.all(
-    targets.map((t) =>
+    targets.map((target) =>
       getCardCandidates(
-        t.kind === "student"
-          ? { kind: "student", studentId: t.id }
-          : t.kind === "class"
-            ? { kind: "class", classId: t.id }
-            : { kind: "intake", intakeId: t.id },
+        target.kind === "student"
+          ? { kind: "student", studentId: target.id }
+          : target.kind === "class"
+            ? { kind: "class", classId: target.id }
+            : { kind: "intake", intakeId: target.id },
         scope.campusId,
       ),
     ),
   );
   const candidatesByTarget = Object.fromEntries(
-    targets.map((t, i) => [`${t.kind}:${t.id}`, resolved[i]]),
+    targets.map((target, index) => [`${target.kind}:${target.id}`, resolved[index]]),
   );
 
-  // Past runs, so a batch generated last week can be reopened without regenerating it.
-  const batches = await prisma.cardBatch.findMany({
-    where: scope.campusId === null ? {} : { campusId: scope.campusId },
-    orderBy: { createdAt: "desc" },
-    take: 8,
-    select: { id: true, targetLabel: true, cardCount: true, sheetCount: true, createdAt: true },
-  });
+  const [batches, documents] = await Promise.all([
+    prisma.cardBatch.findMany({
+      where: scope.campusId === null ? {} : { campusId: scope.campusId },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+      select: { id: true, targetLabel: true, cardCount: true, createdAt: true },
+    }),
+    prisma.generatedDocument.findMany({
+      where: { kind: "ID_CARD", scopeKey: { in: list.rows.map((card) => card.id) } },
+      select: { scopeKey: true, svgText: true },
+    }),
+  ]);
 
+  const documentByCard = new Map(documents.map((document) => [document.scopeKey, document]));
+  const faceByCard = new Map(
+    list.rows.map((card) => {
+      const document = documentByCard.get(card.id);
+      return [card.id, document ? savedCardFaces(document.svgText) : null];
+    }),
+  );
 
+  const countFor = (value: string) =>
+    statusGroups.find((group) => group.status === value)?._count._all ?? 0;
+  const totalCards = statusGroups.reduce((sum, group) => sum + group._count._all, 0);
+  const stats = [
+    { label: "Total cards", value: totalCards, href: "/dashboard/cards", icon: Users },
+    { label: "Issued", value: countFor("ISSUED"), href: "/dashboard/cards?status=ISSUED", icon: ShieldCheck },
+    {
+      label: "Needs attention",
+      value: countFor("PENDING") + countFor("PRINTING"),
+      href: "/dashboard/cards?status=PENDING",
+      icon: AlertTriangle,
+    },
+    {
+      label: "Lost / replaced",
+      value: countFor("LOST") + countFor("REPLACED"),
+      href: "/dashboard/cards?status=LOST",
+      icon: History,
+    },
+  ];
   const statuses = Object.entries(labels.cardStatus).map(([value, label]) => ({ value, label }));
 
-  // Previews come from the saved card documents. Opening this list never re-merges the
-  // artwork: a card is a record, and the record is what the office sees and prints.
-  const documents = await Promise.all(
-    list.rows.map((card) => ensureDocument("ID_CARD", card.id)),
-  );
-  const faceByCard = new Map(
-    list.rows.map((card, index) => [
-      card.id,
-      documents[index] ? savedCardFaces(documents[index]!.svgText) : null,
-    ]),
-  );
-
-  // One card, one record card — the same treatment as programmes, students and invoices.
-  // The whole card opens the card's own page, and the actions stay in the footer strip so a
-  // record never needs a row menu.
-  const cards: RecordCardData[] = list.rows.map((card) => {
-    const programme = card.program?.name ?? card.student.enrollments[0]?.program.name ?? common.none;
-    const faceData = faceByCard.get(card.id) ?? null;
-
-    const face = [
-      { label: copy.print.studentLabel, value: card.student.admissionNo },
-      { label: copy.print.programmeLabel, value: programme },
-      { label: copy.print.campusLabel, value: scope.campusName },
-      { label: copy.print.serialLabel, value: card.serial },
-      { label: copy.print.validLabel, value: card.expiresAt ? formatDate(card.expiresAt) : common.notSet },
-    ];
-
-    const action = (
-      <div className="flex w-full flex-wrap items-start gap-2">
-        <RowForm
-          id={`card-${card.id}-move`}
-          button={copy.move.title}
-          fields={[copy.move.statusField]}
-          values={{ status: card.status }}
-          hidden={{ cardId: card.id }}
-          action={moveCard}
-          submitLabel={common.update}
-        />
-
-        <details className="min-w-0">
-          <summary className={detail}>{copy.print.open}</summary>
-          <div className="mt-2 w-[18rem] max-w-full rounded-xl border border-eavi-border bg-eavi-card p-3 text-xs shadow-eavi-card">
-            <p className="text-xs text-eavi-muted-text">{copy.print.heading}</p>
-            {faceData?.frontSvg ? (
-              // The artwork is the campus's own file, inlined so the browser renders the
-              // real card rather than a redesign of it.
-              <div className="mt-2 space-y-2">
-                <div
-                  className="w-full overflow-hidden rounded-md ring-1 ring-eavi-border [&>svg]:h-auto [&>svg]:w-full"
-                  dangerouslySetInnerHTML={{ __html: faceData.frontSvg }}
-                />
-                <div
-                  className="w-full overflow-hidden rounded-md ring-1 ring-eavi-border [&>svg]:h-auto [&>svg]:w-full"
-                  dangerouslySetInnerHTML={{ __html: faceData.backSvg }}
-                />
-              </div>
-            ) : null}
-            <dl className="mt-2 space-y-1">
-              {face.map((line) => (
-                <div key={line.label} className="flex items-baseline justify-between gap-3">
-                  <dt className="shrink-0 text-xs text-eavi-muted-text">{line.label}</dt>
-                  <dd className="min-w-0 text-xs text-right sm:truncate">{line.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </details>
-      </div>
-    );
-
-    return {
-      id: card.id,
-      href: `/dashboard/cards/${card.id}`,
-      eyebrow: card.serial,
-      title: card.student.user.fullName,
-      subtitle: card.student.admissionNo,
-      status: (
-        // The chip is the STUDENT's state (enrolled or not) — the authoritative enrolment,
-        // never the card's print lifecycle. The print state stays as the small line under
-        // it, so the office still sees which cards await printing without an enrolled
-        // student ever being told "PENDING".
-        <span className="flex flex-col items-start gap-1">
-          <StatusChip tone={card.student.enrollments.length > 0 ? "success" : "neutral"}>
-            {card.student.enrollments.length > 0 ? "Enrolled" : "Not enrolled"}
-          </StatusChip>
-          <span className="text-[11px] text-eavi-muted-text">
-            Card: {labels.cardStatus[card.status] ?? card.status}
-          </span>
-        </span>
-      ),
-      facts: [
-        { label: copy.print.programmeLabel, value: programme, showLabel: true },
-        {
-          label: copy.print.validLabel,
-          value: card.expiresAt ? formatDate(card.expiresAt) : common.notSet,
-          showLabel: true,
-          tone: "muted" as const,
-        },
-        {
-          label: "Issued",
-          value: card.issuedAt ? formatDate(card.issuedAt) : common.notSet,
-          showLabel: true,
-          tone: "muted" as const,
-        },
-      ],
-      action,
-    };
-  });
-
   return (
-    <div className="space-y-6">
-      <PageHeader title={copy.title} description={copy.description} />
+    <div className={s.page}>
+      <section className={s.hero} aria-labelledby="cards-title">
+        <div>
+          <p className={s.heroEyebrow}>Campus credentials</p>
+          <h1 id="cards-title">{copy.title}</h1>
+          <p>{copy.description}</p>
+        </div>
+        <a className={s.heroAction} href="#print-batch">
+          <Printer aria-hidden /> Print card batch <ArrowUpRight aria-hidden />
+        </a>
+      </section>
+
+      <section className={s.stats} aria-label="Card register summary">
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <Link key={stat.label} href={stat.href} className={s.stat}>
+              <span className={s.statIcon}><Icon aria-hidden /></span>
+              <span>
+                <strong>{stat.value.toLocaleString()}</strong>
+                <span>{stat.label}</span>
+              </span>
+              <ArrowUpRight aria-hidden className={s.statArrow} />
+            </Link>
+          );
+        })}
+      </section>
 
       {invalid ? <Notice tone="warning" title={common.errorTitle} body={common.invalidSubmit} /> : null}
       {empty ? <Notice tone="warning" title={copy.generate.title} body={copy.generate.limits.empty} /> : null}
       {tooMany ? <Notice tone="warning" title={copy.generate.title} body={copy.generate.limits.tooMany} /> : null}
       {ready ? <Notice tone="success" title={copy.generate.title} body={copy.generate.limits.saved} /> : null}
 
-      <Panel title={copy.generate.title} description={copy.generate.hint}>
-        <div className="p-4">
-          <CardGenerator
-            students={studentOptions}
-            classes={classChoices.map((c) => ({ value: c.value, label: c.label }))}
-            intakes={intakeChoices.map((i) => ({ value: i.id, label: i.label }))}
-            candidatesByTarget={candidatesByTarget}
-          />
-        </div>
-      </Panel>
+      <div className={s.workspace}>
+        <section className={s.register} aria-labelledby="register-title">
+          <header className={s.sectionHeader}>
+            <div>
+              <p className={s.eyebrow}>Register</p>
+              <h2 id="register-title">All cards</h2>
+              <p>{pages.overview.scopeNote(scope.campusName)}</p>
+            </div>
+            <span className={s.resultCount}>{list.total} results</span>
+          </header>
 
-      {batches.length > 0 ? (
-        <Panel title={copy.history}>
-          <ul className="divide-y divide-eavi-border">
-            {batches.map((batch) => (
-              <li key={batch.id}>
-                <Link
-                  href={`/dashboard/cards/batches/${batch.id}`}
-                  className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 p-3 text-sm hover:bg-eavi-muted"
-                >
-                  <span className="font-medium">{batch.targetLabel}</span>
-                  <span className="text-eavi-muted-text">{copy.generate.preview(batch.cardCount)}</span>
-                  <span className="ms-auto text-xs text-eavi-muted-text tabular-nums">
-                    {formatDate(batch.createdAt)}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-      ) : null}
-
-      <Panel title={copy.title} description={pages.overview.scopeNote(scope.campusName)}>
-        <div className="space-y-4 p-4">
-          <ListFilters
-            basePath="/dashboard/cards"
-            q={q}
-            status={status}
-            statuses={statuses}
-            searchLabel={copy.searchLabel}
-          />
-          <ResultCount total={list.total} />
-        </div>
-
-        {cards.length === 0 ? (
-          <EmptyState title={copy.empty.title} body={copy.empty.body} icon="cards" />
-        ) : (
-          <>
-            <RecordCardGrid>
-              {cards.map((card) => (
-                <RecordCard key={card.id} card={card} openLabel={copy.openLabel} />
-              ))}
-            </RecordCardGrid>
-            <div className="border-t border-eavi-border p-4">
-              <Paginator
-                basePath="/dashboard/cards"
-                page={list.page}
-                total={list.total}
-                q={q}
-                status={status}
+          <form action="/dashboard/cards" method="get" className={s.filters}>
+            <div className={s.searchField}>
+              <Label htmlFor="card-search">{copy.searchLabel}</Label>
+              <Input
+                id="card-search"
+                name="q"
+                type="search"
+                defaultValue={q}
+                placeholder={common.searchPlaceholder}
               />
             </div>
-          </>
-        )}
-      </Panel>
+            <div className={s.statusField}>
+              <Label htmlFor="card-status">{common.filter}</Label>
+              <select
+                id="card-status"
+                name="status"
+                defaultValue={status ?? ""}
+                className={s.select}
+              >
+                <option value="">{common.allStatuses}</option>
+                {statuses.map((choice) => (
+                  <option key={choice.value} value={choice.value}>{choice.label}</option>
+                ))}
+              </select>
+            </div>
+            <input type="hidden" name="page" value="1" />
+            <Button type="submit" size="lg">Apply filters</Button>
+            {q || status ? (
+              <Button asChild size="lg" variant="ghost">
+                <Link href="/dashboard/cards">{common.clear}</Link>
+              </Button>
+            ) : null}
+          </form>
+
+          {list.rows.length === 0 ? (
+            <EmptyState title={copy.empty.title} body={copy.empty.body} icon="cards" />
+          ) : (
+            <ul className={s.cardList}>
+              {list.rows.map((card) => {
+                const face = faceByCard.get(card.id) ?? null;
+                const programme = card.program?.name ?? card.student.enrollments[0]?.program.name ?? common.none;
+                return (
+                  <li key={card.id} className={s.cardRow}>
+                    <Link href={`/dashboard/cards/${card.id}`} className={s.cardLink}>
+                      <span className={s.thumbnail} aria-hidden="true">
+                        {face?.frontSvg ? (
+                          <span dangerouslySetInnerHTML={{ __html: face.frontSvg }} />
+                        ) : (
+                          <span className={s.initials}>
+                            {card.student.user.fullName
+                              .split(/\s+/)
+                              .slice(0, 2)
+                              .map((part) => part[0])
+                              .join("")
+                              .toUpperCase()}
+                          </span>
+                        )}
+                      </span>
+                      <span className={s.identity}>
+                        <span className={s.cardTopline}>
+                          <span className={s.serial}>{card.serial}</span>
+                          <StatusChip tone={tone[card.status] ?? "neutral"}>
+                            {labels.cardStatus[card.status] ?? card.status}
+                          </StatusChip>
+                        </span>
+                        <strong>{card.student.user.fullName}</strong>
+                        <span>{card.student.admissionNo} · {programme}</span>
+                      </span>
+                      <span className={s.facts}>
+                        <span><span>Issued</span><strong>{card.issuedAt ? formatDate(card.issuedAt) : common.notSet}</strong></span>
+                        <span><span>Valid until</span><strong>{card.expiresAt ? formatDate(card.expiresAt) : common.notSet}</strong></span>
+                      </span>
+                      <span className={s.openRecord}>
+                        Open record <ArrowUpRight aria-hidden />
+                      </span>
+                    </Link>
+
+                    <div className={s.rowActions}>
+                      <RowForm
+                        id={`card-${card.id}-move`}
+                        button="Update status"
+                        fields={[copy.move.statusField]}
+                        values={{ status: card.status }}
+                        hidden={{ cardId: card.id }}
+                        action={moveCard}
+                        submitLabel={common.update}
+                        className={s.rowForm}
+                      />
+                      <Button asChild variant="ghost" size="sm">
+                        <a href={`/dashboard/cards/${card.id}/card`} target="_blank" rel="noopener noreferrer">
+                          View PDF <ArrowUpRight aria-hidden />
+                        </a>
+                      </Button>
+                      <Button asChild variant="ghost" size="sm">
+                        <a href={`${site.url}/verify/${card.verifyToken}`} target="_blank" rel="noopener noreferrer">
+                          Verify <ArrowUpRight aria-hidden />
+                        </a>
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <div className={s.pagination}>
+            <Paginator
+              basePath="/dashboard/cards"
+              page={list.page}
+              total={list.total}
+              q={q}
+              status={status}
+            />
+          </div>
+        </section>
+
+        <aside className={s.sidebar}>
+          <section id="print-batch" className={s.printPanel} aria-labelledby="print-title">
+            <header>
+              <span className={s.panelIcon}><Printer aria-hidden /></span>
+              <div>
+                <p className={s.eyebrow}>Physical cards</p>
+                <h2 id="print-title">{copy.generate.title}</h2>
+              </div>
+            </header>
+            <p className={s.panelDescription}>{copy.generate.hint}</p>
+            <CardGenerator
+              students={studentOptions}
+              classes={classChoices.map((choice) => ({ value: choice.value, label: choice.label }))}
+              intakes={intakeChoices.map((choice) => ({ value: choice.id, label: choice.label }))}
+              candidatesByTarget={candidatesByTarget}
+            />
+          </section>
+
+          {batches.length > 0 ? (
+            <section className={s.batches} aria-labelledby="batches-title">
+              <header>
+                <History aria-hidden />
+                <h2 id="batches-title">{copy.history}</h2>
+              </header>
+              <ul>
+                {batches.map((batch) => (
+                  <li key={batch.id}>
+                    <Link href={`/dashboard/cards/batches/${batch.id}`}>
+                      <span>
+                        <strong>{batch.targetLabel}</strong>
+                        <span>{copy.generate.preview(batch.cardCount)}</span>
+                      </span>
+                      <span className={s.batchDate}>{formatDate(batch.createdAt)}</span>
+                      <ArrowUpRight aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </aside>
+      </div>
     </div>
   );
 }

@@ -1859,9 +1859,9 @@ export const pages = {
   },
 
   cards: {
-    title: "ID cards",
-    description: "Card requests and printing status for this campus.",
-    searchLabel: "Search by serial or admission number",
+    title: "Card register",
+    description: "Digital cards are issued at enrolment. Check each record and print physical batches.",
+    searchLabel: "Search by name, admission number or serial",
     columns: [
       { key: "serial", label: "Serial" },
       { key: "student", label: "Student" },
@@ -1873,7 +1873,7 @@ export const pages = {
     openLabel: "Open card",
     empty: {
       title: "No cards recorded",
-      body: "Request a card or generate one for a class.",
+      body: "Cards appear automatically after a student is enrolled.",
     },
     create: {
       button: "Request card",
@@ -1886,7 +1886,7 @@ export const pages = {
       ] satisfies Field[],
       created: "Card requested.",
       /** Written on every card raised by a print run, so its origin is on the record. */
-      autoRemark: "Requested from a card print run.",
+      autoRemark: "Issued automatically at enrolment.",
     },
     move: {
       title: "Move card",

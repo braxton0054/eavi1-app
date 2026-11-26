@@ -1266,7 +1266,21 @@ export async function getCards(query: ListQuery) {
     AND: [
       campusWhere(scope.campusId),
       status ? { status } : {},
-      semester ? { OR: [{ serial: contains(semester) }, { student: { admissionNo: contains(semester) } }] } : {},
+      semester
+        ? {
+            OR: [
+              { serial: contains(semester) },
+              {
+                student: {
+                  OR: [
+                    { admissionNo: contains(semester) },
+                    { user: { fullName: contains(semester) } },
+                  ],
+                },
+              },
+            ],
+          }
+        : {},
     ],
   };
 
