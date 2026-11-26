@@ -135,7 +135,6 @@ export function CardGenerator({
 
       <div className="flex flex-wrap items-center gap-3">
         <SubmitButton label={copy.button} disabled={!choice || candidates.length === 0} />
-        <p className="text-xs text-eavi-muted-text">{copy.hint}</p>
       </div>
     </form>
   );

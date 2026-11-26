@@ -24,7 +24,6 @@ import { RowForm } from "@/components/dashboard/record-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { site } from "@/lib/content/home";
 import { formatDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import s from "./cards.module.css";
@@ -268,11 +267,6 @@ export default async function CardsPage({
                       <Button asChild variant="ghost" size="sm">
                         <a href={`/dashboard/cards/${card.id}/card`} target="_blank" rel="noopener noreferrer">
                           View PDF <ArrowUpRight aria-hidden />
-                        </a>
-                      </Button>
-                      <Button asChild variant="ghost" size="sm">
-                        <a href={`${site.url}/verify/${card.verifyToken}`} target="_blank" rel="noopener noreferrer">
-                          Verify <ArrowUpRight aria-hidden />
                         </a>
                       </Button>
                     </div>

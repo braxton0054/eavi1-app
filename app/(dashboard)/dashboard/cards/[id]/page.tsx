@@ -4,23 +4,14 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireCollegeAdmin } from "@/lib/session";
 import { common, labels, pages } from "@/lib/content/dashboard";
-import { site } from "@/lib/content/home";
-import { DetailList, Notice, PageHeader, Panel } from "@/components/dashboard/panel";
-import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
+import { DetailList, PageHeader, Panel } from "@/components/dashboard/panel";
+import { StatusChip } from "@/components/dashboard/status-chip";
 import { ensureDocument } from "@/lib/documents/service";
 import { savedCardFaces } from "@/lib/documents/renderers";
 import { listAudit } from "@/lib/academics/audit";
 import { formatDate } from "@/lib/format";
 
 const copy = pages.cards.detail;
-
-const tone: Record<string, ChipTone> = {
-  PENDING: "warning",
-  PRINTING: "warning",
-  ISSUED: "success",
-  LOST: "danger",
-  REPLACED: "neutral",
-};
 
 /** One card, with the artwork as it will print and the history of what happened to it. */
 export default async function CardPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +23,6 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
     select: {
       id: true,
       serial: true,
-      verifyToken: true,
       status: true,
       issuedAt: true,
       expiresAt: true,
@@ -104,14 +94,6 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
               className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
             >
               Download PDF
-            </a>
-            <a
-              href={`${site.url ?? ""}/verify/${card.verifyToken}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center rounded-lg border border-eavi-border px-4 text-sm font-medium text-eavi-primary-text hover:bg-eavi-muted"
-            >
-              Share verification
             </a>
             <Link
               href={`/dashboard/students/${card.student.id}`}
