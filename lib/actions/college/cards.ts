@@ -88,7 +88,7 @@ export async function moveCard(formData: FormData) {
 
     const card = await prisma.idCard.findFirst({
       where: { id: cardId, ...(scope.campusId === null ? {} : { campusId: scope.campusId }) },
-      select: { id: true, status: true, studentId: true },
+      select: { id: true, status: true, issuedAt: true, studentId: true },
     });
     if (!card) throw new FieldError(fieldErrors.notOnCampus);
 
@@ -96,20 +96,25 @@ export async function moveCard(formData: FormData) {
     // reported lost, so an ISSUED -> LOST transition is deliberately allowed through.
     await prisma.idCard.update({
       where: { id: card.id },
-      data: { status, issuedAt: status === CardStatus.ISSUED ? new Date() : null },
+      data: { status, issuedAt: status === CardStatus.ISSUED ? card.issuedAt ?? new Date() : null },
     });
 
     // Marking one card replaced retires any live card the student still holds, so two
     // issued cards can never exist for the same person at once.
     if (status === CardStatus.REPLACED) {
-      await prisma.idCard.updateMany({
+      const toRetire = await prisma.idCard.findMany({
         where: {
           studentId: card.studentId,
           status: CardStatus.ISSUED,
           id: { not: card.id },
         },
+        select: { id: true },
+      });
+      await prisma.idCard.updateMany({
+        where: { id: { in: toRetire.map((row) => row.id) } },
         data: { status: CardStatus.REPLACED, issuedAt: null },
       });
+      await Promise.all(toRetire.map((row) => touchDocument("ID_CARD", row.id)));
     }
 
     // Issue date and status are printed on the card, so a status move changes the

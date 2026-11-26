@@ -292,17 +292,25 @@ export async function getStudentFees() {
 export async function getStudentCard() {
   const { student } = await getStudentEnrolment();
 
-  const card = await prisma.idCard.findFirst({
+  const select = {
+    id: true,
+    serial: true,
+    status: true,
+    issuedAt: true,
+    expiresAt: true,
+    verifyToken: true,
+  } as const;
+
+  // A pending or withdrawn row must never shadow the student's current issued card.
+  const issued = await prisma.idCard.findFirst({
+    where: { studentId: student.studentId, status: "ISSUED", issuedAt: { not: null } },
+    orderBy: [{ issuedAt: "desc" }, { createdAt: "desc" }],
+    select,
+  });
+  const card = issued ?? await prisma.idCard.findFirst({
     where: { studentId: student.studentId },
-    orderBy: { issuedAt: "desc" },
-    select: {
-      id: true,
-      serial: true,
-      status: true,
-      issuedAt: true,
-      expiresAt: true,
-      verifyToken: true,
-    },
+    orderBy: { createdAt: "desc" },
+    select,
   });
 
   return { student, card };

@@ -2407,10 +2407,10 @@ export const studentPortal = {
   },
   id: {
     title: "Student card",
-    description: "Your campus identity card, and how to check that it is genuine.",
+    description: "Your official EAVI identity card, ready to show and verify.",
     none: {
-      title: "No card issued yet",
-      body: "Once your card has been printed and issued it will appear here, with a code anyone can scan to confirm it is genuine.",
+      title: "No card on record",
+      body: "Cards are created automatically when you enrol. Contact the registry if you are enrolled and still do not see one.",
     },
     issued: "Issued",
     serial: "Serial",

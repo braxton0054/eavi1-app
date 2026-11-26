@@ -1,224 +1,398 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
-import type { IdCardStudent } from "@/components/id-card-svg";
-import s from "./id-cards.white.module.css";
 
-type CardSummary = {
+import { useRef, useState } from "react";
+import {
+  ArrowUpRight,
+  Check,
+  Clock3,
+  Copy,
+  Download,
+  ExternalLink,
+  IdCard,
+  LifeBuoy,
+  Printer,
+  RotateCcw,
+  Share2,
+  ShieldAlert,
+  ShieldCheck,
+  X,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { StatusChip, type ChipTone } from "@/components/dashboard/status-chip";
+import type { CardLifecycle } from "@/lib/cards/status";
+import { site } from "@/lib/content/home";
+import s from "./id-cards.module.css";
+
+export type CardDetails = {
+  name: string;
+  admissionNo: string;
+  program: string;
+  campus: string;
+  className: string;
+  intake: string;
+  validUntil: string;
+  issuedAt: string | null;
+  serial: string | null;
+  email: string | null;
+};
+
+export type CardHistoryItem = {
   id: string;
   serial: string;
-  status: string;
   issuedAt: string | null;
   expiresAt: string | null;
-  expired: boolean;
+  state: CardLifecycle;
 };
 
 type Props = {
-  /** The signed-in student's own record, ready for the card components. */
-  initial: IdCardStudent;
-  /** The real merged artwork the printer uses, QR and photo filled server-side. */
+  details: CardDetails;
+  lifecycle: CardLifecycle | null;
   faceFront: string | null;
   faceBack: string | null;
-  verifyUrl: string | null;
-  cards: CardSummary[];
+  previewUnavailable: boolean;
+  verificationLink: string | null;
+  cards: CardHistoryItem[];
+  title: string;
+  description: string;
 };
 
-const TABS = [
-  ["view", "My card"],
-  ["list", "Card history"],
-] as const;
-type TabKey = (typeof TABS)[number][0];
+const toneToChip: Record<CardLifecycle["tone"], ChipTone> = {
+  success: "success",
+  warning: "warning",
+  danger: "danger",
+  neutral: "neutral",
+};
 
-const CAMPUSES = ["Main Campus", "West Campus"] as const;
+function StateIcon({ lifecycle }: { lifecycle: CardLifecycle }) {
+  if (lifecycle.tone === "success") return <ShieldCheck aria-hidden />;
+  if (lifecycle.tone === "danger") return <ShieldAlert aria-hidden />;
+  return <Clock3 aria-hidden />;
+}
 
-const statusLabel = (row: CardSummary) =>
-  row.expired
-    ? "Expired"
-    : { ISSUED: "Active", PENDING: "Pending", PRINTING: "Printing", LOST: "Lost", REPLACED: "Replaced" }[row.status] ?? row.status;
-
-const statusClass = (row: CardSummary) =>
-  row.expired ? s.badgeExpired : row.status === "ISSUED" ? s.badge : s.badgePending;
-
-export default function IdCardsClient({ initial, faceFront, faceBack, verifyUrl, cards: seed }: Props) {
-  const [tab, setTab] = useState<TabKey>("view");
-  const [d, setD] = useState<IdCardStudent>(initial);
-  const [cards, setCards] = useState<CardSummary[]>(seed);
+export default function IdCardsClient({
+  details,
+  lifecycle,
+  faceFront,
+  faceBack,
+  previewUnavailable,
+  verificationLink,
+  cards,
+  title,
+  description,
+}: Props) {
   const [flipped, setFlipped] = useState(false);
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [shareMode, setShareMode] = useState<"share" | "copy">("copy");
+  const [sharing, setSharing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const linkInputRef = useRef<HTMLInputElement>(null);
 
-  // Cards list: search + campus filter
-  const [query, setQuery] = useState("");
-  const [campusFilter, setCampusFilter] = useState("All");
+  const openShare = () => {
+    if (!verificationLink) return;
+    setShareMode(typeof navigator.share === "function" ? "share" : "copy");
+    setCopied(false);
+    setShareError(null);
+    dialogRef.current?.showModal();
+  };
 
-  const flip = () => setFlipped((f) => !f);
-  const onFlipKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      flip();
+  const copyLink = async () => {
+    if (!verificationLink) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(verificationLink);
+      } else {
+        linkInputRef.current?.focus();
+        linkInputRef.current?.select();
+        if (!document.execCommand("copy")) throw new Error("Copy was refused");
+      }
+      setCopied(true);
+      setShareError(null);
+    } catch {
+      setShareError("Copy the link manually from the field above.");
     }
   };
 
-  // Tabs: roving tabindex + arrow keys, the standard tablist pattern.
-  const onTabKey = (e: React.KeyboardEvent, i: number) => {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    e.preventDefault();
-    const dir = e.key === "ArrowRight" ? 1 : -1;
-    const n = (i + dir + TABS.length) % TABS.length;
-    setTab(TABS[n][0]);
-    tabRefs.current[n]?.focus();
+  const shareLink = async () => {
+    if (!verificationLink) return;
+    setSharing(true);
+    setShareError(null);
+    try {
+      if (shareMode === "share" && navigator.share) {
+        await navigator.share({
+          title: "EAVI student card verification",
+          text: "Check my EAVI student card against the institute register.",
+          url: verificationLink,
+        });
+        dialogRef.current?.close();
+      } else {
+        await copyLink();
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setShareError("Sharing was not completed. Copy the link manually instead.");
+    } finally {
+      setSharing(false);
+    }
   };
 
-  const openIn = (row: CardSummary, t: TabKey) => {
-    setD((prev) => ({
-      ...prev,
-      serial: row.serial,
-      validUntil: row.expiresAt ?? prev.validUntil,
-      status: row.expired ? "Expired" : "Active",
-    }));
-    setFlipped(false);
-    setTab(t);
+  const closeShare = () => {
+    setShareError(null);
+    setCopied(false);
+    dialogRef.current?.close();
   };
 
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return cards.filter(
-      (x) =>
-        (campusFilter === "All" || d.campus === campusFilter) &&
-        (!q || `${d.name} ${d.adm} ${x.serial}`.toLowerCase().includes(q)),
-    );
-  }, [cards, query, campusFilter, d.name, d.adm, d.campus]);
+  const canPrint = Boolean(lifecycle?.canDownload && faceFront);
 
   return (
-    <main className={s.page}>
-      {/* Sticky tabs */}
-      <div className={s.tabs} role="tablist" aria-label="ID card steps">
-        {TABS.map(([k, label], i) => (
-          <button
-            key={k}
-            ref={(el) => {
-              tabRefs.current[i] = el;
-            }}
-            role="tab"
-            aria-selected={tab === k}
-            tabIndex={tab === k ? 0 : -1}
-            className={`${s.btn} ${tab === k ? s.btnPrimary : ""}`}
-            onClick={() => setTab(k)}
-            onKeyDown={(e) => onTabKey(e, i)}
-          >
-            {label}
-          </button>
-        ))}
+    <>
+      <div className={s.page} data-print="record">
+        <header className={s.header}>
+          <div>
+            <p className={s.eyebrow}>Campus identity</p>
+            <h1>{title}</h1>
+            <p className={s.lede}>{description}</p>
+          </div>
+          <div className={s.seal} aria-hidden="true">
+            <ShieldCheck />
+            <span>EAVI</span>
+          </div>
+        </header>
+
+        {!lifecycle ? (
+          <section className={s.empty} aria-labelledby="empty-title">
+            <div className={s.emptyCard} aria-hidden="true">
+              <IdCard />
+            </div>
+            <p className={s.eyebrow}>No card on record</p>
+            <h2 id="empty-title">Your card will appear here</h2>
+            <p>
+              Cards are created automatically when you enrol. If you are enrolled and still see this,
+              contact the registry so we can check your record.
+            </p>
+            <Button asChild size="lg" variant="outline">
+              <a href={site.whatsapp.href} target="_blank" rel="noopener noreferrer">
+                Contact the registry <ArrowUpRight aria-hidden />
+              </a>
+            </Button>
+          </section>
+        ) : (
+          <section className={s.credentialLayout} aria-label="Your student card">
+            <div className={s.stage}>
+              <div className={s.stageBar}>
+                <span>Card preview</span>
+                {faceFront ? <span className={s.sideLabel}>{flipped ? "Back" : "Front"}</span> : null}
+              </div>
+
+              {faceFront ? (
+                <button
+                  type="button"
+                  className={s.cardButton}
+                  onClick={() => setFlipped((value) => !value)}
+                  aria-label={flipped ? "Show the front of your student card" : "Show the back of your student card"}
+                  aria-pressed={flipped}
+                >
+                  <span className={`${s.cardInner} ${flipped ? s.flipped : ""}`}>
+                    <span className={s.face} aria-hidden={flipped} dangerouslySetInnerHTML={{ __html: faceFront }} />
+                    <span className={`${s.face} ${s.back}`} aria-hidden={!flipped} dangerouslySetInnerHTML={{ __html: faceBack ?? "" }} />
+                  </span>
+                </button>
+              ) : (
+                <div className={s.previewPlaceholder}>
+                  {previewUnavailable ? <ShieldAlert aria-hidden /> : <IdCard aria-hidden />}
+                  <strong>{previewUnavailable ? "Preview unavailable" : "No preview yet"}</strong>
+                  <span>
+                    {previewUnavailable
+                      ? "The card is issued, but its saved preview could not be loaded."
+                      : lifecycle.message}
+                  </span>
+                  {previewUnavailable ? (
+                    <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                      Reload preview
+                    </Button>
+                  ) : null}
+                </div>
+              )}
+
+              {faceFront ? (
+                <p className={s.stageHint}>
+                  <RotateCcw aria-hidden /> Select the card to turn it over
+                </p>
+              ) : null}
+            </div>
+
+            <aside className={s.details} aria-labelledby="card-owner-name">
+              <div className={`${s.statusPanel} ${s[lifecycle.tone]}`} role="status">
+                <span className={s.statusIcon}><StateIcon lifecycle={lifecycle} /></span>
+                <div>
+                  <div className={s.statusHeading}>
+                    <h2>{lifecycle.title}</h2>
+                    <StatusChip tone={toneToChip[lifecycle.tone]}>{lifecycle.label}</StatusChip>
+                  </div>
+                  <p>{lifecycle.message}</p>
+                </div>
+              </div>
+
+              <div className={s.identity}>
+                <p className={s.admissionNo}>{details.admissionNo}</p>
+                <h2 id="card-owner-name">{details.name}</h2>
+                <p>{details.program}</p>
+              </div>
+
+              <dl className={s.detailList}>
+                <div><dt>Campus</dt><dd>{details.campus}</dd></div>
+                <div><dt>Class</dt><dd>{details.className}</dd></div>
+                <div><dt>Intake</dt><dd>{details.intake}</dd></div>
+                <div><dt>Issued</dt><dd>{details.issuedAt ?? "Not issued"}</dd></div>
+                <div><dt>Valid until</dt><dd>{details.validUntil}</dd></div>
+                {details.serial ? <div><dt>Card serial</dt><dd>{details.serial}</dd></div> : null}
+              </dl>
+
+              <div className={s.actions}>
+                {lifecycle.canShare && verificationLink ? (
+                  <Button size="lg" onClick={openShare}>
+                    <Share2 aria-hidden /> Share verification link
+                  </Button>
+                ) : null}
+                {lifecycle.canVerify && verificationLink ? (
+                  <Button asChild size="lg" variant="outline">
+                    <a href={verificationLink} target="_blank" rel="noopener noreferrer">
+                      View verification <ExternalLink aria-hidden />
+                    </a>
+                  </Button>
+                ) : null}
+                {lifecycle.canDownload ? (
+                  <>
+                    <Button asChild size="md" variant="ghost">
+                      <a href="/student/id/card" target="_blank" rel="noopener noreferrer">
+                        View PDF <ArrowUpRight aria-hidden />
+                      </a>
+                    </Button>
+                    <Button asChild size="md" variant="ghost">
+                      <a href="/student/id/card?download=1" download>
+                        <Download aria-hidden /> Download PDF
+                      </a>
+                    </Button>
+                    {canPrint ? (
+                      <Button size="md" variant="ghost" onClick={() => window.print()}>
+                        <Printer aria-hidden /> Print card
+                      </Button>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+
+              {lifecycle.canShare && verificationLink ? (
+                <p className={s.shareNote}>
+                  <ShieldCheck aria-hidden />
+                  The link opens EAVI’s verification page. It confirms your card status without
+                  giving anyone access to your portal.
+                </p>
+              ) : null}
+            </aside>
+          </section>
+        )}
+
+        {cards.length > 0 ? (
+          <section className={s.history} aria-labelledby="history-title">
+            <div className={s.sectionHeading}>
+              <div>
+                <p className={s.eyebrow}>Your record</p>
+                <h2 id="history-title">Card history</h2>
+              </div>
+              <span>{cards.length} {cards.length === 1 ? "card" : "cards"}</span>
+            </div>
+            <ul className={s.historyList}>
+              {cards.map((card) => (
+                <li key={card.id}>
+                  <div className={s.historySerial}>
+                    <span className={s.historyIcon} aria-hidden="true"><IdCard /></span>
+                    <div>
+                      <strong>{card.serial}</strong>
+                      <span>Issued {card.issuedAt ?? "—"}</span>
+                    </div>
+                  </div>
+                  <div className={s.historyDates}>
+                    <span>Valid until</span>
+                    <strong>{card.expiresAt ?? "—"}</strong>
+                  </div>
+                  <StatusChip tone={toneToChip[card.state.tone]}>{card.state.label}</StatusChip>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        <aside className={s.help}>
+          <span className={s.helpIcon} aria-hidden="true"><LifeBuoy /></span>
+          <div>
+            <h2>Need a replacement or an update?</h2>
+            <p>Report a lost card or ask the registry to correct your name, photo, or programme.</p>
+          </div>
+          <Button asChild variant="outline" size="md">
+            <a href={site.whatsapp.href} target="_blank" rel="noopener noreferrer">
+              Contact the registry <ArrowUpRight aria-hidden />
+            </a>
+          </Button>
+        </aside>
       </div>
 
-      {/* 2. STUDENT VIEW: the real card, tap to flip */}
-      {tab === "view" && (
-        <section className={s.panel}>
-          <h2>What the student sees</h2>
-          {faceFront ? (
-            <div
-              className={`${s.flip} ${s.printArea} ${flipped ? s.flipped : ""}`}
-              role="button"
-              tabIndex={0}
-              aria-pressed={flipped}
-              aria-label="Student ID card, activated to flip between front and back"
-              onClick={flip}
-              onKeyDown={onFlipKey}
-            >
-              <div className={s.flipInner}>
-                <div className={s.face} dangerouslySetInnerHTML={{ __html: faceFront }} />
-                <div className={`${s.face} ${s.back}`} dangerouslySetInnerHTML={{ __html: faceBack ?? "" }} />
-              </div>
-            </div>
-          ) : (
-            <p className={s.meta}>No card has been issued yet.</p>
-          )}
-          <div className={s.meta}>
-            <b>{d.name}</b><br />{d.course} · {d.campus} · Valid until {d.validUntil}<br />
-            {d.serial ? <>Serial {d.serial}<br /></> : null}
-            {verifyUrl ? <><a href={verifyUrl}>Verify this card</a><br /></> : null}
-            <br />
-            <span className={`${s.badge} ${d.status === "Expired" ? s.badgeExpired : ""}`}>{d.status}</span>
+      {canPrint ? (
+        <div className={`print-doc ${s.printDoc}`} aria-hidden="true">
+          <header>
+            <strong>East Africa Vision Institute</strong>
+            <span>Student identity card</span>
+          </header>
+          <div className={s.printIdentity}>
+            <strong>{details.name}</strong>
+            <span>{details.admissionNo}</span>
           </div>
-          <div className={`${s.actions} ${s.center}`}>
-            <button className={`${s.btn} ${s.btnPrimary}`} onClick={flip} aria-expanded={flipped}>Flip card</button>
-            <a className={s.btn} href="/student/id/card" target="_blank" rel="noopener noreferrer">View PDF</a>
-            <a className={s.btn} href="/student/id/card?download=1" download>Download PDF</a>
-            <button className={s.btn} onClick={() => window.print()}>Print card</button>
-            {verifyUrl ? <a className={s.btn} href={verifyUrl} target="_blank" rel="noopener noreferrer">Share verification</a> : null}
+          <div className={s.printFaces}>
+            <div className={s.printFace} dangerouslySetInnerHTML={{ __html: faceFront ?? "" }} />
+            <div className={s.printFace} dangerouslySetInnerHTML={{ __html: faceBack ?? "" }} />
           </div>
-        </section>
-      )}
+        </div>
+      ) : null}
 
-      {/* 3. LIST: search + campus filter + status + View/Reissue */}
-      {tab === "list" && (
-        <section className={s.panel}>
-          <h2>Issued cards</h2>
-          <div className={s.filters}>
-            <div>
-              <label className={s.label} htmlFor="id-search">Search</label>
-              <input
-                id="id-search"
-                className={s.input}
-                type="search"
-                placeholder="Name, admission no. or serial"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={s.label} htmlFor="id-filter-campus">Campus</label>
-              <select
-                id="id-filter-campus"
-                className={s.input}
-                value={campusFilter}
-                onChange={(e) => setCampusFilter(e.target.value)}
-              >
-                <option>All</option>
-                {CAMPUSES.map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </div>
+      <dialog ref={dialogRef} className={s.shareDialog} onClose={closeShare} aria-labelledby="share-title">
+        <div className={s.dialogHeader}>
+          <div>
+            <p className={s.eyebrow}>Verification</p>
+            <h2 id="share-title">Share your verification link</h2>
           </div>
-          <p className={s.count} aria-live="polite">
-            Showing {visible.length} of {cards.length} card{cards.length === 1 ? "" : "s"}
-          </p>
-          <div className={s.tableWrap} tabIndex={0} role="region" aria-label="Issued cards, scrollable">
-            <table className={s.table}>
-              <thead>
-                <tr>
-                  <th scope="col">Student</th>
-                  <th scope="col">Adm no.</th>
-                  <th scope="col">Serial</th>
-                  <th scope="col">Status</th>
-                  <th scope="col"><span className={s.srOnly}>Actions</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((row) => (
-                  <tr key={row.id}>
-                    <td>{d.name}</td>
-                    <td>{d.adm}</td>
-                    <td>{row.serial}</td>
-                    <td><span className={statusClass(row)}>{statusLabel(row)}</span></td>
-                    <td>
-                      <button className={s.btn} onClick={() => openIn(row, "view")}>
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {visible.length === 0 && (
-                  <tr className={s.empty}>
-                    <td colSpan={5}>
-                      {cards.length === 0
-                        ? "No cards issued yet — the registry issues them."
-                        : `No cards match “${query || campusFilter}”. Adjust the search or campus filter.`}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-    </main>
+          <Button variant="ghost" size="icon" onClick={closeShare} aria-label="Close sharing dialog">
+            <X aria-hidden />
+          </Button>
+        </div>
+        <p className={s.dialogBody}>
+          Anyone you send this to will see EAVI’s official verification result for your card:
+          your name, programme, campus, issue date, and current status.
+        </p>
+        <label className={s.shareLabel} htmlFor="verification-link">Verification link</label>
+        <input
+          ref={linkInputRef}
+          id="verification-link"
+          className={s.shareInput}
+          value={verificationLink ?? ""}
+          readOnly
+          suppressHydrationWarning
+          onFocus={(event) => event.currentTarget.select()}
+        />
+        {shareError ? <p className={s.shareError} role="alert">{shareError}</p> : null}
+        {copied ? (
+          <p className={s.shareSuccess} role="status"><Check aria-hidden /> Verification link copied</p>
+        ) : null}
+        <div className={s.dialogActions}>
+          <Button variant="outline" size="lg" onClick={copyLink} disabled={sharing}>
+            {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+            {copied ? "Copied" : "Copy link"}
+          </Button>
+          <Button size="lg" onClick={shareLink} loading={sharing}>
+            <Share2 aria-hidden /> {shareMode === "share" ? "Share link" : "Copy verification link"}
+          </Button>
+        </div>
+      </dialog>
+    </>
   );
 }

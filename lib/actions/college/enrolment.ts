@@ -1,7 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-
 import { redirect } from "next/navigation";
 
 import { EnrollmentStatus, Role, Status } from "@/generated/prisma/enums";
@@ -34,7 +32,7 @@ import { resolveClassForName } from "@/lib/academics/class-reuse";
 import { recordAudit } from "@/lib/academics/audit";
 import { registerEnrolmentUnits } from "@/lib/academics/registration";
 import { syncClassConversation } from "@/lib/chat/class-rooms";
-import { expiryForProgram } from "@/lib/cards/validity";
+import { createIssuedCard } from "@/lib/cards/issue";
 
 /**
  * One of the enrolment's optional attachments.
@@ -363,18 +361,14 @@ export async function enrolStudent(formData: FormData) {
       // The card is issued in the same transaction, so an enrolled student always has one.
       // Its expiry follows the programme's duration from the intake, not a figure chosen
       // here, so the card is valid exactly as long as the student is enrolled.
-      await tx.idCard.create({
-        data: {
-          serial: cardSerial,
-          verifyToken: randomUUID(),
-          studentId: profile.id,
-          campusId,
-          programId,
-          status: "PENDING",
-          expiresAt: expiryForProgram(startDate, programDurationMonths),
-          remarks: pages.cards.create.autoRemark,
-        },
-        select: { id: true },
+      await createIssuedCard(tx, {
+        serial: cardSerial,
+        studentId: profile.id,
+        campusId,
+        programId,
+        startedAt: startDate,
+        durationMonths: programDurationMonths,
+        remarks: pages.cards.create.autoRemark,
       });
 
       // Parent/guardians (multiple)

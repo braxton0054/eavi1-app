@@ -5,10 +5,11 @@
  * Run: npx tsx scripts/verify-cards.ts
  */
 import { addMonths, expiryForProgram } from "../lib/cards/validity";
-import { escapeXml, mergeCardTemplate, slotsIn } from "../lib/cards/template";
+import { escapeXml, KNOWN_SLOTS, mergeCardTemplate, slotsIn } from "../lib/cards/template";
 import { A4, CR80, SHEET, paginateSheets, sheetGrid } from "../lib/cards/sheet";
 import { qrSvgGroup, verifyUrl } from "../lib/cards/qr";
 import { CARD_TEMPLATES } from "../components/id-card-svg";
+import { cardLifecycle } from "../lib/cards/status";
 
 let passed = 0;
 let failed = 0;
@@ -217,15 +218,29 @@ console.log("\nartwork ships with the build");
 
   // Every slot the artwork names must be one the renderer knows, or a card prints with a
   // dash where a real value should be and nobody notices until the plastic arrives.
-  const known = new Set([
-    "logo_url", "signature_url", "photo_url", "reg_no", "full_name", "course", "campus",
-    "intake", "expiry_date", "issue_date", "website", "verify_token", "emergency_name",
-    "emergency_phone", "contact_email",
-  ]);
+  const known = new Set<string>(KNOWN_SLOTS);
   const unknown = [...new Set([...slotsIn(front), ...slotsIn(back)])].filter((s) => !known.has(s));
   check("no template slot is unknown to the renderer", unknown.length === 0, unknown.join(", "));
   check("front names the student's name", slotsIn(front).includes("full_name"));
   check("back carries the verification token", slotsIn(back).includes("verify_token"));
+}
+
+console.log("\ncard lifecycle");
+{
+  const now = new Date("2026-11-26T00:00:00.000Z");
+  const issuedAt = new Date("2026-01-01T00:00:00.000Z");
+  const expiresAt = new Date("2029-01-01T00:00:00.000Z");
+  const base = { status: "ISSUED", issuedAt, expiresAt };
+
+  check("an issued, enrolled, unexpired card is active", cardLifecycle(base, true, now).key === "active");
+  check("a pending card never verifies as active", cardLifecycle({ ...base, status: "PENDING", issuedAt: null }, true, now).key === "pending");
+  check("a printing card never verifies as active", cardLifecycle({ ...base, status: "PRINTING", issuedAt: null }, true, now).key === "printing");
+  check("an issued row without an issue date is not active", cardLifecycle({ ...base, issuedAt: null }, true, now).key === "pending");
+  check("a lost card stays lost even when expired", cardLifecycle({ ...base, status: "LOST", issuedAt: null, expiresAt: new Date("2020-01-01") }, true, now).key === "lost");
+  check("a replaced card stays replaced", cardLifecycle({ ...base, status: "REPLACED", issuedAt: null }, true, now).key === "replaced");
+  check("an issued card without active enrolment is not current", cardLifecycle(base, false, now).key === "not-enrolled");
+  check("an expired issued card is labelled expired", cardLifecycle({ ...base, expiresAt: new Date("2020-01-01") }, true, now).key === "expired");
+  check("only an active card can be shared as current", cardLifecycle(base, true, now).canShare && !cardLifecycle({ ...base, status: "PENDING", issuedAt: null }, true, now).canShare);
 }
 
 console.log(`\n${failed === 0 ? "All checks passed." : `${failed} check(s) failed.`} ${passed} passed.`);

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { verify } from "@/lib/content/verify";
 import { formatDate } from "@/lib/format";
+import { cardLifecycle } from "@/lib/cards/status";
 
 /**
  * Where a scanned student card or a printed admission letter lands.
@@ -22,9 +23,6 @@ export const metadata: Metadata = {
   // A verification page is for the holder of the document, not an index of students.
   robots: { index: false, follow: false },
 };
-
-/** A card that is no longer proof of enrolment. LOST and REPLACED are both withdrawn. */
-const WITHDRAWN = new Set(["LOST", "REPLACED"]);
 
 export default async function VerifyPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -65,7 +63,6 @@ async function cardFor(token: string) {
           status: true,
           issuedAt: true,
           expiresAt: true,
-          createdAt: true,
           student: {
             select: {
               admissionNo: true,
@@ -108,20 +105,18 @@ async function CardAnswer({ card }: { card: Card }) {
   const enrollment = card.student.enrollments[0] ?? null;
   const now = new Date();
 
-  // Three separate reasons a card is not proof, because they mean different things to the
-  // person holding it: a lost card was never handed back, an expired one belongs to someone
-  // who has finished or left.
-  const withdrawn = WITHDRAWN.has(card.status);
-  const expired = card.expiresAt !== null && card.expiresAt < now;
-  const notEnrolled = enrollment === null;
-
-  const state = withdrawn
-    ? { tone: "revoked" as const, head: verify.heading.revoked, body: verify.revokedBody, ok: false }
-    : notEnrolled
-      ? { tone: "revoked" as const, head: verify.heading.revoked, body: verify.expiredBody, ok: false }
-      : expired
-        ? { tone: "expired" as const, head: verify.heading.expired, body: verify.expiredBody, ok: false }
-        : { tone: "valid" as const, head: verify.heading.valid, body: verify.validBody, ok: true };
+  // The portal and this public page share one lifecycle rule, so a pending card can never
+  // be presented as active in one place and verified in the other.
+  const lifecycle = cardLifecycle(card, enrollment !== null, now);
+  const state = lifecycle.key === "active"
+    ? { tone: "valid" as const, head: verify.heading.valid, body: verify.validBody, ok: true }
+    : lifecycle.key === "expired"
+      ? { tone: "expired" as const, head: verify.heading.expired, body: verify.expiredBody, ok: false }
+      : lifecycle.key === "pending" || lifecycle.key === "printing"
+        ? { tone: "pending" as const, head: verify.heading.pending, body: verify.pendingBody, ok: false }
+        : lifecycle.key === "not-enrolled"
+          ? { tone: "revoked" as const, head: verify.heading.revoked, body: verify.notEnrolledBody, ok: false }
+          : { tone: "revoked" as const, head: verify.heading.revoked, body: verify.revokedBody, ok: false };
 
   const rows = [
     { label: verify.labels.name, value: card.student.user.fullName },
@@ -133,7 +128,7 @@ async function CardAnswer({ card }: { card: Card }) {
     { label: verify.labels.campus, value: card.campus.name },
     {
       label: verify.labels.issued,
-      value: card.issuedAt ? formatDate(card.issuedAt) : formatDate(card.createdAt),
+      value: card.issuedAt ? formatDate(card.issuedAt) : "Not issued",
     },
     {
       label: verify.labels.expires,
@@ -218,7 +213,7 @@ function Shell({
   hint,
   children,
 }: {
-  tone: "valid" | "invalid" | "expired" | "revoked";
+  tone: "valid" | "invalid" | "pending" | "expired" | "revoked";
   title: string;
   body: string;
   /** What to scan to reach this page. Cards and letters are different documents, so it is a prop
@@ -236,6 +231,11 @@ function Shell({
       ring: "border-eavi-destructive",
       badge: "bg-eavi-danger-soft text-eavi-destructive",
       mark: "✕",
+    },
+    pending: {
+      ring: "border-eavi-warn-text",
+      badge: "bg-eavi-warn-soft text-eavi-warn-text",
+      mark: "!",
     },
     expired: {
       ring: "border-eavi-border",

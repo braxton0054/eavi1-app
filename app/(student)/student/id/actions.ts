@@ -11,7 +11,9 @@ import { getStudentCard } from "@/lib/dal/student-portal";
  */
 export async function downloadCardPng(side: "front" | "back") {
   const { student, card } = await getStudentCard();
-  if (!card) return { ok: false as const, error: "no-card" as const };
+  if (!card || card.status !== "ISSUED" || card.issuedAt === null) {
+    return { ok: false as const, error: "no-card" as const };
+  }
 
   const face = await getCardFace(card.id, student.campusId);
   if (!face) return { ok: false as const, error: "no-face" as const };

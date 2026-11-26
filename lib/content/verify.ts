@@ -12,6 +12,7 @@ export const verify = {
     valid: "Verified student",
     invalid: "Not a valid card",
     expired: "Card has expired",
+    pending: "Card has not been issued",
     revoked: "Card is no longer valid",
   },
   intro:
@@ -31,6 +32,10 @@ export const verify = {
     "No card in the institute's records matches this code. It may be forged, mistyped, or from another institution.",
   expiredBody:
     "The student's enrolment on this card's programme has ended, so the card is no longer proof of enrolment.",
+  pendingBody:
+    "This card exists in the register but has not been issued yet. It must not be accepted as proof of enrolment.",
+  notEnrolledBody:
+    "The institute has no active enrolment for this student, so this card is not current proof of enrolment.",
   revokedBody:
     "This card was reported lost, replaced, or withdrawn and must not be accepted.",
   footer: "East Africa Vision Institute · Eldoret, Kenya",

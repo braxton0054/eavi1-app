@@ -2,12 +2,15 @@
 
 import { EnrollmentStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
+import { touchDocument } from "@/lib/documents/service";
+import { createIssuedCard } from "@/lib/cards/issue";
 import { requireCollegeAdmin } from "@/lib/session";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
 import {
   FieldError,
   enumField,
   hiddenId,
+  nextCardSerial,
   nextInvoiceNumbers,
   onSave,
   requiredText,
@@ -50,9 +53,16 @@ export async function createEnrollment(formData: FormData) {
         archivedAt: null,
         ...(scope.campusId === null ? {} : { campuses: { some: { id: scope.campusId } } }),
       },
-      select: { id: true },
+      select: { id: true, durationMonths: true },
     });
     if (!program) throw new FieldError(fieldErrors.notOnCampus);
+
+    const existingCard = await prisma.idCard.findFirst({
+      where: { studentId },
+      select: { id: true },
+    });
+    const cardSerial = existingCard ? null : await nextCardSerial();
+    let createdCardId: string | null = null;
 
     if (intakeId) {
       const period = await prisma.academicPeriod.findUnique({
@@ -120,7 +130,22 @@ export async function createEnrollment(formData: FormData) {
         studentId,
         programId,
       });
+
+      if (cardSerial) {
+        const card = await createIssuedCard(tx, {
+          serial: cardSerial,
+          studentId,
+          campusId,
+          programId,
+          startedAt: intake.startsAt,
+          durationMonths: program.durationMonths,
+          remarks: pages.cards.create.autoRemark,
+        });
+        createdCardId = card.id;
+      }
     });
+
+    if (createdCardId) await touchDocument("ID_CARD", createdCardId);
   });
 }
 

@@ -3,7 +3,8 @@
 import { EnrollmentStatus, Role, Status } from "@/generated/prisma/enums";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { touchStudent } from "@/lib/documents/service";
+import { touchDocument, touchStudent } from "@/lib/documents/service";
+import { createIssuedCard } from "@/lib/cards/issue";
 import { requireCollegeAdmin } from "@/lib/session";
 import { genderValues } from "@/lib/content/apply";
 import { fieldErrors, pages } from "@/lib/content/dashboard";
@@ -17,6 +18,7 @@ import {
   hiddenId,
   enumField,
   nextAdmissionNo,
+  nextCardSerial,
   onSave,
   passwordField,
   phoneField,
@@ -77,18 +79,21 @@ export async function createStudent(formData: FormData) {
     const programId = requiredText(formData, "programId", fieldLabel("programId"));
     const program = await prisma.program.findFirst({
       where: { id: programId, campuses: { some: { id: campusId } } },
-      select: { id: true },
+      select: { id: true, durationMonths: true },
     });
     if (!program) throw new FieldError(fieldErrors.notOnCampus);
 
     const intakeId = text(formData, "intakeId");
-    if (intakeId) {
-      const intake = await prisma.academicPeriod.findUnique({
-        where: { id: intakeId },
-        select: { id: true },
-      });
-      if (!intake) throw new FieldError(fieldErrors.choice(fieldLabel("intakeId")));
-    }
+    const intake = intakeId
+      ? await prisma.academicPeriod.findUnique({
+          where: { id: intakeId },
+          select: { id: true, startsAt: true },
+        })
+      : await prisma.academicPeriod.findFirst({
+          orderBy: { startsAt: "asc" },
+          select: { id: true, startsAt: true },
+        });
+    if (intakeId && !intake) throw new FieldError(fieldErrors.choice(fieldLabel("intakeId")));
 
     const admissionNo = text(formData, "admissionNo");
     const genderRaw = text(formData, "gender");
@@ -103,6 +108,8 @@ export async function createStudent(formData: FormData) {
     // The blank-number case queries for a free code before the write begins.
     const issuedAdmissionNo = admissionNo ?? (await nextAdmissionNo());
     const passwordHash = await hashPassword(password);
+    const cardSerial = programId ? await nextCardSerial() : null;
+    let createdCardId: string | null = null;
 
     await prisma.$transaction(async (tx) => {
       const user = await unique(fieldLabel("email"), () =>
@@ -138,31 +145,34 @@ export async function createStudent(formData: FormData) {
         }),
       );
 
-      if (programId) {
+      if (programId && intake && cardSerial) {
         // A register entry without a chosen cohort joins the earliest college-wide period,
         // so every enrolment counts its semesters from a real intake date.
-        const intake =
-          intakeId ??
-          (
-            await prisma.academicPeriod.findFirst({
-              orderBy: { startsAt: "asc" },
-              select: { id: true },
-            })
-          )?.id ??
-          null;
-
         await tx.enrollment.create({
           data: {
             studentId: profile.id,
             programId,
-            periodId: intake!,
+            periodId: intake.id,
             campusId,
             yearIndex: 1,
             semesterNo: 1,
             status: EnrollmentStatus.ACTIVE,
           },
         });
+
+        const card = await createIssuedCard(tx, {
+          serial: cardSerial,
+          studentId: profile.id,
+          campusId,
+          programId,
+          startedAt: intake.startsAt,
+          durationMonths: program.durationMonths,
+          remarks: pages.cards.create.autoRemark,
+        });
+        createdCardId = card.id;
       }
     });
+
+    if (createdCardId) await touchDocument("ID_CARD", createdCardId);
   });
 }

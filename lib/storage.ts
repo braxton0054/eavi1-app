@@ -86,13 +86,23 @@ export async function uploadPrivateFile(key: string, body: Buffer, contentType: 
 }
 
 /** Streams an object back for a server-side download. The browser never sees the bucket URL. */
-export async function readFile(key: string) {
-  const response = await client().send(
-    new GetObjectCommand({ Bucket: apiBucket(), Key: key }),
-  );
-  if (!response.Body) return null;
-  const bytes = await response.Body.transformToByteArray();
-  return { bytes: Buffer.from(bytes), contentType: response.ContentType ?? "application/octet-stream" };
+export async function readFile(key: string, timeoutMs?: number) {
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const response = await client().send(
+      new GetObjectCommand({ Bucket: apiBucket(), Key: key }),
+      controller ? { abortSignal: controller.signal } : undefined,
+    );
+    if (!response.Body) return null;
+    const bytes = await response.Body.transformToByteArray();
+    return { bytes: Buffer.from(bytes), contentType: response.ContentType ?? "application/octet-stream" };
+  } catch (error) {
+    if (controller?.signal.aborted) return null;
+    throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /**

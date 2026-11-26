@@ -256,10 +256,10 @@ export async function getCardCandidates(
 /**
  * Builds the printable cards for a run.
  *
- * A card that has never been requested is created here, at the moment of the print run,
- * rather than silently at enrolment: the office decides when a card exists, and a serial is
- * a thing you give someone, not a side effect. An existing card is reused so a reprinted
- * card keeps its serial and its verification token.
+ * Cards are issued digitally at enrolment. This repair path creates an issued card only for
+ * an older imported student who has no card row, so a print run never leaves an enrolled
+ * student without an identity record. Existing cards are reused so reprints keep their serial
+ * and verification token.
  */
 export async function buildPrintableCards(target: CardTarget, campusId: number | null) {
   const candidates = await getCardCandidates(target, campusId);
@@ -339,7 +339,8 @@ export async function buildPrintableCards(target: CardTarget, campusId: number |
         studentId: candidate.studentId,
         campusId: campusId ?? candidate.campusId,
         programId: enrollment?.programId ?? null,
-        status: "PENDING" as const,
+        status: "ISSUED" as const,
+        issuedAt: new Date(),
         expiresAt: enrollment
           ? expiryForProgram(enrollment.period.startsAt, enrollment.program.durationMonths)
           : null,

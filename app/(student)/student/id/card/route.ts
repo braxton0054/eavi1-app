@@ -8,7 +8,9 @@ export const dynamic = "force-dynamic";
 /** The signed-in student's saved card, inline for viewing and `?download` for a copy. */
 export async function GET(request: Request) {
   const { card } = await getStudentCard();
-  if (!card) return new Response("No card has been issued yet.", { status: 404 });
+  if (!card || card.status !== "ISSUED" || card.issuedAt === null) {
+    return new Response("No issued card is available.", { status: 404 });
+  }
   const document = await ensureDocument("ID_CARD", card.id);
   if (!document) return new Response("Card not available", { status: 404 });
   return pdfResponse(request, await documentPdf(document), `id-card-${card.serial}`);

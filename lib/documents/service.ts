@@ -124,7 +124,7 @@ export async function documentPdf(row: {
   snapshot: unknown;
 }): Promise<Buffer> {
   if (row.storageUrl) {
-    const stored = await readFile(keyFromUrl(row.storageUrl));
+    const stored = await readFile(keyFromUrl(row.storageUrl), 4_000);
     if (stored) return stored.bytes;
   }
   const definition = DEFINITIONS[row.kind];
