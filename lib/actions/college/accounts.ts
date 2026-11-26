@@ -143,6 +143,7 @@ export async function createInvoice(formData: FormData) {
 
     const number = await nextInvoiceNumber();
     const invoiceId = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${studentId}, 0))`;
       const invoice = await unique(invoiceLabel, () =>
         tx.invoice.create({
           data: {

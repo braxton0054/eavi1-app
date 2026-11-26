@@ -983,11 +983,11 @@ model Invoice {
   programId        String?
   /// Set on a bill generated from a programme's fee plan. Null on a manually raised bill.
   enrollmentId     String?
-  enrollment       Enrollment?     @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  enrollment       Enrollment?     @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
   feePlanId        String?
-  feePlan          ProgramFeePlan? @relation(fields: [feePlanId], references: [id], onDelete: SetNull)
+  feePlan          ProgramFeePlan? @relation(fields: [feePlanId], references: [id], onDelete: Restrict)
   feePeriodId      String?
-  feePeriod        FeeItem?        @relation("FeePeriodInvoices", fields: [feePeriodId], references: [id], onDelete: SetNull)
+  feePeriod        FeeItem?        @relation("FeePeriodInvoices", fields: [feePeriodId], references: [id], onDelete: Restrict)
   /// Which academic year and semester of the student's programme this period belongs to.
   periodYear       Int?
   periodSemester   Int?

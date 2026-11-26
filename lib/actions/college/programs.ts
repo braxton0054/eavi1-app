@@ -23,6 +23,7 @@ import {
   unique,
 } from "@/lib/actions/college/_shared";
 import { archiveRefusal, deletionRefusal, lifecycleCounts } from "@/lib/academics/lifecycle";
+import { fromCents, MAX_MONEY_CENTS, parseFeeAmount } from "@/lib/fees/money";
 import type { Field } from "@/lib/content/dashboard";
 
 const GRADES = Object.keys(EntryGrade) as (keyof typeof EntryGrade)[];
@@ -326,8 +327,10 @@ export async function saveProgramFeePlan(formData: FormData) {
     if (amounts.length !== labels.length) throw new FieldError(copy.feePlan.noPeriods);
 
     const periods = labels.map((label, index) => {
-      const amount = Number(String(amounts[index] ?? "").replace(/,/g, ""));
-      if (!Number.isFinite(amount) || amount < 0) {
+      let amountCents: number;
+      try {
+        amountCents = parseFeeAmount(amounts[index] ?? "");
+      } catch {
         throw new FieldError(fieldErrors.number(`${label} ${copy.feePlan.amount}`));
       }
       const yearIndex = Number(years[index]);
@@ -336,15 +339,16 @@ export async function saveProgramFeePlan(formData: FormData) {
 
       return {
         label: label || copy.feePlan.periodFallback(index + 1),
-        amount,
+        amountCents,
         yearIndex: Number.isFinite(yearIndex) && yearIndex > 0 ? Math.round(yearIndex) : null,
         semesterNo: Number.isFinite(semesterNo) && semesterNo > 0 ? Math.round(semesterNo) : null,
         dueOffsetDays: Number.isFinite(offset) && offset > 0 ? Math.round(offset) : 0,
       };
     });
 
-    const total = periods.reduce((sum, period) => sum + period.amount, 0);
-    if (total <= 0) throw new FieldError(copy.feePlan.zeroTotal);
+    const totalCents = periods.reduce((sum, period) => sum + period.amountCents, 0);
+    if (totalCents <= 0) throw new FieldError(copy.feePlan.zeroTotal);
+    if (totalCents > MAX_MONEY_CENTS) throw new FieldError(fieldErrors.number(copy.feePlan.total));
 
     await prisma.$transaction(async (tx) => {
       const last = await tx.programFeePlan.findFirst({
@@ -367,7 +371,7 @@ export async function saveProgramFeePlan(formData: FormData) {
           version,
           cadenceId: cadence.id,
           durationMonths: Math.round(durationMonths),
-          totalAmount: total,
+          totalAmount: fromCents(totalCents),
           note: text(formData, "note"),
           isActive: true,
         },
@@ -380,7 +384,7 @@ export async function saveProgramFeePlan(formData: FormData) {
           planId: plan.id,
           sequence: index + 1,
           label: period.label,
-          amount: period.amount,
+          amount: fromCents(period.amountCents),
           yearIndex: period.yearIndex,
           semesterNo: period.semesterNo,
           dueOffsetDays: period.dueOffsetDays,

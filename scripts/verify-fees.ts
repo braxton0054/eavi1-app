@@ -15,7 +15,7 @@ import { prisma } from "@/lib/prisma";
 import { planPaymentAllocation } from "@/lib/fees/allocation";
 import { correctReceipt, creditInvoice, unvoidInvoice, voidInvoiceWithReason } from "@/lib/fees/corrections";
 import { invoicePosition, sumAmounts } from "@/lib/fees/ledger";
-import { fromCents, parsePaymentAmount, sumAmountCents, toCents } from "@/lib/fees/money";
+import { fromCents, parseFeeAmount, parsePaymentAmount, sumAmountCents, toCents } from "@/lib/fees/money";
 import { addMonths, generatePeriods, type FeeKind } from "@/lib/fees/periods";
 import { FinanceError, recordReceipt } from "@/lib/fees/receipts";
 import { generateFeeSchedule } from "@/lib/fees/schedule";
@@ -451,6 +451,10 @@ async function main() {
   };
   check("0.004 is rejected rather than rounded", rejectsAmount("0.004"));
   check("0.006 is rejected rather than rounded", rejectsAmount("0.006"));
+  check("fee-plan amounts also reject fractional cents", (() => {
+    try { parseFeeAmount("0.004"); return false; } catch { return true; }
+  })());
+  check("a zero fee period stays exact while the plan total is validated separately", parseFeeAmount("0") === 0);
   check("0.04 remains exactly four cents", parsePaymentAmount("0.04") === 4 && fromCents(4) === "0.04");
   const overpay = planPaymentAllocation([planInvoice("three-cents", 3, "2027-01-01")], 4);
   check("one cent above the debt is an overpay", !overpay.ok && overpay.reason === "overpay", JSON.stringify(overpay));
@@ -1036,6 +1040,22 @@ async function main() {
       (await prisma.invoice.count({ where: { id: reversal.invoice.id } })) === 1,
     invoiceDeleteError instanceof Error ? invoiceDeleteError.message : String(invoiceDeleteError),
   );
+
+  const generatedInvoice = aInvoices[0];
+  const provenanceDeletes: Array<[string, () => Promise<unknown>]> = [
+    ["enrolment", () => prisma.enrollment.delete({ where: { id: generatedInvoice.enrollmentId! } })],
+    ["fee plan", () => prisma.programFeePlan.delete({ where: { id: generatedInvoice.feePlanId! } })],
+    ["fee period", () => prisma.feeItem.delete({ where: { id: generatedInvoice.feePeriodId! } })],
+  ];
+  for (const [label, remove] of provenanceDeletes) {
+    let error: unknown = null;
+    try { await remove(); } catch (cause) { error = cause; }
+    check(
+      `billing provenance rejects deleting the ${label} while an invoice exists`,
+      isForeignKeyViolation(error) && (await prisma.invoice.count({ where: { id: generatedInvoice.id } })) === 1,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 
   const credit = await paidCorrectionFixture("credit", 10_000);
   const creditBefore = await prisma.invoice.findUniqueOrThrow({

@@ -66,7 +66,7 @@ export async function getStudentEnrolment() {
   const student = await requireStudent();
 
   const enrollment = await prisma.enrollment.findFirst({
-    where: { studentId: student.studentId },
+    where: { studentId: student.studentId, campusId: student.campusId },
     orderBy: { enrolledAt: "desc" },
     include: {
       program: { select: { name: true, code: true, durationMonths: true } },
@@ -128,7 +128,7 @@ export async function getStudentOverview() {
       },
     }),
     prisma.invoice.findMany({
-      where: { studentId: student.studentId, status: { not: "VOID" } },
+      where: { studentId: student.studentId, campusId: student.campusId, status: { not: "VOID" } },
       select: {
         status: true,
         dueAt: true,
@@ -294,7 +294,7 @@ export async function getStudentFees() {
   const { student, enrollment } = await getStudentEnrolment();
 
   const invoices = await prisma.invoice.findMany({
-    where: { studentId: student.studentId, status: { not: "VOID" } },
+    where: { studentId: student.studentId, campusId: student.campusId, status: { not: "VOID" } },
     orderBy: [{ periodYear: "asc" }, { periodSemester: "asc" }, { dueAt: "asc" }],
     select: {
       id: true,

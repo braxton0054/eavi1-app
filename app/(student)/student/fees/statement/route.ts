@@ -30,12 +30,12 @@ export async function GET(request: Request) {
       select: FEE_DOCUMENT_STUDENT,
     }),
     prisma.invoice.findMany({
-      where: { studentId: scope.studentId },
+      where: { studentId: scope.studentId, campusId: scope.campusId },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       select: STATEMENT_INVOICE_SELECT,
     }),
     prisma.payment.findMany({
-      where: { studentId: scope.studentId },
+      where: { studentId: scope.studentId, invoice: { campusId: scope.campusId } },
       orderBy: [{ paidAt: "asc" }, { id: "asc" }],
       select: STATEMENT_PAYMENT_SELECT,
     }),

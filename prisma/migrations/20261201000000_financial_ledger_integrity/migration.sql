@@ -33,6 +33,13 @@ SELECT setval('credit_note_number_seq', 1, false);
 DO $$
 DECLARE collisions integer;
 BEGIN
+  SELECT COUNT(*) INTO collisions
+  FROM "payments" p JOIN "invoices" i ON i."id" = p."invoiceId"
+  WHERE p."studentId" <> i."studentId";
+  IF collisions > 0 THEN
+    RAISE EXCEPTION 'Financial migration paused: % legacy payment(s) belong to a different student than their invoice. Reconcile ownership before deploying.', collisions;
+  END IF;
+
   SELECT COUNT(*) INTO collisions FROM (
     SELECT upper(p."receiptNo")
     FROM "payments" p JOIN "invoices" i ON i."id" = p."invoiceId"
@@ -260,6 +267,17 @@ SET "providerReferenceNormalized" = NULLIF(upper(regexp_replace("reference", '[^
 WHERE "method" = 'MPESA' AND "reference" IS NOT NULL;
 CREATE UNIQUE INDEX "receipts_providerReferenceNormalized_key"
   ON "receipts" ("providerReferenceNormalized");
+
+-- Billing provenance is part of the duplicate-billing guard and must never be nulled away.
+ALTER TABLE "invoices" DROP CONSTRAINT IF EXISTS "invoices_enrollmentId_fkey";
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_enrollmentId_fkey"
+  FOREIGN KEY ("enrollmentId") REFERENCES "enrollments"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "invoices" DROP CONSTRAINT IF EXISTS "invoices_feePlanId_fkey";
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_feePlanId_fkey"
+  FOREIGN KEY ("feePlanId") REFERENCES "program_fee_plans"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "invoices" DROP CONSTRAINT IF EXISTS "invoices_feePeriodId_fkey";
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_feePeriodId_fkey"
+  FOREIGN KEY ("feePeriodId") REFERENCES "fee_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- Posted money is never removed by deleting an invoice or student.
 ALTER TABLE "payments" DROP CONSTRAINT IF EXISTS "payments_invoiceId_fkey";

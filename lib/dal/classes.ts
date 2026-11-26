@@ -157,6 +157,7 @@ export async function getClassMembers(classId: string): Promise<ClassMember[]> {
         select: {
           id: true,
           studentId: true,
+          campusId: true,
           yearIndex: true,
           semesterNo: true,
           status: true,
@@ -171,6 +172,7 @@ export async function getClassMembers(classId: string): Promise<ClassMember[]> {
           },
           invoices: {
             select: {
+              campusId: true,
               status: true,
               lines: { select: { amount: true } },
               payments: { select: { amount: true } },
@@ -184,7 +186,7 @@ export async function getClassMembers(classId: string): Promise<ClassMember[]> {
   return rows.map(({ joinedAt, enrollment }) => {
     // Every nonvoid invoice contributes its exact positive balance, whatever its stored status.
     const owesCents = enrollment.invoices.reduce((total, invoice) => {
-      if (invoice.status === "VOID") return total;
+      if (invoice.campusId !== enrollment.campusId || invoice.status === "VOID") return total;
       return total + invoicePosition(invoice.lines, invoice.payments).outstandingCents;
     }, 0);
     const owes = owesCents / 100;

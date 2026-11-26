@@ -396,7 +396,7 @@ async function studentsFor(campusId: number | null, query: ListQuery) {
     prisma.studentProfile.count({ where }),
   ]);
 
-  const balances = await feeBalances(rows.map((row) => row.id));
+  const balances = await feeBalances(rows.map((row) => ({ id: row.id, campusId: row.campusId })));
 
   return {
     page,
@@ -419,11 +419,13 @@ function studentInclude() {
 }
 
 /** Signed billed-minus-paid balance in exact cents, per student. */
-async function feeBalances(studentIds: string[]) {
+async function feeBalances(students: Array<{ id: string; campusId: number }>) {
+  const campusByStudent = new Map(students.map((student) => [student.id, student.campusId]));
   const invoices = await prisma.invoice.findMany({
-    where: { studentId: { in: studentIds }, status: { not: "VOID" } },
+    where: { studentId: { in: students.map((student) => student.id) }, status: { not: "VOID" } },
     select: {
       studentId: true,
+      campusId: true,
       lines: { select: { amount: true } },
       payments: { select: { amount: true } },
     },
@@ -431,6 +433,7 @@ async function feeBalances(studentIds: string[]) {
 
   const totals = new Map<string, number>();
   for (const invoice of invoices) {
+    if (invoice.campusId !== campusByStudent.get(invoice.studentId)) continue;
     const { balanceCents } = invoicePosition(invoice.lines, invoice.payments);
     totals.set(invoice.studentId, (totals.get(invoice.studentId) ?? 0) + balanceCents);
   }
@@ -508,7 +511,7 @@ export async function getStudent(id: string) {
   });
 
   if (!row) throw new Error("not_found");
-  return row;
+  return { ...row, invoices: row.invoices.filter((invoice) => invoice.campusId === row.campusId) };
 }
 
 /* -------------------------------------------------------------- applications */

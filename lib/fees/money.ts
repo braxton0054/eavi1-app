@@ -29,6 +29,17 @@ export function sumAmountCents(rows: Array<{ amount: unknown }>): number {
   }, 0);
 }
 
+/** Fee-plan input is exact decimal money; an individual period may be zero. */
+export function parseFeeAmount(raw: string): number {
+  const value = raw.trim().replace(/,/g, "");
+  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) {
+    throw new Error("Enter an amount with no more than two decimal places.");
+  }
+  const cents = toCents(value);
+  if (cents > MAX_MONEY_CENTS) throw new Error("Money is outside the supported range.");
+  return cents;
+}
+
 /** Payment input is a plain decimal string with at most two fractional digits. */
 export function parsePaymentAmount(raw: string): number {
   const value = raw.trim();
