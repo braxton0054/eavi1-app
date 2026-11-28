@@ -101,6 +101,12 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      # Application-letter delivery. Both are best effort after the letter is committed.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      OPENWA_API_URL: http://openwa:2785
+      OPENWA_API_KEY: ${OPENWA_API_KEY:-}
+      OPENWA_SESSION_NAME: ${OPENWA_SESSION_NAME:-eavi-admissions}
     ports:
       - "127.0.0.1:${APP_PORT:-3000}:3000"
     depends_on:
@@ -108,6 +114,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      openwa:
+        condition: service_started
     healthcheck:
       test:
         - CMD
@@ -118,6 +126,26 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+  # WhatsApp delivery for application letters. One API process, one linked session, no
+  # separate dashboard: pairing is driven from EAVI's super-admin screen. The container
+  # listens on 2785 and is published on its own host port so other OpenWA stacks are untouched.
+  openwa:
+    image: rmyndharis/openwa:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 2785
+      SERVE_DASHBOARD: "false"
+      API_MASTER_KEY: ${OPENWA_API_KEY:?set OPENWA_API_KEY in .env}
+      ENGINE_TYPE: ${OPENWA_ENGINE_TYPE:-whatsapp-web.js}
+      AUTO_START_SESSIONS: "true"
+      CORS_ORIGINS: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+    volumes:
+      - openwa-data:/app/data
+    ports:
+      - "127.0.0.1:${OPENWA_PORT:-2786}:2785"
+    stop_grace_period: 90s
 
   # Consumes the queues: card batch PDFs and the chat attachment sweep. The same image as
   # the app, a different entry point. It must exist in production — without it, queued card
@@ -153,3 +181,4 @@ services:
 volumes:
   db-data:
   redis-data:
+  openwa-data:

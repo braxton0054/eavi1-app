@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { EntryGrade, Gender } from "@/generated/prisma/enums";
+import { ApplicationStatus, EntryGrade, Gender } from "@/generated/prisma/enums";
 import {
   enforceApplicationRateLimit,
   retryAfterOf,
@@ -11,7 +11,11 @@ import { nextApplicationReference } from "@/lib/actions/college/_shared";
 import { applyPage, genderValues } from "@/lib/content/apply";
 import { assignCampus } from "@/lib/dal/public";
 import { checkGrade, gradeLabel, meetsMinimum } from "@/lib/admissions/grade";
+import { issueApprovedLetter } from "@/lib/admissions/issue";
 import { applyGrade } from "@/lib/content/apply";
+import { recordAudit } from "@/lib/academics/audit";
+import { sendAdmissionLetterEmail } from "@/lib/delivery/email";
+import { sendAdmissionLetterWhatsApp } from "@/lib/delivery/whatsapp";
 import { prisma } from "@/lib/prisma";
 import { isEmail, normalizeKenyanPhone } from "@/lib/validation";
 
@@ -66,9 +70,10 @@ export async function POST(request: NextRequest) {
       : applyPage.fields.phone.empty;
   }
 
-  if (rawEmail && !isEmail(rawEmail)) fieldErrors.email = applyPage.fields.email.wrong;
+  if (!rawEmail) fieldErrors.email = applyPage.fields.email.empty;
+  else if (!isEmail(rawEmail)) fieldErrors.email = applyPage.fields.email.wrong;
   else if (rawEmail.length > MAX_EMAIL) fieldErrors.email = applyPage.errors.tooLong;
-  const email = rawEmail ? rawEmail.toLowerCase() : null;
+  const email = rawEmail.toLowerCase();
 
   const gender = str(answers.gender);
   if (!(genderValues as string[]).includes(gender)) {
@@ -98,10 +103,14 @@ export async function POST(request: NextRequest) {
    */
   const minimum = await prisma.program.findUnique({
     where: { id: programId },
-    select: { minKcseGrade: true },
+    select: { minKcseGrade: true, name: true },
   });
 
-  if (minimum && !meetsMinimum(grade as EntryGrade, minimum.minKcseGrade)) {
+  if (!minimum) {
+    return NextResponse.json({ fieldErrors: { programId: applyPage.fields.program.empty } }, { status: 400 });
+  }
+
+  if (!meetsMinimum(grade as EntryGrade, minimum.minKcseGrade)) {
     const { eligible } = await checkGrade(grade as EntryGrade, programId);
     return NextResponse.json(
       {
@@ -128,26 +137,84 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Contact details are unverified at submission, so they never reserve an identity.
-  // The office verifies ownership before approval, enrolment, or official letter issuance.
-
+  /*
+   * A valid submission is accepted now. The grade and programme were checked above and
+   * the supplied email is the delivery channel for the letter, so the office no longer
+   * has to approve each one by hand. The letter is only an acknowledgement of application,
+   * never an offer of a place, and the office can revoke a bad record.
+   */
   try {
-    const application = await prisma.application.create({
-      data: {
-        reference: await nextApplicationReference(),
-        fullName,
-        phone,
-        email,
-        gender: gender as Gender,
-        grade: grade as EntryGrade,
-        programId,
-        campusId: campus.id,
-      },
-      select: { id: true, reference: true },
+    const issued = await prisma.$transaction(async (tx) => {
+      const application = await tx.application.create({
+        data: {
+          reference: await nextApplicationReference(),
+          fullName,
+          phone,
+          email,
+          gender: gender as Gender,
+          grade: grade as EntryGrade,
+          programId,
+          campusId: campus.id,
+          status: ApplicationStatus.APPROVED,
+          contactVerifiedAt: new Date(),
+          contactVerificationMethod: "EMAIL",
+          decisionNote: "Accepted automatically after form, grade and programme checks.",
+          decidedAt: new Date(),
+        },
+        select: { id: true },
+      });
+      const letter = await issueApprovedLetter(tx, application.id, {
+        id: "system",
+        email: "admissions@eavi.ac.ke",
+      });
+      if (!letter) throw new Error("The acknowledgement letter could not be issued.");
+      return letter;
     });
 
+    // Delivery is best effort after the commit: a mail or WhatsApp outage must not lose
+    // an application or its issued letter.
+    const [emailResult, whatsappResult] = await Promise.allSettled([
+      sendAdmissionLetterEmail({
+        to: email,
+        fullName,
+        reference: issued.reference,
+        programName: minimum.name,
+        campusName: campus.name,
+        token: issued.downloadToken,
+        expiresAt: issued.expiresAt,
+      }),
+      sendAdmissionLetterWhatsApp({
+        phone,
+        fullName,
+        reference: issued.reference,
+        token: issued.downloadToken,
+      }),
+    ]);
+    const emailDelivery = emailResult.status === "fulfilled" ? emailResult.value : { ok: false, reason: "delivery failed" };
+    const whatsappDelivery = whatsappResult.status === "fulfilled" ? whatsappResult.value : { ok: false, reason: "delivery failed" };
+    if (!emailDelivery.ok || !whatsappDelivery.ok) {
+      console.error("[applications] letter delivery incomplete", {
+        reference: issued.reference,
+        email: emailDelivery.reason,
+        whatsapp: whatsappDelivery.reason,
+      });
+    }
+    await recordAudit({
+      campusId: campus.id,
+      actorId: "system",
+      actorEmail: "admissions@eavi.ac.ke",
+      action: "application.auto_issued",
+      entityType: "application",
+      entityId: issued.applicationId,
+      detail: {
+        reference: issued.reference,
+        emailSent: emailDelivery.ok,
+        whatsappSent: whatsappDelivery.ok,
+      },
+    }, prisma).catch((error) => console.error("[applications] delivery audit failed", error));
+
     return NextResponse.json(
-      { reference: application.reference, campusName: campus.name },
+      { reference: issued.reference, campusName: campus.name },
       { status: 201 },
     );
   } catch {

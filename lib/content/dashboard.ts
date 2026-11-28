@@ -177,6 +177,7 @@ export const superNavGroups: NavGroup[] = [
       { href: "/dashboard", label: "College overview", icon: "overview" },
       { href: "/dashboard/campuses", label: "Campuses", icon: "programs" },
       { href: "/dashboard/staff", label: "Staff approvals", icon: "tutors" },
+      { href: "/dashboard/integrations/whatsapp", label: "WhatsApp setup", icon: "communication" },
       { href: "/dashboard/jobs", label: "Background jobs", icon: "jobs" },
       { href: "/dashboard/profile", label: shell.account.profile, icon: "profile" },
     ],

@@ -162,9 +162,10 @@ async function main() {
   const publicReference = typeof publicBody.reference === "string" ? publicBody.reference : null;
   const publicRow = publicReference ? await prisma.application.findUnique({
     where: { reference: publicReference },
-    select: { id: true, offerLetter: { select: { id: true } } },
+    select: { id: true, status: true, offerLetter: { select: { id: true } } },
   }) : null;
-  check("public submission never creates an official letter", publicRow?.offerLetter === null);
+  check("a valid public submission is accepted automatically", publicRow?.status === "APPROVED");
+  check("a valid public submission receives an acknowledgement letter", publicRow?.offerLetter !== null);
   if (publicRow) await prisma.application.delete({ where: { id: publicRow.id } });
 
   console.log("A4/A6 session status and temporary passwords");

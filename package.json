@@ -16,6 +16,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "verify:fees": "tsx scripts/verify-fees.ts",
+    "verify:delivery": "tsx scripts/verify-delivery.ts",
     "verify:fee-docs": "tsx scripts/verify-fee-docs.ts",
     "verify:programs": "tsx scripts/verify-programs.ts",
     "verify:progression": "tsx scripts/verify-progression.ts",

@@ -13,6 +13,9 @@ export type IssuedLetter = {
   applicationId: string;
   reference: string;
   verifyToken: string;
+  /** Plaintext private download capability, returned once and never stored. */
+  downloadToken: string;
+  expiresAt: Date;
 };
 
 /**
@@ -67,7 +70,7 @@ export async function issueApprovedLetter(
     update: snapshot,
   });
 
-  return { applicationId, reference: application.reference, verifyToken };
+  return { applicationId, reference: application.reference, verifyToken, downloadToken: privateToken, expiresAt };
 }
 
 /** Private PDF authority is separate from the public QR verification token. */

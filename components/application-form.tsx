@@ -227,7 +227,7 @@ export function ApplicationForm({ programs }: { programs: (Choice & { minGrade?:
                 <FieldError id="apply-phone-error">{errors.phone}</FieldError>
               </Field>
               <Field>
-                <FieldLabel htmlFor="apply-email">{copy.email.label} <span className="font-normal text-muted-foreground">({copy.email.optional})</span></FieldLabel>
+                <FieldLabel htmlFor="apply-email">{copy.email.label}</FieldLabel>
                 <Input id="apply-email" type="email" value={values.email} onChange={(e) => set("email", e.target.value)} placeholder={copy.email.placeholder} autoComplete="email" />
                 <FieldError id="apply-email-error">{errors.email}</FieldError>
               </Field>

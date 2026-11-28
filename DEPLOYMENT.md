@@ -5,7 +5,7 @@
 | File | Role |
 |---|---|
 | `Dockerfile` | `runner` target: the Next standalone server. `migrate` target: a one-off that applies pending Prisma migrations. |
-| `docker-compose.yml` | Postgres + `migrate` + `app` on one server. Reads settings from `.env` beside it. |
+| `docker-compose.yml` | Postgres + Redis + `migrate` + `app` + `openwa` on one server. Reads settings from `.env` beside it. |
 | `deploy.example.env` | Template for that `.env`. Copy it, fill it in, never commit it. |
 | `.github/workflows/ci.yml` | On every push/PR: `npm ci`, `prisma validate`, eslint, `tsc --noEmit`, `next build`, then builds both images. |
 | `.github/workflows/release.yml` | On push to `main`: publishes `ghcr.io/braxton0054/eavi1-app` (`latest`, `sha-…`) plus the `:migrate-<sha>` image. |
@@ -25,6 +25,27 @@ triggers only when CI concludes successfully for `main`, then:
 4. gates on `https://$PUBLIC_HOST/api/health` and prints the running commit.
 
 So shipping is: **push to `main` → CI → deploy.** Nothing to run by hand.
+
+## Application-letter delivery
+
+A valid public application is approved, issued an acknowledgement letter, and delivered
+without an office click:
+
+1. `RESEND_API_KEY` and `RESEND_FROM_EMAIL` send the private download link by email.
+2. The embedded `openwa` service sends the same link to the applicant's phone.
+3. A super admin opens **Administration → WhatsApp setup** and scans the QR once with
+   WhatsApp → Settings → Linked devices → Link a device. The QR refreshes itself until
+   the session is `ready`.
+
+OpenWA is part of this Compose stack, not a separate project on the VPS. It listens on
+container port `2785`, publishes on host port `OPENWA_PORT` (default `2786`), and runs with
+its own dashboard disabled (`SERVE_DASHBOARD=false`). Its state lives in the `openwa-data`
+volume. Set `OPENWA_API_KEY` to the same long random value in both the portal and gateway;
+without it the service cannot start. Use a different `OPENWA_PORT` from any other OpenWA
+instance already on the server.
+
+Delivery is best effort: if email or WhatsApp is unavailable, the application and its
+letter are still committed and an audit row records the failed channel.
 
 The image is built on the box rather than pulled from GHCR on purpose: the package is
 private, so pulling would need a token with `read:packages`.

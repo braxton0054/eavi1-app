@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 const PLACES_PER_CAMPUS = 5;
 
 /** A refused or withdrawn applicant gives their place back, so they do not count. */
-const TAKEN = [ApplicationStatus.SUBMITTED, ApplicationStatus.REVIEWING];
+const TAKEN = [ApplicationStatus.SUBMITTED, ApplicationStatus.REVIEWING, ApplicationStatus.APPROVED];
 
 export type ApplyOptions = {
   programs: { value: string; label: string; minGrade: string | null }[];

@@ -41,6 +41,7 @@ async function main() {
     );
     check("an approved, contact-verified application gets a letter", Boolean(issued?.verifyToken));
     check("re-issuing rotates the public token rather than duplicating the row", Boolean(issued && again && issued.verifyToken !== again.verifyToken));
+    check("the private download token authorizes the letter", Boolean(again && await letterForDownload(application.reference, again.downloadToken)));
 
     const office = await approvedLetterForOffice(application.id);
     check("the authenticated office can retrieve the approved letter", Boolean(office));
