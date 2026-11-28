@@ -144,7 +144,7 @@ services:
     volumes:
       - openwa-data:/app/data
     ports:
-      - "127.0.0.1:${OPENWA_PORT:-2786}:2785"
+      - "127.0.0.1:${OPENWA_PORT:-2787}:2785"
     stop_grace_period: 90s
 
   # Consumes the queues: card batch PDFs and the chat attachment sweep. The same image as

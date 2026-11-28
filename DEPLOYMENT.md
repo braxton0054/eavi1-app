@@ -38,7 +38,7 @@ without an office click:
    the session is `ready`.
 
 OpenWA is part of this Compose stack, not a separate project on the VPS. It listens on
-container port `2785`, publishes on host port `OPENWA_PORT` (default `2786`), and runs with
+container port `2785`, publishes on host port `OPENWA_PORT` (default `2787`), and runs with
 its own dashboard disabled (`SERVE_DASHBOARD=false`). Its state lives in the `openwa-data`
 volume. Set `OPENWA_API_KEY` to the same long random value in both the portal and gateway;
 without it the service cannot start. Use a different `OPENWA_PORT` from any other OpenWA

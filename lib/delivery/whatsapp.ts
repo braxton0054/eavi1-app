@@ -4,7 +4,7 @@
  * through its REST API and surfaced in our super-admin screen.
  *
  * Official project: github.com/rmyndharis/OpenWA. Its API and bundled UI share one
- * internal port (2785); our Compose file publishes that on a unique host port (2786).
+ * internal port (2785); our Compose file publishes that on a unique host port (2787).
  */
 
 import { site } from "@/lib/content/home";
