@@ -31,7 +31,8 @@ So shipping is: **push to `main` → CI → deploy.** Nothing to run by hand.
 A valid public application is approved, issued an acknowledgement letter, and delivered
 without an office click:
 
-1. `RESEND_API_KEY` and `RESEND_FROM_EMAIL` send the private download link by email.
+1. `RESEND_API_KEY` and `RESEND_FROM_EMAIL` send the private download link by email when
+   configured; otherwise the existing `MAIL_*` SMTP settings send the same letter.
 2. The embedded `openwa` service sends the same link to the applicant's phone.
 3. A super admin opens **Administration → WhatsApp setup** and scans the QR once with
    WhatsApp → Settings → Linked devices → Link a device. The QR refreshes itself until

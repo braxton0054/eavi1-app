@@ -1,10 +1,13 @@
 /**
  * Transactional email delivery for issued application letters.
  *
- * Resend is called only after the letter has been committed. A missing key or a failed
- * request never rolls back the application: the letter remains in the register and the
- * office can give the applicant the same link.
+ * Resend is preferred when a key is configured; otherwise the portal's existing SMTP
+ * settings (the MAIL_* values already used on the server) send the same message. Delivery
+ * runs only after the letter has been committed, so a mail outage never loses an
+ * application: the letter stays in the register and the office can give the link.
  */
+
+import nodemailer from "nodemailer";
 
 import { site } from "@/lib/content/home";
 
@@ -13,6 +16,17 @@ export type LetterDelivery = {
   skipped?: boolean;
   reason?: string;
   id?: string;
+  channel?: "resend" | "smtp";
+};
+
+export type AdmissionLetterEmail = {
+  to: string;
+  fullName: string;
+  reference: string;
+  programName: string;
+  campusName: string;
+  token: string;
+  expiresAt: Date;
 };
 
 const escapeHtml = (value: string) =>
@@ -24,27 +38,10 @@ const escapeHtml = (value: string) =>
     "'": "&#39;",
   })[character] ?? character);
 
-function letterUrl(reference: string, token: string) {
+function letterContent(input: AdmissionLetterEmail) {
   const origin = site.url.replace(/\/$/, "");
-  return `${origin}/letter/${encodeURIComponent(reference)}?t=${encodeURIComponent(token)}&format=pdf`;
-}
-
-export async function sendAdmissionLetterEmail(input: {
-  to: string;
-  fullName: string;
-  reference: string;
-  programName: string;
-  campusName: string;
-  token: string;
-  expiresAt: Date;
-}): Promise<LetterDelivery> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.RESEND_FROM_EMAIL?.trim();
-  if (!apiKey || !from) {
-    return { ok: false, skipped: true, reason: "Resend is not configured." };
-  }
-
-  const url = letterUrl(input.reference, input.token);
+  const url = `${origin}/letter/${encodeURIComponent(input.reference)}?t=${encodeURIComponent(input.token)}&format=pdf`;
+  const subject = `Your application acknowledgement — ${input.reference}`;
   const text = [
     `Hello ${input.fullName},`,
     "",
@@ -59,7 +56,6 @@ export async function sendAdmissionLetterEmail(input: {
     "",
     site.name,
   ].join("\n");
-
   const html = `<p>Hello ${escapeHtml(input.fullName)},</p>
 <p>Your application to <strong>${escapeHtml(input.programName)}</strong> at ${escapeHtml(input.campusName)} was received.</p>
 <p>Reference: <strong>${escapeHtml(input.reference)}</strong></p>
@@ -67,7 +63,14 @@ export async function sendAdmissionLetterEmail(input: {
 <p>This letter confirms that your application was received. It is not an offer of a place.</p>
 <p>The link expires on ${escapeHtml(input.expiresAt.toUTCString())}. Keep your reference safe.</p>
 <p>${escapeHtml(site.name)}</p>`;
+  return { subject, text, html };
+}
 
+async function sendViaResend(input: AdmissionLetterEmail): Promise<LetterDelivery> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  if (!apiKey || !from) return { ok: false, skipped: true, reason: "Resend is not configured." };
+  const { subject, text, html } = letterContent(input);
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -79,7 +82,7 @@ export async function sendAdmissionLetterEmail(input: {
       body: JSON.stringify({
         from,
         to: [input.to],
-        subject: `Your application acknowledgement — ${input.reference}`,
+        subject,
         text,
         html,
         tags: [{ name: "type", value: "application-letter" }],
@@ -88,11 +91,53 @@ export async function sendAdmissionLetterEmail(input: {
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
-      return { ok: false, reason: `Resend answered ${response.status}: ${detail.slice(0, 300)}` };
+      return { ok: false, channel: "resend", reason: `Resend answered ${response.status}: ${detail.slice(0, 300)}` };
     }
     const body = (await response.json().catch(() => ({}))) as { id?: string };
-    return { ok: true, id: body.id };
+    return { ok: true, channel: "resend", id: body.id };
   } catch (cause) {
-    return { ok: false, reason: cause instanceof Error ? cause.message : String(cause) };
+    return { ok: false, channel: "resend", reason: cause instanceof Error ? cause.message : String(cause) };
   }
+}
+
+async function sendViaSmtp(input: AdmissionLetterEmail): Promise<LetterDelivery> {
+  const host = process.env.MAIL_HOST?.trim();
+  const user = process.env.MAIL_USERNAME?.trim();
+  const password = process.env.MAIL_PASSWORD?.trim();
+  const fromAddress = process.env.MAIL_FROM_ADDRESS?.trim();
+  if (!host || !user || !password || !fromAddress) {
+    return { ok: false, skipped: true, reason: "SMTP is not configured." };
+  }
+  const port = Number(process.env.MAIL_PORT ?? 587);
+  const secure = process.env.MAIL_SECURE?.trim().toLowerCase() === "true" || port === 465;
+  const fromName = process.env.MAIL_FROM_NAME?.trim() || site.name;
+  const { subject, text, html } = letterContent(input);
+  try {
+    const transport = nodemailer.createTransport({
+      host,
+      port: Number.isFinite(port) ? port : 587,
+      secure,
+      auth: { user, pass: password },
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 15_000,
+    });
+    const result = await transport.sendMail({
+      from: `"${fromName.replace(/["<>]/g, "")}" <${fromAddress}>`,
+      to: input.to,
+      subject,
+      text,
+      html,
+      headers: { "X-EAVI-Letter": input.reference, "X-EAVI-Channel": "application-letter" },
+    });
+    return { ok: true, channel: "smtp", id: result.messageId };
+  } catch (cause) {
+    return { ok: false, channel: "smtp", reason: cause instanceof Error ? cause.message : String(cause) };
+  }
+}
+
+export async function sendAdmissionLetterEmail(input: AdmissionLetterEmail): Promise<LetterDelivery> {
+  const resend = await sendViaResend(input);
+  if (!resend.skipped) return resend;
+  return sendViaSmtp(input);
 }
